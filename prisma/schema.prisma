@@ -1,0 +1,311 @@
+// SPAC OS Database Schema
+// PostgreSQL with Prisma ORM
+// Sprint 1 - Core Models
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum SpacStatus {
+  PRE_IPO
+  SEARCHING
+  LOI_SIGNED
+  DEFINITIVE_AGREEMENT
+  VOTE_PENDING
+  DE_SPAC_COMPLETE
+  LIQUIDATED
+}
+
+enum TargetStatus {
+  IDENTIFIED
+  INITIAL_OUTREACH
+  NDA_SIGNED
+  DUE_DILIGENCE
+  LOI_SUBMITTED
+  NEGOTIATION
+  REJECTED
+  CLOSED_WON
+}
+
+enum DocumentType {
+  NDA
+  LOI
+  DEFINITIVE_AGREEMENT
+  FINANCIAL_STATEMENT
+  DUE_DILIGENCE
+  BOARD_PRESENTATION
+  SEC_FILING
+  OTHER
+}
+
+enum SecFilingStatus {
+  DRAFT
+  REVIEW
+  SUBMITTED
+  ACCEPTED
+  AMENDED
+}
+
+enum ContactType {
+  INVESTOR
+  ADVISOR
+  LEGAL
+  BANKER
+  TARGET_EXEC
+  BOARD_MEMBER
+  OTHER
+}
+
+enum TaskStatus {
+  NOT_STARTED
+  IN_PROGRESS
+  BLOCKED
+  COMPLETED
+  CANCELLED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum OrganizationRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum FinancialType {
+  TRUST_ACCOUNT
+  CAP_TABLE
+  DILUTION_MODEL
+  PRO_FORMA
+  FORECAST
+}
+
+// ============================================================================
+// MODELS
+// ============================================================================
+
+/// SPAC entity - Represents a Special Purpose Acquisition Company
+model Spac {
+  id             String     @id @default(cuid())
+  name           String
+  ticker         String?    @unique
+  status         SpacStatus @default(SEARCHING)
+  trustAmount    Decimal?   @db.Decimal(18, 2)
+  ipoDate        DateTime?
+  deadlineDate   DateTime?
+  redemptionRate Decimal?   @db.Decimal(5, 4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  targets    Target[]
+  documents  Document[]
+  filings    SecFiling[]
+  financials Financial[]
+  tasks      Task[]
+
+  @@map("spacs")
+}
+
+/// Target company - Potential acquisition targets for SPACs
+model Target {
+  id        String       @id @default(cuid())
+  name      String
+  industry  String?
+  status    TargetStatus @default(IDENTIFIED)
+  valuation Decimal?     @db.Decimal(18, 2)
+  revenue   Decimal?     @db.Decimal(18, 2)
+  ebitda    Decimal?     @db.Decimal(18, 2)
+  aiScore   Decimal?     @db.Decimal(5, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId    String?
+  spac      Spac?      @relation(fields: [spacId], references: [id])
+  documents Document[]
+
+  @@index([spacId])
+  @@map("targets")
+}
+
+/// Document - Files and documents related to SPACs and targets
+model Document {
+  id              String       @id @default(cuid())
+  name            String
+  type            DocumentType @default(OTHER)
+  fileUrl         String?
+  fileSize        Int?
+  mimeType        String?
+  aiSummary       String?      @db.Text
+  aiExtractedData Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId   String?
+  spac     Spac?   @relation(fields: [spacId], references: [id])
+  targetId String?
+  target   Target? @relation(fields: [targetId], references: [id])
+
+  @@index([spacId])
+  @@index([targetId])
+  @@map("documents")
+}
+
+/// SEC Filing - SEC filings and regulatory documents
+model SecFiling {
+  id         String          @id @default(cuid())
+  formType   String
+  filingDate DateTime?
+  dueDate    DateTime?
+  status     SecFilingStatus @default(DRAFT)
+  edgarUrl   String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id])
+
+  @@index([spacId])
+  @@map("sec_filings")
+}
+
+/// Contact - CRM contacts for investors, advisors, and other stakeholders
+model Contact {
+  id        String      @id @default(cuid())
+  firstName String
+  lastName  String
+  email     String?
+  phone     String?
+  company   String?
+  title     String?
+  type      ContactType @default(OTHER)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([email])
+  @@map("contacts")
+}
+
+/// Task - Tasks and todos related to SPAC operations
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?      @db.Text
+  status      TaskStatus   @default(NOT_STARTED)
+  priority    TaskPriority @default(MEDIUM)
+  dueDate     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String?
+  spac   Spac?   @relation(fields: [spacId], references: [id])
+
+  @@index([spacId])
+  @@index([status])
+  @@index([dueDate])
+  @@map("tasks")
+}
+
+/// Financial - Financial records and models
+model Financial {
+  id     String        @id @default(cuid())
+  type   FinancialType
+  period String?
+  data   Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id])
+
+  @@index([spacId])
+  @@index([type])
+  @@map("financials")
+}
+
+/// Organization - Multi-tenant organization for SPAC OS
+model Organization {
+  id   String @id @default(cuid())
+  name String
+  slug String @unique
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  users     OrganizationUser[]
+  auditLogs AuditLog[]
+
+  @@index([slug])
+  @@map("organizations")
+}
+
+/// OrganizationUser - User membership in an organization
+model OrganizationUser {
+  id     String           @id @default(cuid())
+  role   OrganizationRole @default(MEMBER)
+  userId String           // Clerk user ID
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([organizationId])
+  @@index([userId])
+  @@map("organization_users")
+}
+
+/// AuditLog - Audit trail for tracking user actions
+model AuditLog {
+  id         String  @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  userId     String
+  metadata   Json?
+  ipAddress  String?
+  userAgent  String?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  organizationId String
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([entityType, entityId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_logs")
+}

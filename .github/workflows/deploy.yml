@@ -1,0 +1,318 @@
+# =============================================================================
+# SPAC OS - Production Deployment Pipeline
+# =============================================================================
+# Deploys to Vercel production when pushing to main branch
+# =============================================================================
+
+name: Deploy Production
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Deployment environment'
+        required: true
+        default: 'production'
+        type: choice
+        options:
+          - staging
+          - production
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: '20'
+  VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+  VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+jobs:
+  # ===========================================================================
+  # Pre-deployment Checks
+  # ===========================================================================
+  pre-deploy:
+    name: Pre-deployment Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    outputs:
+      should_deploy: ${{ steps.check.outputs.should_deploy }}
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for deployable changes
+        id: check
+        run: |
+          # Check if there are meaningful changes
+          CHANGED_FILES=$(git diff --name-only HEAD^ HEAD)
+
+          # Skip deployment if only docs changed
+          if echo "$CHANGED_FILES" | grep -qvE '^(README|CHANGELOG|docs/|\.github/.*\.md)'; then
+            echo "should_deploy=true" >> $GITHUB_OUTPUT
+          else
+            echo "should_deploy=false" >> $GITHUB_OUTPUT
+            echo "Only documentation changes detected, skipping deployment"
+          fi
+
+      - name: Generate version
+        id: version
+        run: |
+          VERSION=$(date +'%Y.%m.%d')-$(git rev-parse --short HEAD)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+  # ===========================================================================
+  # Database Migration
+  # ===========================================================================
+  migrate:
+    name: Database Migration
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: pre-deploy
+    if: needs.pre-deploy.outputs.should_deploy == 'true'
+
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npx prisma generate
+
+      - name: Run database migrations
+        run: npx prisma migrate deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+
+      - name: Verify migration status
+        run: npx prisma migrate status
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+
+  # ===========================================================================
+  # Deploy to Vercel
+  # ===========================================================================
+  deploy:
+    name: Deploy to Vercel
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: [pre-deploy, migrate]
+    if: needs.pre-deploy.outputs.should_deploy == 'true'
+
+    environment:
+      name: ${{ github.event.inputs.environment || 'production' }}
+      url: ${{ steps.deploy.outputs.url }}
+
+    outputs:
+      url: ${{ steps.deploy.outputs.url }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Install Vercel CLI
+        run: npm install --global vercel@latest
+
+      - name: Pull Vercel Environment (Production)
+        if: github.event.inputs.environment != 'staging'
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Pull Vercel Environment (Staging)
+        if: github.event.inputs.environment == 'staging'
+        run: vercel pull --yes --environment=preview --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build Project Artifacts
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
+      - name: Deploy to Production
+        id: deploy
+        run: |
+          if [ "${{ github.event.inputs.environment }}" = "staging" ]; then
+            url=$(vercel deploy --prebuilt --token=${{ secrets.VERCEL_TOKEN }})
+          else
+            url=$(vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }})
+          fi
+          echo "url=$url" >> $GITHUB_OUTPUT
+
+      - name: Add deployment summary
+        run: |
+          echo "## Deployment Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Environment:** ${{ github.event.inputs.environment || 'production' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Version:** ${{ needs.pre-deploy.outputs.version }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **URL:** ${{ steps.deploy.outputs.url }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Commit:** ${{ github.sha }}" >> $GITHUB_STEP_SUMMARY
+
+  # ===========================================================================
+  # Post-deployment Verification
+  # ===========================================================================
+  verify:
+    name: Verify Deployment
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: deploy
+
+    steps:
+      - name: Wait for deployment to stabilize
+        run: sleep 30
+
+      - name: Health check
+        run: |
+          URL="${{ needs.deploy.outputs.url }}"
+          echo "Checking health at $URL/api/health"
+
+          for i in {1..5}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL/api/health")
+            if [ "$STATUS" = "200" ]; then
+              echo "Health check passed!"
+              exit 0
+            fi
+            echo "Attempt $i: Status $STATUS, retrying in 10s..."
+            sleep 10
+          done
+
+          echo "Health check failed after 5 attempts"
+          exit 1
+
+      - name: Smoke test - Homepage
+        run: |
+          URL="${{ needs.deploy.outputs.url }}"
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" "$URL")
+          if [ "$STATUS" != "200" ]; then
+            echo "Homepage returned status $STATUS"
+            exit 1
+          fi
+          echo "Homepage smoke test passed!"
+
+      - name: Smoke test - API endpoints
+        run: |
+          URL="${{ needs.deploy.outputs.url }}"
+
+          # Test health endpoint
+          curl -sf "$URL/api/health" || exit 1
+          echo "API health check passed!"
+
+  # ===========================================================================
+  # Notify on Success
+  # ===========================================================================
+  notify-success:
+    name: Notify Success
+    runs-on: ubuntu-latest
+    needs: [deploy, verify]
+    if: success()
+
+    steps:
+      - name: Send Slack notification
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "✅ *SPAC OS deployed successfully!*\n\n*Environment:* ${{ github.event.inputs.environment || 'production' }}\n*URL:* ${{ needs.deploy.outputs.url }}\n*Commit:* `${{ github.sha }}`"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ===========================================================================
+  # Notify on Failure
+  # ===========================================================================
+  notify-failure:
+    name: Notify Failure
+    runs-on: ubuntu-latest
+    needs: [deploy, verify]
+    if: failure()
+
+    steps:
+      - name: Send Slack notification
+        if: ${{ secrets.SLACK_WEBHOOK_URL != '' }}
+        uses: slackapi/slack-github-action@v1.25.0
+        with:
+          payload: |
+            {
+              "blocks": [
+                {
+                  "type": "section",
+                  "text": {
+                    "type": "mrkdwn",
+                    "text": "❌ *SPAC OS deployment failed!*\n\n*Environment:* ${{ github.event.inputs.environment || 'production' }}\n*Commit:* `${{ github.sha }}`\n*Workflow:* <${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}|View logs>"
+                  }
+                }
+              ]
+            }
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+          SLACK_WEBHOOK_TYPE: INCOMING_WEBHOOK
+
+  # ===========================================================================
+  # Create Release (on production deployment)
+  # ===========================================================================
+  release:
+    name: Create Release
+    runs-on: ubuntu-latest
+    needs: [pre-deploy, deploy, verify]
+    if: success() && github.event.inputs.environment != 'staging'
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Create GitHub Release
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ needs.pre-deploy.outputs.version }}';
+            const url = '${{ needs.deploy.outputs.url }}';
+
+            try {
+              await github.rest.repos.createRelease({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                tag_name: `v${version}`,
+                name: `Release ${version}`,
+                body: `## Deployment\n\n- **URL:** ${url}\n- **Commit:** ${context.sha}\n- **Deployed at:** ${new Date().toISOString()}`,
+                draft: false,
+                prerelease: false
+              });
+              console.log(`Created release v${version}`);
+            } catch (error) {
+              console.log(`Release creation failed: ${error.message}`);
+              // Don't fail the workflow if release creation fails
+            }
