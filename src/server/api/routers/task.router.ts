@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { Prisma } from '@prisma/client';
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -102,7 +103,7 @@ export const taskRouter = createTRPCRouter({
         sortOrder,
       } = input;
 
-      const where: any = { deletedAt: null };
+      const where: Prisma.TaskWhereInput = { deletedAt: null };
 
       if (spacId) where.spacId = spacId;
       if (targetId) where.targetId = targetId;
@@ -111,8 +112,12 @@ export const taskRouter = createTRPCRouter({
       if (assigneeId) where.assigneeId = assigneeId;
       if (status?.length) where.status = { in: status };
       if (priority?.length) where.priority = { in: priority };
-      if (dueBefore) where.dueDate = { ...where.dueDate, lte: dueBefore };
-      if (dueAfter) where.dueDate = { ...where.dueDate, gte: dueAfter };
+      if (dueBefore || dueAfter) {
+        where.dueDate = {
+          ...(dueBefore && { lte: dueBefore }),
+          ...(dueAfter && { gte: dueAfter }),
+        };
+      }
       if (category) where.category = category;
       if (tags?.length) where.tags = { hasSome: tags };
       if (!includeSubtasks) where.parentTaskId = null;
@@ -269,7 +274,7 @@ export const taskRouter = createTRPCRouter({
         });
       }
 
-      const updateData: any = { status: input.status };
+      const updateData: Prisma.TaskUpdateInput = { status: input.status };
 
       if (input.status === 'COMPLETED') {
         updateData.completedAt = new Date();
@@ -343,7 +348,7 @@ export const taskRouter = createTRPCRouter({
       }),
     }))
     .mutation(async ({ ctx, input }) => {
-      const updateData: any = { ...input.data };
+      const updateData: Prisma.TaskUpdateInput = { ...input.data };
 
       if (input.data.status === 'COMPLETED') {
         updateData.completedAt = new Date();
@@ -372,7 +377,7 @@ export const taskRouter = createTRPCRouter({
         throw new TRPCError({ code: 'UNAUTHORIZED' });
       }
 
-      const where: any = {
+      const where: Prisma.TaskWhereInput = {
         deletedAt: null,
         assigneeId: userId,
       };
@@ -409,7 +414,7 @@ export const taskRouter = createTRPCRouter({
       assigneeId: UuidSchema.optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const where: any = {
+      const where: Prisma.TaskWhereInput = {
         deletedAt: null,
         status: { notIn: ['COMPLETED', 'CANCELLED'] },
         dueDate: { lt: new Date() },
@@ -436,7 +441,7 @@ export const taskRouter = createTRPCRouter({
   getWorkload: protectedProcedure
     .input(z.object({ spacId: UuidSchema.optional() }))
     .query(async ({ ctx, input }) => {
-      const where: any = {
+      const where: Prisma.TaskWhereInput = {
         deletedAt: null,
         status: { notIn: ['COMPLETED', 'CANCELLED'] },
         assigneeId: { not: null },
@@ -479,7 +484,7 @@ export const taskRouter = createTRPCRouter({
       const dueDate = new Date();
       dueDate.setDate(dueDate.getDate() + input.days);
 
-      const where: any = {
+      const where: Prisma.TaskWhereInput = {
         deletedAt: null,
         status: { notIn: ['COMPLETED', 'CANCELLED'] },
         dueDate: {
@@ -511,7 +516,7 @@ export const taskRouter = createTRPCRouter({
       assigneeId: UuidSchema.optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const where: any = { deletedAt: null };
+      const where: Prisma.TaskWhereInput = { deletedAt: null };
       if (input.spacId) where.spacId = input.spacId;
       if (input.assigneeId) where.assigneeId = input.assigneeId;
 

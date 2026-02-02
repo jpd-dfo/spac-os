@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { Prisma } from '@prisma/client';
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -68,7 +69,7 @@ export const documentRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const { spacId, targetId, type, status, category, tags, search, isLatest, uploadedById, page, pageSize, sortBy, sortOrder } = input;
 
-      const where: any = { deletedAt: null };
+      const where: Prisma.DocumentWhereInput = { deletedAt: null };
 
       if (spacId) where.spacId = spacId;
       if (targetId) where.targetId = targetId;
@@ -407,7 +408,7 @@ export const documentRouter = createTRPCRouter({
       targetId: UuidSchema.optional(),
     }))
     .query(async ({ ctx, input }) => {
-      const where: any = { deletedAt: null };
+      const where: Prisma.DocumentWhereInput = { deletedAt: null };
       if (input.spacId) where.spacId = input.spacId;
       if (input.targetId) where.targetId = input.targetId;
 
@@ -453,7 +454,7 @@ export const documentRouter = createTRPCRouter({
       limit: z.number().int().min(1).max(50).default(10),
     }))
     .query(async ({ ctx, input }) => {
-      const where: any = { deletedAt: null, isLatest: true };
+      const where: Prisma.DocumentWhereInput = { deletedAt: null, isLatest: true };
       if (input.spacId) where.spacId = input.spacId;
 
       return ctx.db.document.findMany({
@@ -478,7 +479,7 @@ export const documentRouter = createTRPCRouter({
       limit: z.number().int().min(1).max(100).default(20),
     }))
     .query(async ({ ctx, input }) => {
-      const where: any = {
+      const where: Prisma.DocumentWhereInput = {
         deletedAt: null,
         OR: [
           { name: { contains: input.query, mode: 'insensitive' } },

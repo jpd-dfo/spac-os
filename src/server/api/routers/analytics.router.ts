@@ -212,7 +212,7 @@ export const analyticsRouter = createTRPCRouter({
           completionRate: totalTasks > 0 ? completedTasks / totalTasks : 0,
         },
         filings: filingMetrics,
-        trustHistory: (trustHistory?.balanceHistory as any[]) || [],
+        trustHistory: (trustHistory?.balanceHistory as Array<{ date: Date; balance: number; perShare: number; note?: string }>) || [],
         redemptions: redemptionHistory,
         pipe: {
           investorCount: pipeMetrics._count,

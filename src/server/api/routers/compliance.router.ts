@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { Prisma } from '@prisma/client';
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -20,6 +21,17 @@ import {
   PaginationSchema,
   ComplianceStatusSchema,
 } from '@/schemas';
+
+/** Resolution entry structure for board meetings */
+interface BoardResolution {
+  number: number;
+  title: string;
+  description?: string;
+  votesFor?: number;
+  votesAgainst?: number;
+  abstentions?: number;
+  passed?: boolean;
+}
 
 export const complianceRouter = createTRPCRouter({
   // ============================================================================
@@ -56,12 +68,16 @@ export const complianceRouter = createTRPCRouter({
       .query(async ({ ctx, input }) => {
         const { spacId, status, category, dueBefore, dueAfter, page, pageSize, sortBy, sortOrder } = input;
 
-        const where: any = {};
+        const where: Prisma.ComplianceItemWhereInput = {};
         if (spacId) where.spacId = spacId;
         if (status?.length) where.status = { in: status };
         if (category) where.category = category;
-        if (dueBefore) where.dueDate = { ...where.dueDate, lte: dueBefore };
-        if (dueAfter) where.dueDate = { ...where.dueDate, gte: dueAfter };
+        if (dueBefore || dueAfter) {
+          where.dueDate = {
+            ...(dueBefore && { lte: dueBefore }),
+            ...(dueAfter && { gte: dueAfter }),
+          };
+        }
 
         const [items, total] = await Promise.all([
           ctx.db.complianceItem.findMany({
@@ -122,7 +138,7 @@ export const complianceRouter = createTRPCRouter({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Compliance item not found' });
         }
 
-        const updateData: any = { status: input.status };
+        const updateData: Prisma.ComplianceItemUpdateInput = { status: input.status };
         if (input.status === 'COMPLIANT') {
           updateData.completedDate = new Date();
         }
@@ -136,7 +152,7 @@ export const complianceRouter = createTRPCRouter({
     getOverdue: protectedProcedure
       .input(z.object({ spacId: UuidSchema.optional() }))
       .query(async ({ ctx, input }) => {
-        const where: any = {
+        const where: Prisma.ComplianceItemWhereInput = {
           status: { in: ['PENDING', 'IN_PROGRESS'] },
           dueDate: { lt: new Date() },
         };
@@ -154,7 +170,7 @@ export const complianceRouter = createTRPCRouter({
     getStatistics: protectedProcedure
       .input(z.object({ spacId: UuidSchema.optional() }))
       .query(async ({ ctx, input }) => {
-        const where: any = {};
+        const where: Prisma.ComplianceItemWhereInput = {};
         if (input.spacId) where.spacId = input.spacId;
 
         const [total, byStatus, byCategory, overdue] = await Promise.all([
@@ -221,12 +237,16 @@ export const complianceRouter = createTRPCRouter({
       .query(async ({ ctx, input }) => {
         const { spacId, type, status, scheduledAfter, scheduledBefore, page, pageSize, sortBy, sortOrder } = input;
 
-        const where: any = {};
+        const where: Prisma.BoardMeetingWhereInput = {};
         if (spacId) where.spacId = spacId;
         if (type) where.type = type;
         if (status) where.status = status;
-        if (scheduledAfter) where.scheduledDate = { ...where.scheduledDate, gte: scheduledAfter };
-        if (scheduledBefore) where.scheduledDate = { ...where.scheduledDate, lte: scheduledBefore };
+        if (scheduledAfter || scheduledBefore) {
+          where.scheduledDate = {
+            ...(scheduledAfter && { gte: scheduledAfter }),
+            ...(scheduledBefore && { lte: scheduledBefore }),
+          };
+        }
 
         const [items, total] = await Promise.all([
           ctx.db.boardMeeting.findMany({
@@ -315,7 +335,7 @@ export const complianceRouter = createTRPCRouter({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Board meeting not found' });
         }
 
-        const resolutions = meeting.resolutions as any[] || [];
+        const resolutions = (meeting.resolutions as BoardResolution[]) || [];
         resolutions.push(input.resolution);
 
         return ctx.db.boardMeeting.update({
@@ -333,7 +353,7 @@ export const complianceRouter = createTRPCRouter({
         const cutoffDate = new Date();
         cutoffDate.setDate(cutoffDate.getDate() + input.days);
 
-        const where: any = {
+        const where: Prisma.BoardMeetingWhereInput = {
           status: 'scheduled',
           scheduledDate: {
             gte: new Date(),
@@ -384,7 +404,7 @@ export const complianceRouter = createTRPCRouter({
       .query(async ({ ctx, input }) => {
         const { spacId, severity, isResolved, page, pageSize, sortBy, sortOrder } = input;
 
-        const where: any = {};
+        const where: Prisma.ConflictWhereInput = {};
         if (spacId) where.spacId = spacId;
         if (severity?.length) where.severity = { in: severity };
         if (isResolved !== undefined) where.isResolved = isResolved;
@@ -464,7 +484,7 @@ export const complianceRouter = createTRPCRouter({
     getUnresolved: protectedProcedure
       .input(z.object({ spacId: UuidSchema.optional() }))
       .query(async ({ ctx, input }) => {
-        const where: any = { isResolved: false };
+        const where: Prisma.ConflictWhereInput = { isResolved: false };
         if (input.spacId) where.spacId = input.spacId;
 
         return ctx.db.conflict.findMany({
@@ -510,7 +530,7 @@ export const complianceRouter = createTRPCRouter({
       .query(async ({ ctx, input }) => {
         const { spacId, status, userId, page, pageSize, sortBy, sortOrder } = input;
 
-        const where: any = {};
+        const where: Prisma.InsiderTradingWindowWhereInput = {};
         if (spacId) where.spacId = spacId;
         if (status?.length) where.status = { in: status };
         if (userId) where.userId = userId;
@@ -587,7 +607,7 @@ export const complianceRouter = createTRPCRouter({
     getActiveBlackouts: protectedProcedure
       .input(z.object({ spacId: UuidSchema.optional() }))
       .query(async ({ ctx, input }) => {
-        const where: any = {
+        const where: Prisma.InsiderTradingWindowWhereInput = {
           status: 'BLACKOUT',
           OR: [
             { endDate: null },

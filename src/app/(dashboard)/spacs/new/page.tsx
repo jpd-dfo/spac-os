@@ -5,12 +5,14 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { ArrowLeft, Building2, Save, X } from 'lucide-react';
+import toast from 'react-hot-toast';
+import { ArrowLeft, Building2, Save, X, AlertCircle, Check } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { SPAC_STATUS_LABELS, SPAC_PHASE_LABELS, SECTORS, GEOGRAPHIES } from '@/lib/constants';
+import { trpc } from '@/lib/trpc/client';
 
 // Zod schema for SPAC form validation
 const spacFormSchema = z.object({
@@ -127,9 +129,24 @@ type SpacFormData = z.infer<typeof spacFormSchema>;
 
 export default function NewSPACPage() {
   const router = useRouter();
-  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedSectors, setSelectedSectors] = useState<string[]>([]);
   const [selectedGeographies, setSelectedGeographies] = useState<string[]>([]);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // tRPC mutation for creating a SPAC
+  const createSpacMutation = trpc.spac.create.useMutation({
+    onSuccess: (data) => {
+      toast.success('SPAC created successfully');
+      // Redirect to the newly created SPAC's detail page
+      router.push(`/spacs/${data.id}`);
+    },
+    onError: (error) => {
+      // Display error message to user
+      const message = error.message || 'Failed to create SPAC. Please try again.';
+      toast.error(`Failed to create SPAC: ${message}`);
+      setErrorMessage(message);
+    },
+  });
 
   const {
     register,
@@ -165,21 +182,41 @@ export default function NewSPACPage() {
   };
 
   const onSubmit = async (data: SpacFormData) => {
-    setIsSubmitting(true);
-    try {
-      // TODO: Call tRPC mutation to create SPAC
+    // Clear any previous error
+    setErrorMessage(null);
 
-      // Simulate API call
-      await new Promise((resolve) => setTimeout(resolve, 1000));
+    // Map form data to the backend schema
+    // The backend expects a simpler schema than what the form collects
+    const mutationInput = {
+      name: data.name,
+      ticker: data.ticker || null,
+      status: mapFrontendStatusToBackend(data.status),
+      trustAmount: data.trustBalance ?? null,
+      ipoDate: data.ipoDate ? new Date(data.ipoDate) : null,
+      deadlineDate: data.deadline ? new Date(data.deadline) : null,
+      redemptionRate: null, // Not captured in form currently
+    };
 
-      // Redirect to SPACs list on success
-      router.push('/spacs');
-    } catch (error) {
-      // Error handled in UI - show error state
-    } finally {
-      setIsSubmitting(false);
-    }
+    // Call the tRPC mutation
+    createSpacMutation.mutate(mutationInput);
   };
+
+  // Map frontend status enum to backend status enum
+  // The backend has a different set of valid status values
+  function mapFrontendStatusToBackend(frontendStatus: string): 'PRE_IPO' | 'SEARCHING' | 'LOI_SIGNED' | 'DEFINITIVE_AGREEMENT' | 'VOTE_PENDING' | 'DE_SPAC_COMPLETE' | 'LIQUIDATED' {
+    const statusMap: Record<string, 'PRE_IPO' | 'SEARCHING' | 'LOI_SIGNED' | 'DEFINITIVE_AGREEMENT' | 'VOTE_PENDING' | 'DE_SPAC_COMPLETE' | 'LIQUIDATED'> = {
+      PRE_IPO: 'PRE_IPO',
+      SEARCHING: 'SEARCHING',
+      LOI_SIGNED: 'LOI_SIGNED',
+      DA_ANNOUNCED: 'DEFINITIVE_AGREEMENT',
+      PROXY_FILED: 'VOTE_PENDING',
+      VOTE_SCHEDULED: 'VOTE_PENDING',
+      CLOSING: 'DE_SPAC_COMPLETE',
+      COMPLETED: 'DE_SPAC_COMPLETE',
+      LIQUIDATED: 'LIQUIDATED',
+    };
+    return statusMap[frontendStatus] || 'SEARCHING';
+  }
 
   const handleCancel = () => {
     router.push('/spacs');
@@ -201,6 +238,21 @@ export default function NewSPACPage() {
       </div>
 
       <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+        {/* Error Message */}
+        {errorMessage && (
+          <div className="flex items-center gap-2 rounded-lg bg-danger-50 border border-danger-200 p-4 text-danger-700">
+            <AlertCircle className="h-5 w-5 flex-shrink-0" />
+            <span>{errorMessage}</span>
+            <button
+              type="button"
+              onClick={() => setErrorMessage(null)}
+              className="ml-auto text-danger-500 hover:text-danger-700"
+            >
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+        )}
+
         {/* Basic Information */}
         <Card>
           <CardHeader>
@@ -427,7 +479,7 @@ export default function NewSPACPage() {
             <X className="mr-2 h-4 w-4" />
             Cancel
           </Button>
-          <Button type="submit" variant="primary" isLoading={isSubmitting}>
+          <Button type="submit" variant="primary" isLoading={createSpacMutation.isPending}>
             <Save className="mr-2 h-4 w-4" />
             Create SPAC
           </Button>

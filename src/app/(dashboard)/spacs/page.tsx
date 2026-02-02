@@ -1,8 +1,9 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useCallback } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 import {
   Plus,
   Search,
@@ -11,125 +12,114 @@ import {
   LayoutGrid,
   List,
   ChevronDown,
+  ChevronLeft,
+  ChevronRight,
   X,
+  Eye,
+  Pencil,
+  Trash2,
+  MoreHorizontal,
+  AlertCircle,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
-import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
+import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '@/components/ui/Table';
 import { EmptyState } from '@/components/ui/EmptyState';
+import { PageLoader, LoadingSpinner } from '@/components/ui/LoadingSpinner';
+import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
+import { Modal, ModalHeader, ModalTitle, ModalDescription, ModalBody, ModalFooter } from '@/components/ui/Modal';
 import { SpacCard, SpacStatusBadge } from '@/components/spacs';
 import { formatLargeNumber, formatDate, daysUntil, cn } from '@/lib/utils';
-import { SPAC_STATUS_LABELS, SPAC_PHASE_LABELS } from '@/lib/constants';
+import { SPAC_STATUS_LABELS, SPAC_PHASE_LABELS, DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '@/lib/constants';
+import { trpc } from '@/lib/trpc/client';
+import type { SpacStatus } from '@/schemas';
 
-// Mock data for demonstration
-const mockSPACs = [
-  {
-    id: '1',
-    name: 'Alpha Acquisition Corp',
-    ticker: 'ALPH',
-    status: 'DA_ANNOUNCED',
-    phase: 'SEC_REVIEW',
-    ipoDate: new Date('2023-06-15'),
-    ipoSize: 250000000,
-    trustBalance: 258000000,
-    deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
-    targetSectors: ['Technology', 'Healthcare'],
-    activeTargets: 1,
-  },
-  {
-    id: '2',
-    name: 'Beta Holdings SPAC',
-    ticker: 'BETA',
-    status: 'SEARCHING',
-    phase: 'TARGET_SEARCH',
-    ipoDate: new Date('2023-09-20'),
-    ipoSize: 300000000,
-    trustBalance: 305000000,
-    deadline: new Date(Date.now() + 180 * 24 * 60 * 60 * 1000),
-    targetSectors: ['Consumer', 'Financial Services'],
-    activeTargets: 5,
-  },
-  {
-    id: '3',
-    name: 'Gamma Ventures',
-    ticker: 'GAMA',
-    status: 'SEARCHING',
-    phase: 'DUE_DILIGENCE',
-    ipoDate: new Date('2023-03-10'),
-    ipoSize: 200000000,
-    trustBalance: 204000000,
-    deadline: new Date(Date.now() + 60 * 24 * 60 * 60 * 1000),
-    targetSectors: ['Energy', 'Industrials'],
-    activeTargets: 3,
-  },
-  {
-    id: '4',
-    name: 'Delta Capital SPAC',
-    ticker: 'DELT',
-    status: 'VOTE_SCHEDULED',
-    phase: 'SHAREHOLDER_VOTE',
-    ipoDate: new Date('2023-01-05'),
-    ipoSize: 350000000,
-    trustBalance: 360000000,
-    deadline: new Date(Date.now() + 14 * 24 * 60 * 60 * 1000),
-    targetSectors: ['Technology'],
-    activeTargets: 1,
-  },
-  {
-    id: '5',
-    name: 'Epsilon Growth Corp',
-    ticker: 'EPSI',
-    status: 'LOI_SIGNED',
-    phase: 'NEGOTIATION',
-    ipoDate: new Date('2023-08-01'),
-    ipoSize: 275000000,
-    trustBalance: 280000000,
-    deadline: new Date(Date.now() + 120 * 24 * 60 * 60 * 1000),
-    targetSectors: ['Healthcare', 'Technology'],
-    activeTargets: 2,
-  },
-  {
-    id: '6',
-    name: 'Zeta Partners SPAC',
-    ticker: 'ZETA',
-    status: 'COMPLETED',
-    phase: 'DE_SPAC',
-    ipoDate: new Date('2022-11-15'),
-    ipoSize: 400000000,
-    trustBalance: 0,
-    deadline: null,
-    targetSectors: ['Industrials'],
-    activeTargets: 0,
-  },
+// All SPAC statuses from schema
+const ALL_STATUSES: SpacStatus[] = [
+  'SEARCHING',
+  'LOI_SIGNED',
+  'DA_ANNOUNCED',
+  'SEC_REVIEW',
+  'SHAREHOLDER_VOTE',
+  'CLOSING',
+  'COMPLETED',
+  'LIQUIDATING',
+  'LIQUIDATED',
+  'TERMINATED',
+];
+
+// Sort options
+type SortField = 'name' | 'status' | 'trustBalance' | 'ipoDate' | 'deadline' | 'updatedAt';
+type SortOrder = 'asc' | 'desc';
+
+const SORT_OPTIONS: { value: SortField; label: string }[] = [
+  { value: 'name', label: 'Name' },
+  { value: 'status', label: 'Status' },
+  { value: 'trustBalance', label: 'Trust Value' },
+  { value: 'ipoDate', label: 'IPO Date' },
+  { value: 'deadline', label: 'Deadline' },
+  { value: 'updatedAt', label: 'Last Updated' },
 ];
 
 type ViewMode = 'grid' | 'table';
 
 export default function SPACsPage() {
   const router = useRouter();
+
+  // Filter state
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [viewMode, setViewMode] = useState<ViewMode>('grid');
+  const [statusFilter, setStatusFilter] = useState<SpacStatus[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>('table');
   const [showFilters, setShowFilters] = useState(false);
 
-  // Filter SPACs based on search and status
-  const filteredSPACs = useMemo(() => {
-    return mockSPACs.filter((spac) => {
-      const matchesSearch =
-        searchQuery === '' ||
-        spac.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        spac.ticker.toLowerCase().includes(searchQuery.toLowerCase());
-      const matchesStatus = statusFilter === 'all' || spac.status === statusFilter;
-      return matchesSearch && matchesStatus;
-    });
-  }, [searchQuery, statusFilter]);
+  // Pagination state
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
-  // Get unique statuses for filter dropdown
-  const statuses = useMemo(() => {
-    const uniqueStatuses = [...new Set(mockSPACs.map((s) => s.status))];
-    return uniqueStatuses.sort();
-  }, []);
+  // Sort state
+  const [sortBy, setSortBy] = useState<SortField>('updatedAt');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
 
+  // Delete modal state
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [spacToDelete, setSpacToDelete] = useState<{ id: string; name: string } | null>(null);
+
+  // tRPC query
+  const {
+    data,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = trpc.spac.list.useQuery({
+    search: searchQuery || undefined,
+    status: statusFilter.length > 0 ? statusFilter : undefined,
+    page,
+    pageSize,
+    sortBy,
+    sortOrder,
+  }, {
+    keepPreviousData: true,
+  });
+
+  // tRPC mutation for delete
+  const deleteMutation = trpc.spac.delete.useMutation({
+    onSuccess: () => {
+      toast.success('SPAC deleted successfully');
+      setDeleteModalOpen(false);
+      setSpacToDelete(null);
+      refetch();
+    },
+    onError: (error) => {
+      const message = error.message || 'An unexpected error occurred';
+      toast.error(`Failed to delete SPAC: ${message}`);
+    },
+  });
+
+  // Handlers
   const handleNewSpac = () => {
     router.push('/spacs/new');
   };
@@ -142,16 +132,84 @@ export default function SPACsPage() {
     router.push(`/spacs/${id}/edit`);
   };
 
-  const handleDeleteSpac = (id: string) => {
-    // TODO: Implement delete functionality
+  const handleDeleteClick = (id: string, name: string) => {
+    setSpacToDelete({ id, name });
+    setDeleteModalOpen(true);
+  };
+
+  const handleConfirmDelete = () => {
+    if (spacToDelete) {
+      deleteMutation.mutate({ id: spacToDelete.id });
+    }
+  };
+
+  const handleSort = useCallback((field: SortField) => {
+    if (sortBy === field) {
+      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc');
+    } else {
+      setSortBy(field);
+      setSortOrder('asc');
+    }
+    setPage(1);
+  }, [sortBy]);
+
+  const handleStatusFilterChange = (status: SpacStatus) => {
+    setStatusFilter(prev => {
+      if (prev.includes(status)) {
+        return prev.filter(s => s !== status);
+      }
+      return [...prev, status];
+    });
+    setPage(1);
+  };
+
+  const handleSearchChange = (value: string) => {
+    setSearchQuery(value);
+    setPage(1);
   };
 
   const clearFilters = () => {
     setSearchQuery('');
-    setStatusFilter('all');
+    setStatusFilter([]);
+    setPage(1);
   };
 
-  const hasActiveFilters = searchQuery !== '' || statusFilter !== 'all';
+  const hasActiveFilters = searchQuery !== '' || statusFilter.length > 0;
+
+  // Calculate pagination
+  const totalPages = data?.totalPages ?? 1;
+  const total = data?.total ?? 0;
+  const items = data?.items ?? [];
+
+  const getSortIcon = (field: SortField) => {
+    if (sortBy !== field) return <ArrowUpDown className="h-4 w-4 text-slate-400" />;
+    return sortOrder === 'asc'
+      ? <ArrowUp className="h-4 w-4 text-primary-600" />
+      : <ArrowDown className="h-4 w-4 text-primary-600" />;
+  };
+
+  // Loading state
+  if (isLoading && !data) {
+    return <PageLoader message="Loading SPACs..." />;
+  }
+
+  // Error state
+  if (isError) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="rounded-full bg-danger-100 p-3 mb-4">
+          <AlertCircle className="h-8 w-8 text-danger-600" />
+        </div>
+        <h2 className="text-lg font-semibold text-slate-900 mb-2">Failed to load SPACs</h2>
+        <p className="text-sm text-slate-500 mb-4 text-center max-w-md">
+          {error?.message || 'An unexpected error occurred while loading the SPAC list.'}
+        </p>
+        <Button variant="primary" onClick={() => refetch()}>
+          Try Again
+        </Button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -179,12 +237,12 @@ export default function SPACsPage() {
               type="text"
               placeholder="Search by name or ticker..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={(e) => handleSearchChange(e.target.value)}
               className="flex h-10 w-full rounded-md border border-slate-200 bg-white pl-10 pr-4 text-sm transition-colors placeholder:text-slate-400 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
             />
             {searchQuery && (
               <button
-                onClick={() => setSearchQuery('')}
+                onClick={() => handleSearchChange('')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600"
               >
                 <X className="h-4 w-4" />
@@ -192,33 +250,67 @@ export default function SPACsPage() {
             )}
           </div>
 
-          {/* Status Filter */}
-          <div className="relative">
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              className="flex h-10 appearance-none rounded-md border border-slate-200 bg-white pl-3 pr-10 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500 focus-visible:ring-offset-2"
-            >
-              <option value="all">All Status</option>
-              {statuses.map((status) => (
-                <option key={status} value={status}>
-                  {SPAC_STATUS_LABELS[status] || status}
-                </option>
-              ))}
-            </select>
-            <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
-          </div>
-
-          {/* More Filters Button */}
-          <Button
-            variant="secondary"
-            size="md"
-            onClick={() => setShowFilters(!showFilters)}
-            className={cn(showFilters && 'bg-primary-50 text-primary-700')}
+          {/* Status Filter Dropdown */}
+          <Dropdown
+            trigger={
+              <div className="flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm hover:bg-slate-50">
+                <Filter className="h-4 w-4 text-slate-400" />
+                <span>Status</span>
+                {statusFilter.length > 0 && (
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-primary-100 text-xs font-medium text-primary-700">
+                    {statusFilter.length}
+                  </span>
+                )}
+                <ChevronDown className="h-4 w-4 text-slate-400" />
+              </div>
+            }
+            align="left"
           >
-            <Filter className="mr-2 h-4 w-4" />
-            More Filters
-          </Button>
+            {ALL_STATUSES.map((status) => (
+              <DropdownItem
+                key={status}
+                onClick={() => handleStatusFilterChange(status)}
+                closeOnClick={false}
+              >
+                <input
+                  type="checkbox"
+                  checked={statusFilter.includes(status)}
+                  onChange={() => {}}
+                  className="h-4 w-4 rounded border-slate-300 text-primary-600 focus:ring-primary-500"
+                />
+                <span>{SPAC_STATUS_LABELS[status] || status}</span>
+              </DropdownItem>
+            ))}
+          </Dropdown>
+
+          {/* Sort Dropdown */}
+          <Dropdown
+            trigger={
+              <div className="flex h-10 items-center gap-2 rounded-md border border-slate-200 bg-white px-3 text-sm hover:bg-slate-50">
+                <ArrowUpDown className="h-4 w-4 text-slate-400" />
+                <span className="hidden sm:inline">Sort by:</span>
+                <span className="font-medium">{SORT_OPTIONS.find(o => o.value === sortBy)?.label}</span>
+                <ChevronDown className="h-4 w-4 text-slate-400" />
+              </div>
+            }
+            align="left"
+          >
+            {SORT_OPTIONS.map((option) => (
+              <DropdownItem
+                key={option.value}
+                onClick={() => handleSort(option.value)}
+              >
+                <span className={cn(sortBy === option.value && 'font-medium text-primary-700')}>
+                  {option.label}
+                </span>
+                {sortBy === option.value && (
+                  <span className="ml-auto text-xs text-slate-500">
+                    {sortOrder === 'asc' ? 'A-Z' : 'Z-A'}
+                  </span>
+                )}
+              </DropdownItem>
+            ))}
+          </Dropdown>
 
           {/* Clear Filters */}
           {hasActiveFilters && (
@@ -239,6 +331,7 @@ export default function SPACsPage() {
                 ? 'bg-primary-100 text-primary-700'
                 : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
             )}
+            aria-label="Grid view"
           >
             <LayoutGrid className="h-4 w-4" />
           </button>
@@ -250,111 +343,248 @@ export default function SPACsPage() {
                 ? 'bg-primary-100 text-primary-700'
                 : 'text-slate-500 hover:bg-slate-100 hover:text-slate-700'
             )}
+            aria-label="Table view"
           >
             <List className="h-4 w-4" />
           </button>
         </div>
       </div>
 
-      {/* Results Count */}
-      <div className="flex items-center justify-between">
+      {/* Results Count and Page Size */}
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <p className="text-sm text-slate-500">
-          Showing <span className="font-medium text-slate-900">{filteredSPACs.length}</span>{' '}
-          of <span className="font-medium text-slate-900">{mockSPACs.length}</span> SPACs
+          {isLoading ? (
+            <span className="flex items-center gap-2">
+              <LoadingSpinner size="sm" />
+              Loading...
+            </span>
+          ) : (
+            <>
+              Showing{' '}
+              <span className="font-medium text-slate-900">
+                {items.length > 0 ? (page - 1) * pageSize + 1 : 0}
+              </span>
+              {' - '}
+              <span className="font-medium text-slate-900">
+                {Math.min(page * pageSize, total)}
+              </span>
+              {' of '}
+              <span className="font-medium text-slate-900">{total}</span> SPACs
+            </>
+          )}
         </p>
+
+        {/* Page Size Selector */}
+        <div className="flex items-center gap-2">
+          <label htmlFor="page-size" className="text-sm text-slate-500">
+            Show:
+          </label>
+          <select
+            id="page-size"
+            value={pageSize}
+            onChange={(e) => {
+              setPageSize(Number(e.target.value));
+              setPage(1);
+            }}
+            className="h-8 rounded-md border border-slate-200 bg-white px-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+          >
+            {PAGE_SIZE_OPTIONS.map((size) => (
+              <option key={size} value={size}>
+                {size}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
 
       {/* SPAC Grid View */}
-      {viewMode === 'grid' && filteredSPACs.length > 0 && (
-        <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
-          {filteredSPACs.map((spac) => (
+      {viewMode === 'grid' && items.length > 0 && (
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-2 xl:grid-cols-3">
+          {items.map((spac) => (
             <SpacCard
               key={spac.id}
-              spac={spac}
+              spac={{
+                id: spac.id,
+                name: spac.name,
+                ticker: spac.ticker || '',
+                status: spac.status,
+                phase: spac.phase,
+                ipoDate: spac.ipoDate,
+                ipoSize: spac.ipoSize || 0,
+                trustBalance: spac.trustAccounts?.[0]?.currentBalance || spac.trustBalance || 0,
+                deadline: spac.deadline,
+                targetSectors: spac.targetSectors || [],
+                activeTargets: spac._count?.targets || 0,
+              }}
               onView={handleViewSpac}
               onEdit={handleEditSpac}
-              onDelete={handleDeleteSpac}
+              onDelete={(id) => handleDeleteClick(id, spac.name)}
             />
           ))}
         </div>
       )}
 
       {/* SPAC Table View */}
-      {viewMode === 'table' && filteredSPACs.length > 0 && (
+      {viewMode === 'table' && items.length > 0 && (
         <Card>
-          <Table>
-            <TableHead>
-              <TableRow>
-                <TableCell header>SPAC</TableCell>
-                <TableCell header>Status</TableCell>
-                <TableCell header>Phase</TableCell>
-                <TableCell header>Trust Balance</TableCell>
-                <TableCell header>IPO Size</TableCell>
-                <TableCell header>Deadline</TableCell>
-                <TableCell header>Targets</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {filteredSPACs.map((spac) => {
-                const days = daysUntil(spac.deadline);
-                const isUrgent = days !== null && days <= 30;
-
-                return (
-                  <TableRow
-                    key={spac.id}
-                    className="cursor-pointer"
-                    onClick={() => handleViewSpac(spac.id)}
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHead>
+                <TableRow>
+                  <TableHeaderCell
+                    sortable
+                    sorted={sortBy === 'name' ? sortOrder : null}
+                    onSort={() => handleSort('name')}
                   >
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50">
-                          <Building2 className="h-5 w-5 text-primary-600" />
+                    SPAC
+                  </TableHeaderCell>
+                  <TableHeaderCell
+                    sortable
+                    sorted={sortBy === 'status' ? sortOrder : null}
+                    onSort={() => handleSort('status')}
+                  >
+                    Status
+                  </TableHeaderCell>
+                  <TableHeaderCell
+                    sortable
+                    sorted={sortBy === 'trustBalance' ? sortOrder : null}
+                    onSort={() => handleSort('trustBalance')}
+                    className="hidden md:table-cell"
+                  >
+                    Trust Value
+                  </TableHeaderCell>
+                  <TableHeaderCell
+                    sortable
+                    sorted={sortBy === 'ipoDate' ? sortOrder : null}
+                    onSort={() => handleSort('ipoDate')}
+                    className="hidden lg:table-cell"
+                  >
+                    IPO Date
+                  </TableHeaderCell>
+                  <TableHeaderCell
+                    sortable
+                    sorted={sortBy === 'deadline' ? sortOrder : null}
+                    onSort={() => handleSort('deadline')}
+                    className="hidden sm:table-cell"
+                  >
+                    Deadline
+                  </TableHeaderCell>
+                  <TableCell header className="text-right">
+                    Actions
+                  </TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {items.map((spac) => {
+                  const trustValue = spac.trustAccounts?.[0]?.currentBalance || spac.trustBalance || 0;
+                  const days = daysUntil(spac.deadline);
+                  const isUrgent = days !== null && days <= 30 && days > 0;
+                  const isExpired = days !== null && days <= 0;
+
+                  return (
+                    <TableRow
+                      key={spac.id}
+                      className="cursor-pointer"
+                      onClick={() => handleViewSpac(spac.id)}
+                    >
+                      {/* Name Column */}
+                      <TableCell>
+                        <div className="flex items-center gap-3">
+                          <div className="hidden sm:flex h-10 w-10 items-center justify-center rounded-lg bg-primary-50">
+                            <Building2 className="h-5 w-5 text-primary-600" />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="truncate font-medium text-slate-900">{spac.name}</p>
+                            {spac.ticker && (
+                              <p className="text-sm text-slate-500">{spac.ticker}</p>
+                            )}
+                          </div>
                         </div>
-                        <div>
-                          <p className="font-medium text-slate-900">{spac.name}</p>
-                          <p className="text-sm text-slate-500">{spac.ticker}</p>
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <SpacStatusBadge status={spac.status} size="sm" />
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm text-slate-600">
-                        {SPAC_PHASE_LABELS[spac.phase] || spac.phase}
-                      </span>
-                    </TableCell>
-                    <TableCell>
-                      <span className="font-medium">
-                        {formatLargeNumber(spac.trustBalance)}
-                      </span>
-                    </TableCell>
-                    <TableCell>{formatLargeNumber(spac.ipoSize)}</TableCell>
-                    <TableCell>
-                      {spac.deadline ? (
-                        <div className={cn(isUrgent && 'text-warning-600')}>
-                          <p className="text-sm">{formatDate(spac.deadline)}</p>
-                          <p className="text-xs text-slate-500">
-                            {days !== null && days > 0 ? `${days} days` : 'Expired'}
-                          </p>
-                        </div>
-                      ) : (
-                        <span className="text-slate-400">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      <span className="text-sm">{spac.activeTargets}</span>
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
+                      </TableCell>
+
+                      {/* Status Column */}
+                      <TableCell>
+                        <SpacStatusBadge status={spac.status} size="sm" />
+                      </TableCell>
+
+                      {/* Trust Value Column */}
+                      <TableCell className="hidden md:table-cell">
+                        <span className="font-medium">
+                          {formatLargeNumber(trustValue)}
+                        </span>
+                      </TableCell>
+
+                      {/* IPO Date Column */}
+                      <TableCell className="hidden lg:table-cell">
+                        <span className="text-sm text-slate-600">
+                          {formatDate(spac.ipoDate)}
+                        </span>
+                      </TableCell>
+
+                      {/* Deadline Column */}
+                      <TableCell className="hidden sm:table-cell">
+                        {spac.deadline ? (
+                          <div className={cn(
+                            isUrgent && 'text-warning-600',
+                            isExpired && 'text-danger-600'
+                          )}>
+                            <p className="text-sm">{formatDate(spac.deadline)}</p>
+                            <p className="text-xs text-slate-500">
+                              {days !== null && days > 0
+                                ? `${days} days left`
+                                : days === 0
+                                  ? 'Today'
+                                  : 'Expired'}
+                            </p>
+                          </div>
+                        ) : (
+                          <span className="text-slate-400">-</span>
+                        )}
+                      </TableCell>
+
+                      {/* Actions Column */}
+                      <TableCell className="text-right" onClick={(e) => e.stopPropagation()}>
+                        <Dropdown
+                          trigger={
+                            <div className="inline-flex h-8 w-8 items-center justify-center rounded-md hover:bg-slate-100">
+                              <MoreHorizontal className="h-4 w-4 text-slate-500" />
+                            </div>
+                          }
+                          align="right"
+                        >
+                          <DropdownItem
+                            icon={<Eye className="h-4 w-4" />}
+                            onClick={() => handleViewSpac(spac.id)}
+                          >
+                            View Details
+                          </DropdownItem>
+                          <DropdownItem
+                            icon={<Pencil className="h-4 w-4" />}
+                            onClick={() => handleEditSpac(spac.id)}
+                          >
+                            Edit
+                          </DropdownItem>
+                          <DropdownDivider />
+                          <DropdownItem
+                            icon={<Trash2 className="h-4 w-4" />}
+                            variant="danger"
+                            onClick={() => handleDeleteClick(spac.id, spac.name)}
+                          >
+                            Delete
+                          </DropdownItem>
+                        </Dropdown>
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
         </Card>
       )}
 
       {/* Empty State */}
-      {filteredSPACs.length === 0 && (
+      {items.length === 0 && !isLoading && (
         <EmptyState
           icon={<Building2 className="h-12 w-12" />}
           title="No SPACs found"
@@ -370,6 +600,135 @@ export default function SPACsPage() {
           }
         />
       )}
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between border-t border-slate-200 pt-4">
+          <p className="text-sm text-slate-500">
+            Page <span className="font-medium">{page}</span> of{' '}
+            <span className="font-medium">{totalPages}</span>
+          </p>
+
+          <div className="flex items-center gap-2">
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPage(1)}
+              disabled={page === 1 || isLoading}
+            >
+              First
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPage(p => Math.max(1, p - 1))}
+              disabled={page === 1 || isLoading}
+            >
+              <ChevronLeft className="h-4 w-4" />
+              <span className="hidden sm:inline ml-1">Previous</span>
+            </Button>
+
+            {/* Page Numbers */}
+            <div className="hidden sm:flex items-center gap-1">
+              {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
+                let pageNum: number;
+                if (totalPages <= 5) {
+                  pageNum = i + 1;
+                } else if (page <= 3) {
+                  pageNum = i + 1;
+                } else if (page >= totalPages - 2) {
+                  pageNum = totalPages - 4 + i;
+                } else {
+                  pageNum = page - 2 + i;
+                }
+
+                return (
+                  <button
+                    key={pageNum}
+                    onClick={() => setPage(pageNum)}
+                    disabled={isLoading}
+                    className={cn(
+                      'flex h-8 w-8 items-center justify-center rounded-md text-sm transition-colors',
+                      page === pageNum
+                        ? 'bg-primary-600 text-white'
+                        : 'text-slate-600 hover:bg-slate-100'
+                    )}
+                  >
+                    {pageNum}
+                  </button>
+                );
+              })}
+            </div>
+
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+              disabled={page === totalPages || isLoading}
+            >
+              <span className="hidden sm:inline mr-1">Next</span>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={() => setPage(totalPages)}
+              disabled={page === totalPages || isLoading}
+            >
+              Last
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Delete Confirmation Modal */}
+      <Modal
+        isOpen={deleteModalOpen}
+        onClose={() => {
+          setDeleteModalOpen(false);
+          setSpacToDelete(null);
+        }}
+        size="sm"
+      >
+        <ModalHeader>
+          <ModalTitle>Delete SPAC</ModalTitle>
+          <ModalDescription>
+            Are you sure you want to delete this SPAC? This action cannot be undone.
+          </ModalDescription>
+        </ModalHeader>
+        <ModalBody>
+          {spacToDelete && (
+            <div className="rounded-lg bg-slate-50 p-4">
+              <p className="font-medium text-slate-900">{spacToDelete.name}</p>
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setDeleteModalOpen(false);
+              setSpacToDelete(null);
+            }}
+          >
+            Cancel
+          </Button>
+          <Button
+            variant="danger"
+            onClick={handleConfirmDelete}
+            disabled={deleteMutation.isPending}
+          >
+            {deleteMutation.isPending ? (
+              <>
+                <LoadingSpinner size="sm" className="mr-2" />
+                Deleting...
+              </>
+            ) : (
+              'Delete'
+            )}
+          </Button>
+        </ModalFooter>
+      </Modal>
     </div>
   );
 }

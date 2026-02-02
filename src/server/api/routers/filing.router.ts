@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { Prisma } from '@prisma/client';
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -79,13 +80,17 @@ export const filingRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const { spacId, type, status, filedAfter, filedBefore, search, page, pageSize, sortBy, sortOrder } = input;
 
-      const where: any = {};
+      const where: Prisma.FilingWhereInput = {};
 
       if (spacId) where.spacId = spacId;
       if (type?.length) where.type = { in: type };
       if (status?.length) where.status = { in: status };
-      if (filedAfter) where.filedDate = { ...where.filedDate, gte: filedAfter };
-      if (filedBefore) where.filedDate = { ...where.filedDate, lte: filedBefore };
+      if (filedAfter || filedBefore) {
+        where.filedDate = {
+          ...(filedAfter && { gte: filedAfter }),
+          ...(filedBefore && { lte: filedBefore }),
+        };
+      }
 
       if (search) {
         where.OR = [
@@ -248,7 +253,7 @@ export const filingRouter = createTRPCRouter({
         });
       }
 
-      const updateData: any = { status: input.status };
+      const updateData: Prisma.FilingUpdateInput = { status: input.status };
 
       if (input.status === 'FILED') {
         updateData.filedDate = input.filedDate || new Date();
@@ -534,7 +539,7 @@ export const filingRouter = createTRPCRouter({
   getStatistics: protectedProcedure
     .input(z.object({ spacId: UuidSchema.optional() }))
     .query(async ({ ctx, input }) => {
-      const where: any = {};
+      const where: Prisma.FilingWhereInput = {};
       if (input.spacId) where.spacId = input.spacId;
 
       const [total, byType, byStatus, avgReviewTime] = await Promise.all([

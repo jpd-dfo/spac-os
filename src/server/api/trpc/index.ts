@@ -7,7 +7,7 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import { type CreateNextContextOptions } from '@trpc/server/adapters/next';
 import superjson from 'superjson';
 import { ZodError } from 'zod';
-import { prisma } from '@/lib/prisma';
+import { db } from '@/server/db';
 import { getServerAuthSession } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 
@@ -20,7 +20,7 @@ export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   const session = await getServerAuthSession({ req, res });
 
   return {
-    prisma,
+    db,
     session,
     req,
     res,
@@ -88,7 +88,7 @@ const enforceOrgAccess = t.middleware(async ({ ctx, next, rawInput }) => {
 
   const input = rawInput as { organizationId?: string };
   if (input?.organizationId) {
-    const membership = await ctx.prisma.organizationUser.findUnique({
+    const membership = await ctx.db.organizationUser.findUnique({
       where: {
         organizationId_userId: {
           organizationId: input.organizationId,
@@ -135,7 +135,7 @@ const auditMiddleware = t.middleware(async ({ ctx, path, type, rawInput, next })
   if (type === 'mutation' && ctx.session?.user) {
     try {
       const input = rawInput as Record<string, unknown>;
-      await ctx.prisma.auditLog.create({
+      await ctx.db.auditLog.create({
         data: {
           organizationId: (input?.organizationId as string) || ctx.session.user.organizationId || '',
           userId: ctx.session.user.id,

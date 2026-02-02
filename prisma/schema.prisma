@@ -1,6 +1,6 @@
 // SPAC OS Database Schema
 // PostgreSQL with Prisma ORM
-// Sprint 1 - Core Models
+// Sprint 2 - Full Models
 
 generator client {
   provider = "prisma-client-js"
@@ -19,21 +19,61 @@ enum SpacStatus {
   PRE_IPO
   SEARCHING
   LOI_SIGNED
+  DA_ANNOUNCED
+  SEC_REVIEW
+  SHAREHOLDER_VOTE
+  CLOSING
+  COMPLETED
+  LIQUIDATING
+  LIQUIDATED
+  TERMINATED
+  // Legacy values for compatibility
   DEFINITIVE_AGREEMENT
   VOTE_PENDING
   DE_SPAC_COMPLETE
-  LIQUIDATED
+}
+
+enum SpacPhase {
+  PRE_IPO
+  IPO
+  TARGET_SEARCH
+  LOI
+  DUE_DILIGENCE
+  DA_NEGOTIATION
+  SEC_REVIEW
+  PROXY
+  VOTE
+  CLOSING
+  POST_CLOSE
+  LIQUIDATION
 }
 
 enum TargetStatus {
   IDENTIFIED
+  PRELIMINARY
   INITIAL_OUTREACH
   NDA_SIGNED
   DUE_DILIGENCE
+  TERM_SHEET
+  LOI
   LOI_SUBMITTED
+  DEFINITIVE
   NEGOTIATION
+  CLOSED
+  PASSED
   REJECTED
+  TERMINATED
   CLOSED_WON
+}
+
+enum TargetStage {
+  SOURCING
+  SCREENING
+  PRELIMINARY_DD
+  FULL_DD
+  NEGOTIATION
+  DOCUMENTATION
+  CLOSING
 }
 
 enum DocumentType {
@@ -44,7 +84,24 @@ enum DocumentType {
   DUE_DILIGENCE
   BOARD_PRESENTATION
   SEC_FILING
+  INVESTOR_PRESENTATION
+  PRESS_RELEASE
+  LEGAL
+  TAX
+  INSURANCE
+  ENVIRONMENTAL
+  TECHNICAL
   OTHER
+}
+
+enum DocumentStatus {
+  DRAFT
+  PENDING_REVIEW
+  IN_REVIEW
+  APPROVED
+  REJECTED
+  FINAL
+  ARCHIVED
 }
 
 enum SecFilingStatus {
@@ -55,6 +112,40 @@ enum SecFilingStatus {
   AMENDED
 }
 
+enum FilingType {
+  S1
+  S4
+  F1
+  F4
+  DEFA14A
+  DEFM14A
+  PRER14A
+  PREM14A
+  SC_TO
+  FORM_8K
+  FORM_10K
+  FORM_10Q
+  FORM_425
+  SUPER_8K
+  REGISTRATION
+  PROXY
+  PROSPECTUS
+  OTHER
+}
+
+enum FilingStatus {
+  DRAFTING
+  INTERNAL_REVIEW
+  LEGAL_REVIEW
+  BOARD_APPROVAL
+  FILED
+  SEC_COMMENT
+  RESPONSE_FILED
+  AMENDED
+  EFFECTIVE
+  WITHDRAWN
+}
+
 enum ContactType {
   INVESTOR
   ADVISOR
@@ -62,6 +153,9 @@ enum ContactType {
   BANKER
   TARGET_EXEC
   BOARD_MEMBER
+  SPONSOR
+  UNDERWRITER
+  AUDITOR
   OTHER
 }
 
@@ -84,6 +178,7 @@ enum OrganizationRole {
   OWNER
   ADMIN
   MEMBER
+  VIEWER
 }
 
 enum FinancialType {
@@ -94,83 +189,352 @@ enum FinancialType {
   FORECAST
 }
 
+enum ComplianceStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLIANT
+  NON_COMPLIANT
+  WAIVED
+  EXPIRED
+}
+
+enum WarrantType {
+  PUBLIC
+  PRIVATE
+  WORKING_CAPITAL
+  FORWARD_PURCHASE
+}
+
+enum PipeStatus {
+  PROSPECT
+  CONTACTED
+  INTERESTED
+  TERM_SHEET
+  COMMITTED
+  FUNDED
+  DECLINED
+}
+
+enum EarnoutStatus {
+  PENDING
+  TRACKING
+  ACHIEVED
+  MISSED
+  EXPIRED
+}
+
+enum ConflictSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum TradingWindowStatus {
+  OPEN
+  CLOSED
+  BLACKOUT
+}
+
+enum MilestoneType {
+  REGULATORY
+  FINANCIAL
+  LEGAL
+  OPERATIONAL
+  STRATEGIC
+  OTHER
+}
+
+enum SponsorTier {
+  TIER_1
+  TIER_2
+  TIER_3
+  EMERGING
+}
+
 // ============================================================================
 // MODELS
 // ============================================================================
 
-/// SPAC entity - Represents a Special Purpose Acquisition Company
-model Spac {
-  id             String     @id @default(cuid())
-  name           String
-  ticker         String?    @unique
-  status         SpacStatus @default(SEARCHING)
-  trustAmount    Decimal?   @db.Decimal(18, 2)
-  ipoDate        DateTime?
-  deadlineDate   DateTime?
-  redemptionRate Decimal?   @db.Decimal(5, 4)
+/// User - System user (synced from Clerk)
+model User {
+  id        String  @id @default(cuid())
+  clerkId   String? @unique
+  email     String  @unique
+  name      String?
+  image     String?
+  firstName String?
+  lastName  String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  targets    Target[]
-  documents  Document[]
-  filings    SecFiling[]
-  financials Financial[]
-  tasks      Task[]
+  assignedTasks         Task[]                 @relation("TaskAssignee")
+  createdTasks          Task[]                 @relation("TaskCreator")
+  insiderTradingWindows InsiderTradingWindow[]
+  comments              Comment[]
+  auditLogs             AuditLog[]             @relation("UserAuditLogs")
 
+  @@index([clerkId])
+  @@index([email])
+  @@map("users")
+}
+
+/// Sponsor - SPAC Sponsor entity
+model Sponsor {
+  id          String      @id @default(cuid())
+  name        String
+  tier        SponsorTier @default(TIER_2)
+  description String?     @db.Text
+  website     String?
+  logoUrl     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacs SpacSponsor[]
+
+  @@map("sponsors")
+}
+
+/// SpacSponsor - Many-to-many relationship between SPACs and Sponsors
+model SpacSponsor {
+  id          String   @id @default(cuid())
+  isPrimary   Boolean  @default(false)
+  ownershipPct Decimal? @db.Decimal(5, 4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId    String
+  spac      Spac    @relation(fields: [spacId], references: [id], onDelete: Cascade)
+  sponsorId String
+  sponsor   Sponsor @relation(fields: [sponsorId], references: [id], onDelete: Cascade)
+
+  @@unique([spacId, sponsorId])
+  @@index([spacId])
+  @@index([sponsorId])
+  @@map("spac_sponsors")
+}
+
+/// SPAC entity - Represents a Special Purpose Acquisition Company
+model Spac {
+  id               String     @id @default(cuid())
+  name             String
+  ticker           String?    @unique
+  cik              String?
+  status           SpacStatus @default(SEARCHING)
+  phase            SpacPhase  @default(TARGET_SEARCH)
+  description      String?    @db.Text
+
+  // Financial
+  trustAmount      Decimal?   @db.Decimal(18, 2)
+  ipoSize          Decimal?   @db.Decimal(18, 2)
+  trustBalance     Decimal?   @db.Decimal(18, 2)
+  sharesOutstanding BigInt?
+
+  // Key Dates
+  ipoDate          DateTime?
+  deadline         DateTime?
+  deadlineDate     DateTime?
+  extensionDeadline DateTime?
+  daAnnouncedDate  DateTime?
+  proxyFiledDate   DateTime?
+  voteDate         DateTime?
+  closingDate      DateTime?
+
+  // Extensions
+  maxExtensions    Int        @default(2)
+  extensionsUsed   Int        @default(0)
+  extensionCount   Int        @default(0)
+
+  // Redemption
+  redemptionRate   Decimal?   @db.Decimal(5, 4)
+
+  // Target criteria
+  targetSectors    String[]   @default([])
+  targetGeographies String[]  @default([])
+  tags             String[]   @default([])
+
+  // Soft delete
+  deletedAt        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organizationId   String?
+  organization     Organization?    @relation(fields: [organizationId], references: [id])
+  sponsors         SpacSponsor[]
+  targets          Target[]
+  documents        Document[]
+  filings          Filing[]
+  secFilings       SecFiling[]
+  financials       Financial[]
+  tasks            Task[]
+  trustAccounts    TrustAccount[]
+  capTableEntries  CapTableEntry[]
+  warrants         Warrant[]
+  redemptions      Redemption[]
+  pipes            PipeInvestor[]
+  earnouts         Earnout[]
+  milestones       Milestone[]
+  complianceItems  ComplianceItem[]
+  boardMeetings    BoardMeeting[]
+  conflicts        Conflict[]
+  insiderWindows   InsiderTradingWindow[]
+  secComments      SecComment[]
+  webhooks         Webhook[]
+
+  @@index([organizationId])
+  @@index([status])
+  @@index([ticker])
   @@map("spacs")
 }
 
 /// Target company - Potential acquisition targets for SPACs
 model Target {
-  id        String       @id @default(cuid())
-  name      String
-  industry  String?
-  status    TargetStatus @default(IDENTIFIED)
-  valuation Decimal?     @db.Decimal(18, 2)
-  revenue   Decimal?     @db.Decimal(18, 2)
-  ebitda    Decimal?     @db.Decimal(18, 2)
-  aiScore   Decimal?     @db.Decimal(5, 2)
+  id               String       @id @default(cuid())
+  name             String
+  description      String?      @db.Text
+  industry         String?
+  sector           String?
+  status           TargetStatus @default(IDENTIFIED)
+  stage            TargetStage?
+
+  // Valuation
+  valuation        Decimal?     @db.Decimal(18, 2)
+  enterpriseValue  Decimal?     @db.Decimal(18, 2)
+  revenue          Decimal?     @db.Decimal(18, 2)
+  ebitda           Decimal?     @db.Decimal(18, 2)
+  evRevenue        Decimal?     @db.Decimal(10, 2)
+  evEbitda         Decimal?     @db.Decimal(10, 2)
+
+  // Scoring
+  aiScore          Decimal?     @db.Decimal(5, 2)
+  overallScore     Decimal?     @db.Decimal(5, 2)
+  managementScore  Int?
+  marketScore      Int?
+  financialScore   Int?
+  operationalScore Int?
+  riskScore        Int?
+
+  // Priority
+  priority         Int          @default(0)
+  probability      Decimal?     @db.Decimal(5, 4)
+
+  // Due Diligence
+  dueDiligenceStatus Json?
+  keyRisks           String[]   @default([])
+  keyOpportunities   String[]   @default([])
+
+  // Key Dates
+  identifiedDate   DateTime?
+  ndaDate          DateTime?
+  ndaSignedDate    DateTime?
+  loiDate          DateTime?
+  loiSignedDate    DateTime?
+  daDate           DateTime?
+  daSignedDate     DateTime?
+  expectedCloseDate DateTime?
+  actualCloseDate  DateTime?
+
+  // Soft delete
+  deletedAt        DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  spacId    String?
-  spac      Spac?      @relation(fields: [spacId], references: [id])
-  documents Document[]
+  spacId       String?
+  spac         Spac?           @relation(fields: [spacId], references: [id])
+  documents    Document[]
+  tasks        Task[]
+  contacts     TargetContact[]
+  transactions Transaction[]
 
   @@index([spacId])
+  @@index([status])
+  @@index([industry])
   @@map("targets")
+}
+
+/// TargetContact - Many-to-many relationship between Targets and Contacts
+model TargetContact {
+  id        String  @id @default(cuid())
+  role      String?
+  isPrimary Boolean @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  targetId  String
+  target    Target  @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  contactId String
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+
+  @@unique([targetId, contactId])
+  @@index([targetId])
+  @@index([contactId])
+  @@map("target_contacts")
+}
+
+/// Transaction - Target transaction records
+model Transaction {
+  id          String   @id @default(cuid())
+  type        String
+  amount      Decimal? @db.Decimal(18, 2)
+  description String?  @db.Text
+  date        DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  targetId String
+  target   Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([targetId])
+  @@map("transactions")
 }
 
 /// Document - Files and documents related to SPACs and targets
 model Document {
-  id              String       @id @default(cuid())
+  id              String         @id @default(cuid())
   name            String
-  type            DocumentType @default(OTHER)
+  type            DocumentType   @default(OTHER)
+  category        String?
+  status          DocumentStatus @default(DRAFT)
   fileUrl         String?
   fileSize        Int?
   mimeType        String?
-  aiSummary       String?      @db.Text
+  aiSummary       String?        @db.Text
   aiExtractedData Json?
+
+  // Soft delete
+  deletedAt       DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
   spacId   String?
-  spac     Spac?   @relation(fields: [spacId], references: [id])
+  spac     Spac?            @relation(fields: [spacId], references: [id])
   targetId String?
-  target   Target? @relation(fields: [targetId], references: [id])
+  target   Target?          @relation(fields: [targetId], references: [id])
+  filings  FilingDocument[]
 
   @@index([spacId])
   @@index([targetId])
+  @@index([type])
   @@map("documents")
 }
 
-/// SEC Filing - SEC filings and regulatory documents
+/// SEC Filing - SEC filings and regulatory documents (legacy model)
 model SecFiling {
   id         String          @id @default(cuid())
   formType   String
@@ -190,6 +554,121 @@ model SecFiling {
   @@map("sec_filings")
 }
 
+/// Filing - Enhanced SEC filing management
+model Filing {
+  id               String       @id @default(cuid())
+  type             FilingType
+  status           FilingStatus @default(DRAFTING)
+  title            String?
+  description      String?      @db.Text
+
+  // SEC Details
+  cik              String?
+  accessionNumber  String?
+  fileNumber       String?
+  edgarUrl         String?
+
+  // Dates
+  dueDate          DateTime?
+  filedDate        DateTime?
+  effectiveDate    DateTime?
+  internalReviewDate DateTime?
+  externalReviewDate DateTime?
+  secCommentDate   DateTime?
+  responseDate     DateTime?
+
+  // Amendment tracking
+  amendmentNumber  Int          @default(0)
+  parentFilingId   String?
+  parentFiling     Filing?      @relation("FilingAmendments", fields: [parentFilingId], references: [id])
+  amendments       Filing[]     @relation("FilingAmendments")
+
+  // SEC Comment tracking
+  secCommentCount  Int          @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId      String
+  spac        Spac             @relation(fields: [spacId], references: [id], onDelete: Cascade)
+  secComments SecComment[]
+  documents   FilingDocument[]
+  tasks       Task[]
+  comments    Comment[]
+
+  @@index([spacId])
+  @@index([type])
+  @@index([status])
+  @@index([filedDate])
+  @@map("filings")
+}
+
+/// FilingDocument - Many-to-many relationship between Filings and Documents
+model FilingDocument {
+  id String @id @default(cuid())
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  filingId   String
+  filing     Filing   @relation(fields: [filingId], references: [id], onDelete: Cascade)
+  documentId String
+  document   Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@unique([filingId, documentId])
+  @@index([filingId])
+  @@index([documentId])
+  @@map("filing_documents")
+}
+
+/// SecComment - SEC comment letters and responses
+model SecComment {
+  id             String    @id @default(cuid())
+  commentNumber  Int
+  commentText    String    @db.Text
+  category       String?
+  receivedDate   DateTime
+  dueDate        DateTime?
+  responseText   String?   @db.Text
+  responseDate   DateTime?
+  isResolved     Boolean   @default(false)
+  resolvedDate   DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId   String
+  spac     Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+  filingId String
+  filing   Filing @relation(fields: [filingId], references: [id], onDelete: Cascade)
+
+  @@index([spacId])
+  @@index([filingId])
+  @@index([isResolved])
+  @@map("sec_comments")
+}
+
+/// Comment - User comments on various entities
+model Comment {
+  id      String  @id @default(cuid())
+  content String  @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  userId   String
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filingId String?
+  filing   Filing? @relation(fields: [filingId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([filingId])
+  @@map("comments")
+}
+
 /// Contact - CRM contacts for investors, advisors, and other stakeholders
 model Contact {
   id        String      @id @default(cuid())
@@ -204,6 +683,9 @@ model Contact {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  // Relations
+  targets TargetContact[]
+
   @@index([email])
   @@map("contacts")
 }
@@ -215,16 +697,32 @@ model Task {
   description String?      @db.Text
   status      TaskStatus   @default(NOT_STARTED)
   priority    TaskPriority @default(MEDIUM)
+  category    String?
   dueDate     DateTime?
+  completedAt DateTime?
+
+  // Soft delete
+  deletedAt   DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  spacId String?
-  spac   Spac?   @relation(fields: [spacId], references: [id])
+  spacId     String?
+  spac       Spac?   @relation(fields: [spacId], references: [id])
+  targetId   String?
+  target     Target? @relation(fields: [targetId], references: [id])
+  filingId   String?
+  filing     Filing? @relation(fields: [filingId], references: [id])
+  assigneeId String?
+  assignee   User?   @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  creatorId  String?
+  creator    User?   @relation("TaskCreator", fields: [creatorId], references: [id])
 
   @@index([spacId])
+  @@index([targetId])
+  @@index([filingId])
+  @@index([assigneeId])
   @@index([status])
   @@index([dueDate])
   @@map("tasks")
@@ -249,6 +747,340 @@ model Financial {
   @@map("financials")
 }
 
+/// TrustAccount - Trust account balance tracking
+model TrustAccount {
+  id              String    @id @default(cuid())
+  accountName     String?
+  currentBalance  Decimal   @db.Decimal(18, 2)
+  balanceDate     DateTime
+  perShareValue   Decimal?  @db.Decimal(10, 4)
+  accruedInterest Decimal?  @db.Decimal(18, 2)
+  balanceHistory  Json?     // Array of historical balances
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  @@index([spacId])
+  @@index([balanceDate])
+  @@map("trust_accounts")
+}
+
+/// CapTableEntry - Cap table ownership records
+model CapTableEntry {
+  id           String  @id @default(cuid())
+  holderName   String
+  holderType   String  // FOUNDER, SPONSOR, PUBLIC, PIPE, etc.
+  shareClass   String  // CLASS_A, CLASS_B, FOUNDER, etc.
+  sharesOwned  BigInt
+  ownershipPct Decimal @db.Decimal(10, 6)
+  vestingInfo  Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  @@index([spacId])
+  @@index([holderType])
+  @@index([shareClass])
+  @@map("cap_table_entries")
+}
+
+/// Warrant - Warrant tracking
+model Warrant {
+  id                String      @id @default(cuid())
+  type              WarrantType
+  totalWarrants     BigInt
+  exercisePrice     Decimal     @db.Decimal(10, 4)
+  expirationDate    DateTime?
+  warrantsExercised BigInt      @default(0)
+  warrantsRedeemed  BigInt      @default(0)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  @@index([spacId])
+  @@index([type])
+  @@map("warrants")
+}
+
+/// Redemption - Redemption event tracking
+model Redemption {
+  id              String   @id @default(cuid())
+  eventType       String   // EXTENSION, VOTE, OTHER
+  eventDate       DateTime
+  sharesEligible  BigInt
+  sharesRedeemed  BigInt
+  redemptionRate  Decimal  @db.Decimal(10, 6)
+  redemptionPrice Decimal? @db.Decimal(10, 4)
+  totalPayout     Decimal? @db.Decimal(18, 2)
+  remainingShares BigInt?
+  remainingTrust  Decimal? @db.Decimal(18, 2)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  @@index([spacId])
+  @@index([eventDate])
+  @@map("redemptions")
+}
+
+/// PipeInvestor - PIPE investor tracking
+model PipeInvestor {
+  id              String     @id @default(cuid())
+  investorName    String
+  investorType    String?    // STRATEGIC, FINANCIAL, etc.
+  status          PipeStatus @default(PROSPECT)
+  targetAmount    Decimal?   @db.Decimal(18, 2)
+  committedAmount Decimal?   @db.Decimal(18, 2)
+  fundedAmount    Decimal?   @db.Decimal(18, 2)
+  commitmentDate  DateTime?
+  fundingDate     DateTime?
+  notes           String?    @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  @@index([spacId])
+  @@index([status])
+  @@map("pipe_investors")
+}
+
+/// Earnout - Earnout milestone tracking
+model Earnout {
+  id               String        @id @default(cuid())
+  name             String
+  description      String?       @db.Text
+  status           EarnoutStatus @default(PENDING)
+  metricType       String        // STOCK_PRICE, REVENUE, EBITDA, etc.
+  targetValue      Decimal       @db.Decimal(18, 2)
+  currentValue     Decimal?      @db.Decimal(18, 2)
+  earnoutShares    BigInt
+  sharesEarned     BigInt        @default(0)
+  measurementStart DateTime?
+  measurementEnd   DateTime?
+  achievedDate     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  @@index([spacId])
+  @@index([status])
+  @@map("earnouts")
+}
+
+/// Milestone - Key milestones for SPAC lifecycle
+model Milestone {
+  id          String        @id @default(cuid())
+  name        String
+  description String?       @db.Text
+  type        MilestoneType @default(OTHER)
+  targetDate  DateTime?
+  actualDate  DateTime?
+  isCompleted Boolean       @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  @@index([spacId])
+  @@index([isCompleted])
+  @@map("milestones")
+}
+
+// ============================================================================
+// COMPLIANCE MODELS
+// ============================================================================
+
+/// ComplianceItem - Compliance requirements and tracking
+model ComplianceItem {
+  id            String           @id @default(cuid())
+  name          String
+  description   String?          @db.Text
+  category      String           // SEC, LEGAL, CORPORATE, etc.
+  status        ComplianceStatus @default(PENDING)
+  dueDate       DateTime?
+  completedDate DateTime?
+  assignedTo    String?
+  notes         String?          @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  @@index([spacId])
+  @@index([status])
+  @@index([category])
+  @@index([dueDate])
+  @@map("compliance_items")
+}
+
+/// BoardMeeting - Board meeting records
+model BoardMeeting {
+  id             String    @id @default(cuid())
+  title          String
+  type           String    // REGULAR, SPECIAL, UNANIMOUS_CONSENT
+  status         String    @default("scheduled") // scheduled, in_progress, completed, cancelled
+  scheduledDate  DateTime
+  actualDate     DateTime?
+  location       String?
+  agenda         String?   @db.Text
+  minutes        String?   @db.Text
+  attendees      String[]  @default([])
+  quorumRequired Int?
+  quorumMet      Boolean?
+  resolutions    Json?     // Array of resolutions with voting results
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  @@index([spacId])
+  @@index([scheduledDate])
+  @@index([status])
+  @@map("board_meetings")
+}
+
+/// Conflict - Conflicts of interest tracking
+model Conflict {
+  id              String           @id @default(cuid())
+  title           String
+  description     String           @db.Text
+  involvedParties String[]         @default([])
+  severity        ConflictSeverity @default(MEDIUM)
+  isResolved      Boolean          @default(false)
+  resolution      String?          @db.Text
+  resolvedDate    DateTime?
+  disclosedDate   DateTime?
+  disclosedIn     String?          // Filing or document where disclosed
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  @@index([spacId])
+  @@index([severity])
+  @@index([isResolved])
+  @@map("conflicts")
+}
+
+/// InsiderTradingWindow - Insider trading window management
+model InsiderTradingWindow {
+  id          String              @id @default(cuid())
+  name        String?
+  status      TradingWindowStatus @default(OPEN)
+  startDate   DateTime
+  endDate     DateTime?
+  reason      String?             @db.Text
+  affectsAll  Boolean             @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  spacId String
+  spac   Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+  userId String?
+  user   User?  @relation(fields: [userId], references: [id])
+
+  @@index([spacId])
+  @@index([userId])
+  @@index([status])
+  @@index([startDate])
+  @@map("insider_trading_windows")
+}
+
+// ============================================================================
+// WEBHOOK MODELS
+// ============================================================================
+
+/// Webhook - Webhook configuration
+model Webhook {
+  id              String   @id @default(cuid())
+  name            String
+  url             String
+  secret          String
+  events          String[] @default([])
+  headers         Json?
+  isActive        Boolean  @default(true)
+  failureCount    Int      @default(0)
+  lastTriggeredAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  organizationId String
+  organization   Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  spacId         String?
+  spac           Spac?             @relation(fields: [spacId], references: [id])
+  deliveries     WebhookDelivery[]
+
+  @@index([organizationId])
+  @@index([spacId])
+  @@index([isActive])
+  @@map("webhooks")
+}
+
+/// WebhookDelivery - Webhook delivery records
+model WebhookDelivery {
+  id          String    @id @default(cuid())
+  eventType   String
+  payload     Json
+  statusCode  Int?
+  response    String?   @db.Text
+  error       String?   @db.Text
+  duration    Int?      // milliseconds
+  success     Boolean   @default(false)
+  attempts    Int       @default(1)
+  deliveredAt DateTime?
+
+  createdAt DateTime @default(now())
+
+  // Relations
+  webhookId String
+  webhook   Webhook @relation(fields: [webhookId], references: [id], onDelete: Cascade)
+
+  @@index([webhookId])
+  @@index([success])
+  @@index([createdAt])
+  @@map("webhook_deliveries")
+}
+
 /// Organization - Multi-tenant organization for SPAC OS
 model Organization {
   id   String @id @default(cuid())
@@ -261,6 +1093,8 @@ model Organization {
   // Relations
   users     OrganizationUser[]
   auditLogs AuditLog[]
+  spacs     Spac[]
+  webhooks  Webhook[]
 
   @@index([slug])
   @@map("organizations")
@@ -291,7 +1125,7 @@ model AuditLog {
   action     String
   entityType String
   entityId   String
-  userId     String
+  userId     String?
   metadata   Json?
   ipAddress  String?
   userAgent  String?
@@ -301,6 +1135,7 @@ model AuditLog {
   // Relations
   organizationId String
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User?        @relation("UserAuditLogs", fields: [userId], references: [id])
 
   @@index([organizationId])
   @@index([userId])

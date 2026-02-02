@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { Prisma } from '@prisma/client';
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -20,6 +21,14 @@ import {
   UuidSchema,
   PaginationSchema,
 } from '@/schemas';
+
+/** Balance history entry structure */
+interface BalanceHistoryEntry {
+  date: Date;
+  balance: number;
+  perShare: number;
+  note?: string;
+}
 
 export const financialRouter = createTRPCRouter({
   // ============================================================================
@@ -99,7 +108,7 @@ export const financialRouter = createTRPCRouter({
         }
 
         // Add to balance history
-        const balanceHistory = account.balanceHistory as any[] || [];
+        const balanceHistory = (account.balanceHistory as BalanceHistoryEntry[]) || [];
         balanceHistory.push({
           date: input.balanceDate,
           balance: input.balance,
@@ -131,7 +140,7 @@ export const financialRouter = createTRPCRouter({
           return [];
         }
 
-        return account.balanceHistory as any[] || [];
+        return (account.balanceHistory as BalanceHistoryEntry[]) || [];
       }),
   },
 
@@ -147,7 +156,7 @@ export const financialRouter = createTRPCRouter({
         holderType: z.string().optional(),
       }))
       .query(async ({ ctx, input }) => {
-        const where: any = { spacId: input.spacId };
+        const where: Prisma.CapTableEntryWhereInput = { spacId: input.spacId };
         if (input.shareClass) where.shareClass = input.shareClass;
         if (input.holderType) where.holderType = input.holderType;
 
@@ -456,7 +465,7 @@ export const financialRouter = createTRPCRouter({
         status: z.array(z.string()).optional(),
       }))
       .query(async ({ ctx, input }) => {
-        const where: any = { spacId: input.spacId };
+        const where: Prisma.PipeInvestorWhereInput = { spacId: input.spacId };
         if (input.status?.length) where.status = { in: input.status };
 
         return ctx.db.pipeInvestor.findMany({
@@ -540,7 +549,7 @@ export const financialRouter = createTRPCRouter({
       .mutation(async ({ ctx, input }) => {
         const { id, status, ...data } = input;
 
-        const updateData: any = { status };
+        const updateData: Prisma.PipeInvestorUpdateInput = { status };
         if (data.committedAmount) updateData.committedAmount = data.committedAmount;
         if (data.fundedAmount) updateData.fundedAmount = data.fundedAmount;
         if (status === 'COMMITTED' && !data.commitmentDate) {
@@ -615,7 +624,7 @@ export const financialRouter = createTRPCRouter({
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Earnout not found' });
         }
 
-        const updateData: any = {
+        const updateData: Prisma.EarnoutUpdateInput = {
           currentValue: input.currentValue,
           status: 'TRACKING',
         };
