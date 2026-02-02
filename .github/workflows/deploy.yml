@@ -79,9 +79,7 @@ jobs:
     needs: pre-deploy
     if: needs.pre-deploy.outputs.should_deploy == 'true'
 
-    environment:
-      name: ${{ github.event.inputs.environment || 'production' }}
-
+    # Note: Using repository secrets, not environment secrets
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -117,7 +115,7 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     needs: [pre-deploy, migrate]
-    if: needs.pre-deploy.outputs.should_deploy == 'true'
+    if: needs.pre-deploy.outputs.should_deploy == 'true' && vars.SKIP_VERCEL_DEPLOY != 'true'
 
     environment:
       name: ${{ github.event.inputs.environment || 'production' }}
