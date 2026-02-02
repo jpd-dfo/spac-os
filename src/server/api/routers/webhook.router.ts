@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { Prisma } from '@prisma/client';
 import crypto from 'crypto';
 import {
   createTRPCRouter,
@@ -19,6 +20,14 @@ import {
   WebhookEventTypeSchema,
 } from '@/schemas';
 
+/** Webhook payload structure */
+interface WebhookPayload {
+  event: string;
+  timestamp: string;
+  test?: boolean;
+  data: Record<string, unknown>;
+}
+
 export const webhookRouter = createTRPCRouter({
   /**
    * List webhooks for an organization
@@ -32,7 +41,7 @@ export const webhookRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const { organizationId, isActive, page, pageSize } = input;
 
-      const where: any = { organizationId };
+      const where: Prisma.WebhookWhereInput = { organizationId };
       if (isActive !== undefined) where.isActive = isActive;
 
       const [items, total] = await Promise.all([
@@ -309,7 +318,7 @@ export const webhookRouter = createTRPCRouter({
     .query(async ({ ctx, input }) => {
       const { webhookId, success, page, pageSize } = input;
 
-      const where: any = { webhookId };
+      const where: Prisma.WebhookDeliveryWhereInput = { webhookId };
       if (success !== undefined) where.success = success;
 
       const [items, total] = await Promise.all([
@@ -347,7 +356,7 @@ export const webhookRouter = createTRPCRouter({
         });
       }
 
-      const payload = delivery.payload as any;
+      const payload = delivery.payload as WebhookPayload;
       const signature = crypto
         .createHmac('sha256', delivery.webhook.secret)
         .update(JSON.stringify(payload))

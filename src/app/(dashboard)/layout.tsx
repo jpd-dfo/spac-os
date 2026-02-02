@@ -1,31 +1,16 @@
-'use client';
-
-import { useAuth } from '@clerk/nextjs';
+import { auth } from '@clerk/nextjs/server';
 import { redirect } from 'next/navigation';
 import { Sidebar } from '@/components/layout/Sidebar';
 import { Header } from '@/components/layout/Header';
 
-export default function DashboardLayout({
+export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { userId } = await auth();
 
-  // Show loading state while Clerk is initializing
-  if (!isLoaded) {
-    return (
-      <div className="flex h-screen items-center justify-center bg-gray-50">
-        <div className="flex flex-col items-center gap-4">
-          <div className="h-10 w-10 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
-          <p className="text-sm text-slate-500">Loading...</p>
-        </div>
-      </div>
-    );
-  }
-
-  // Redirect to sign-in if not authenticated
-  if (!isSignedIn) {
+  if (!userId) {
     redirect('/sign-in');
   }
 

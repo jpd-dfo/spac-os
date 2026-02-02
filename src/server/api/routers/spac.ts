@@ -1,174 +1,135 @@
 /**
  * SPAC OS - SPAC Router
- * Full CRUD operations for SPACs with filtering and search
+ * Full CRUD operations for SPACs with filtering, search, and audit logging
  */
 
-import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
+
 import {
   createTRPCRouter,
-  publicProcedure,
   protectedProcedure,
-  orgAuditedProcedure,
 } from '../trpc';
 
 // Input validation schemas
-const UuidSchema = z.string().uuid();
+const UuidSchema = z.string().min(1, 'ID is required');
 
 const SpacStatusSchema = z.enum([
+  'PRE_IPO',
   'SEARCHING',
   'LOI_SIGNED',
-  'DA_ANNOUNCED',
-  'SEC_REVIEW',
-  'SHAREHOLDER_VOTE',
-  'CLOSING',
-  'COMPLETED',
-  'LIQUIDATING',
-  'LIQUIDATED',
-  'TERMINATED',
-]);
-
-const SpacPhaseSchema = z.enum([
-  'FORMATION',
-  'IPO',
-  'TARGET_SEARCH',
-  'DUE_DILIGENCE',
-  'NEGOTIATION',
   'DEFINITIVE_AGREEMENT',
-  'SEC_REVIEW',
-  'SHAREHOLDER_VOTE',
-  'CLOSING',
-  'DE_SPAC',
+  'VOTE_PENDING',
+  'DE_SPAC_COMPLETE',
+  'LIQUIDATED',
 ]);
 
-const SpacCreateSchema = z.object({
-  organizationId: UuidSchema,
-  name: z.string().min(1).max(255),
-  ticker: z.string().min(1).max(10).regex(/^[A-Z0-9.]+$/).optional().nullable(),
-  cusip: z.string().length(9).optional().nullable(),
-  isin: z.string().length(12).optional().nullable(),
-  cik: z.string().max(10).optional().nullable(),
-  status: SpacStatusSchema.default('SEARCHING'),
-  phase: SpacPhaseSchema.default('FORMATION'),
-  ipoDate: z.coerce.date().optional().nullable(),
-  ipoSize: z.number().min(0).optional().nullable(),
-  ipoPrice: z.number().positive().optional().nullable(),
-  trustSize: z.number().min(0).optional().nullable(),
-  trustBalance: z.number().min(0).optional().nullable(),
-  trustPerShare: z.number().positive().optional().nullable(),
-  deadline: z.coerce.date().optional().nullable(),
-  deadlineDate: z.coerce.date().optional().nullable(),
-  maxExtensions: z.number().int().min(0).max(12).default(6),
-  extensionMonths: z.number().int().min(1).max(12).default(1),
-  description: z.string().optional().nullable(),
-  investmentThesis: z.string().optional().nullable(),
-  targetSectors: z.array(z.string()).default([]),
-  targetIndustries: z.array(z.string()).default([]),
-  targetGeographies: z.array(z.string()).default([]),
-  targetSizeMin: z.number().min(0).optional().nullable(),
-  targetSizeMax: z.number().min(0).optional().nullable(),
-  exchange: z.string().max(20).optional().nullable(),
-  notes: z.string().optional().nullable(),
-  tags: z.array(z.string()).default([]),
-  metadata: z.record(z.unknown()).optional().default({}),
+// List input schema with pagination, filtering, and sorting
+const SpacListSchema = z.object({
+  page: z.number().int().min(1).default(1),
+  limit: z.number().int().min(1).max(100).default(20),
+  status: SpacStatusSchema.optional(),
+  search: z.string().optional(),
+  sortBy: z.enum(['name', 'ticker', 'status', 'ipoDate', 'deadlineDate', 'trustAmount', 'createdAt', 'updatedAt']).optional(),
+  sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
-const SpacUpdateSchema = SpacCreateSchema.partial().omit({ organizationId: true });
+// Create input schema - all required Spac fields from Prisma schema
+const SpacCreateSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(255),
+  ticker: z.string().min(1).max(10).regex(/^[A-Z0-9.]+$/, 'Ticker must be uppercase letters, numbers, or dots').optional().nullable(),
+  status: SpacStatusSchema.default('SEARCHING'),
+  trustAmount: z.number().min(0).optional().nullable(),
+  ipoDate: z.coerce.date().optional().nullable(),
+  deadlineDate: z.coerce.date().optional().nullable(),
+  redemptionRate: z.number().min(0).max(1).optional().nullable(),
+});
 
-const SpacListSchema = z.object({
-  organizationId: UuidSchema.optional(),
-  status: z.array(SpacStatusSchema).optional(),
-  phase: z.array(SpacPhaseSchema).optional(),
-  ticker: z.string().optional(),
-  search: z.string().optional(),
-  deadlineBefore: z.coerce.date().optional(),
-  deadlineAfter: z.coerce.date().optional(),
-  page: z.number().int().min(1).default(1),
-  pageSize: z.number().int().min(1).max(100).default(20),
-  sortBy: z.string().optional(),
-  sortOrder: z.enum(['asc', 'desc']).default('desc'),
+// Update input schema - all fields optional except id
+const SpacUpdateSchema = z.object({
+  id: UuidSchema,
+  name: z.string().min(1).max(255).optional(),
+  ticker: z.string().min(1).max(10).regex(/^[A-Z0-9.]+$/).optional().nullable(),
+  status: SpacStatusSchema.optional(),
+  trustAmount: z.number().min(0).optional().nullable(),
+  ipoDate: z.coerce.date().optional().nullable(),
+  deadlineDate: z.coerce.date().optional().nullable(),
+  redemptionRate: z.number().min(0).max(1).optional().nullable(),
+});
+
+// Update status input schema with audit reason
+const SpacUpdateStatusSchema = z.object({
+  id: UuidSchema,
+  status: SpacStatusSchema,
+  reason: z.string().optional(),
 });
 
 export const spacRouter = createTRPCRouter({
   /**
-   * List SPACs with filtering and pagination
+   * List SPACs with pagination, filtering, and sorting
+   * Returns paginated list with total count
    */
   list: protectedProcedure
     .input(SpacListSchema)
     .query(async ({ ctx, input }) => {
-      const {
-        organizationId,
-        status,
-        phase,
-        ticker,
-        search,
-        deadlineBefore,
-        deadlineAfter,
-        page,
-        pageSize,
-        sortBy,
-        sortOrder,
-      } = input;
+      const { page, limit, status, search, sortBy, sortOrder } = input;
 
-      // Build where clause
-      const where: Record<string, unknown> = {
-        deletedAt: null,
-      };
+      // Build where clause for filtering
+      const where: Record<string, unknown> = {};
 
-      if (organizationId) where.organizationId = organizationId;
-      if (status?.length) where.status = { in: status };
-      if (phase?.length) where.phase = { in: phase };
-      if (ticker) where.ticker = { contains: ticker, mode: 'insensitive' };
+      if (status) {
+        where.status = status;
+      }
 
       if (search) {
         where.OR = [
           { name: { contains: search, mode: 'insensitive' } },
           { ticker: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } },
         ];
       }
 
-      if (deadlineBefore || deadlineAfter) {
-        where.deadline = {};
-        if (deadlineBefore) (where.deadline as Record<string, unknown>).lte = deadlineBefore;
-        if (deadlineAfter) (where.deadline as Record<string, unknown>).gte = deadlineAfter;
-      }
+      // Calculate pagination offset
+      const skip = (page - 1) * limit;
+
+      // Build orderBy clause
+      const orderBy = sortBy
+        ? { [sortBy]: sortOrder }
+        : { updatedAt: 'desc' as const };
 
       // Execute query with pagination
       const [items, total] = await Promise.all([
         ctx.db.spac.findMany({
           where,
           include: {
-            sponsors: {
-              include: { sponsor: { select: { id: true, name: true, tier: true } } },
-              where: { isPrimary: true },
-            },
-            trustAccounts: {
-              orderBy: { balanceDate: 'desc' },
-              take: 1,
-            },
             _count: {
-              select: { targets: true, tasks: true, filings: true },
+              select: {
+                targets: true,
+                documents: true,
+                filings: true,
+                tasks: true,
+              },
             },
           },
-          orderBy: sortBy ? { [sortBy]: sortOrder } : { updatedAt: 'desc' },
-          skip: (page - 1) * pageSize,
-          take: pageSize,
+          orderBy,
+          skip,
+          take: limit,
         }),
         ctx.db.spac.count({ where }),
       ]);
+
+      const totalPages = Math.ceil(total / limit);
 
       return {
         items,
         total,
         page,
-        pageSize,
-        totalPages: Math.ceil(total / pageSize),
+        totalPages,
       };
     }),
 
   /**
-   * Get a single SPAC by ID
+   * Get single SPAC by ID with all related data
+   * Returns full SPAC with targets, documents, filings, and tasks
    */
   getById: protectedProcedure
     .input(z.object({ id: UuidSchema }))
@@ -176,32 +137,28 @@ export const spacRouter = createTRPCRouter({
       const spac = await ctx.db.spac.findUnique({
         where: { id: input.id },
         include: {
-          organization: true,
-          sponsors: {
-            include: { sponsor: true },
-          },
           targets: {
-            where: { deletedAt: null },
-            take: 10,
             orderBy: { updatedAt: 'desc' },
+            take: 50,
           },
-          trustAccounts: {
-            orderBy: { balanceDate: 'desc' },
-            take: 1,
+          documents: {
+            orderBy: { createdAt: 'desc' },
+            take: 50,
           },
           filings: {
-            orderBy: { filedDate: 'desc' },
-            take: 5,
+            orderBy: { filingDate: 'desc' },
+            take: 20,
           },
           tasks: {
-            where: { deletedAt: null, status: { notIn: ['COMPLETED', 'CANCELLED'] } },
+            where: {
+              status: { notIn: ['COMPLETED', 'CANCELLED'] },
+            },
             orderBy: { dueDate: 'asc' },
-            take: 10,
+            take: 50,
           },
-          milestones: {
-            where: { isCompleted: false },
-            orderBy: { targetDate: 'asc' },
-            take: 5,
+          financials: {
+            orderBy: { createdAt: 'desc' },
+            take: 20,
           },
           _count: {
             select: {
@@ -209,7 +166,7 @@ export const spacRouter = createTRPCRouter({
               documents: true,
               filings: true,
               tasks: true,
-              milestones: true,
+              financials: true,
             },
           },
         },
@@ -218,7 +175,7 @@ export const spacRouter = createTRPCRouter({
       if (!spac) {
         throw new TRPCError({
           code: 'NOT_FOUND',
-          message: 'SPAC not found',
+          message: `SPAC with ID '${input.id}' not found`,
         });
       }
 
@@ -227,30 +184,45 @@ export const spacRouter = createTRPCRouter({
 
   /**
    * Create a new SPAC
+   * Validates ticker uniqueness before creation
    */
-  create: orgAuditedProcedure
+  create: protectedProcedure
     .input(SpacCreateSchema)
     .mutation(async ({ ctx, input }) => {
-      // Validate ticker uniqueness
+      // Validate ticker uniqueness if provided
       if (input.ticker) {
-        const existing = await ctx.db.spac.findUnique({
+        const existingSpac = await ctx.db.spac.findUnique({
           where: { ticker: input.ticker },
         });
-        if (existing) {
+
+        if (existingSpac) {
           throw new TRPCError({
             code: 'CONFLICT',
-            message: 'A SPAC with this ticker already exists',
+            message: `A SPAC with ticker '${input.ticker}' already exists`,
           });
         }
       }
 
+      // Create the SPAC
       const spac = await ctx.db.spac.create({
         data: {
-          ...input,
-          deadlineDate: input.deadline || input.deadlineDate,
+          name: input.name,
+          ticker: input.ticker,
+          status: input.status,
+          trustAmount: input.trustAmount,
+          ipoDate: input.ipoDate,
+          deadlineDate: input.deadlineDate,
+          redemptionRate: input.redemptionRate,
         },
         include: {
-          organization: true,
+          _count: {
+            select: {
+              targets: true,
+              documents: true,
+              filings: true,
+              tasks: true,
+            },
+          },
         },
       });
 
@@ -258,44 +230,62 @@ export const spacRouter = createTRPCRouter({
     }),
 
   /**
-   * Update a SPAC
+   * Update an existing SPAC
+   * Validates existence and ticker uniqueness
    */
-  update: orgAuditedProcedure
-    .input(z.object({
-      id: UuidSchema,
-      data: SpacUpdateSchema,
-    }))
+  update: protectedProcedure
+    .input(SpacUpdateSchema)
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.db.spac.findUnique({
-        where: { id: input.id },
+      const { id, ...updateData } = input;
+
+      // Check if SPAC exists
+      const existingSpac = await ctx.db.spac.findUnique({
+        where: { id },
       });
 
-      if (!existing) {
+      if (!existingSpac) {
         throw new TRPCError({
           code: 'NOT_FOUND',
-          message: 'SPAC not found',
+          message: `SPAC with ID '${id}' not found`,
         });
       }
 
       // Validate ticker uniqueness if changing
-      if (input.data.ticker && input.data.ticker !== existing.ticker) {
+      if (updateData.ticker && updateData.ticker !== existingSpac.ticker) {
         const tickerExists = await ctx.db.spac.findUnique({
-          where: { ticker: input.data.ticker },
+          where: { ticker: updateData.ticker },
         });
+
         if (tickerExists) {
           throw new TRPCError({
             code: 'CONFLICT',
-            message: 'A SPAC with this ticker already exists',
+            message: `A SPAC with ticker '${updateData.ticker}' already exists`,
           });
         }
       }
 
+      // Remove undefined values from update data
+      const cleanUpdateData = Object.fromEntries(
+        Object.entries(updateData).filter(([, value]) => value !== undefined)
+      );
+
+      // Update the SPAC
       const spac = await ctx.db.spac.update({
-        where: { id: input.id },
-        data: input.data,
+        where: { id },
+        data: cleanUpdateData,
         include: {
-          organization: true,
-          sponsors: { include: { sponsor: true } },
+          targets: {
+            take: 10,
+            orderBy: { updatedAt: 'desc' },
+          },
+          _count: {
+            select: {
+              targets: true,
+              documents: true,
+              filings: true,
+              tasks: true,
+            },
+          },
         },
       });
 
@@ -303,27 +293,167 @@ export const spacRouter = createTRPCRouter({
     }),
 
   /**
-   * Soft delete a SPAC
+   * Soft delete (archive) a SPAC
+   * Sets status to LIQUIDATED as a soft delete mechanism
+   * Note: Since the Prisma schema doesn't have a deletedAt field,
+   * we use status change as an archive mechanism
    */
-  delete: orgAuditedProcedure
+  delete: protectedProcedure
     .input(z.object({ id: UuidSchema }))
     .mutation(async ({ ctx, input }) => {
-      const existing = await ctx.db.spac.findUnique({
+      // Check if SPAC exists
+      const existingSpac = await ctx.db.spac.findUnique({
         where: { id: input.id },
       });
 
-      if (!existing) {
+      if (!existingSpac) {
         throw new TRPCError({
           code: 'NOT_FOUND',
-          message: 'SPAC not found',
+          message: `SPAC with ID '${input.id}' not found`,
         });
       }
 
+      // Archive by setting status to LIQUIDATED
+      // In a production system, you might want to add a deletedAt field
       await ctx.db.spac.update({
         where: { id: input.id },
-        data: { deletedAt: new Date() },
+        data: { status: 'LIQUIDATED' },
       });
 
       return { success: true };
+    }),
+
+  /**
+   * Update SPAC lifecycle status with audit logging
+   * Records the status change with optional reason for compliance tracking
+   */
+  updateStatus: protectedProcedure
+    .input(SpacUpdateStatusSchema)
+    .mutation(async ({ ctx, input }) => {
+      const { id, status, reason } = input;
+
+      // Check if SPAC exists
+      const existingSpac = await ctx.db.spac.findUnique({
+        where: { id },
+      });
+
+      if (!existingSpac) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: `SPAC with ID '${id}' not found`,
+        });
+      }
+
+      const previousStatus = existingSpac.status;
+
+      // Validate status transition (optional business logic)
+      const validTransitions: Record<string, string[]> = {
+        PRE_IPO: ['SEARCHING'],
+        SEARCHING: ['LOI_SIGNED', 'LIQUIDATED'],
+        LOI_SIGNED: ['DEFINITIVE_AGREEMENT', 'SEARCHING', 'LIQUIDATED'],
+        DEFINITIVE_AGREEMENT: ['VOTE_PENDING', 'SEARCHING', 'LIQUIDATED'],
+        VOTE_PENDING: ['DE_SPAC_COMPLETE', 'LIQUIDATED'],
+        DE_SPAC_COMPLETE: [], // Terminal state
+        LIQUIDATED: [], // Terminal state
+      };
+
+      const allowedNextStatuses = validTransitions[previousStatus] || [];
+
+      // Only enforce transitions for non-terminal states
+      if (allowedNextStatuses.length > 0 && !allowedNextStatuses.includes(status)) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Invalid status transition from '${previousStatus}' to '${status}'. Allowed transitions: ${allowedNextStatuses.join(', ')}`,
+        });
+      }
+
+      // Terminal states cannot transition
+      if (allowedNextStatuses.length === 0 && previousStatus !== status) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: `Cannot change status from terminal state '${previousStatus}'`,
+        });
+      }
+
+      // Update the SPAC status
+      const spac = await ctx.db.spac.update({
+        where: { id },
+        data: { status },
+        include: {
+          _count: {
+            select: {
+              targets: true,
+              documents: true,
+              filings: true,
+              tasks: true,
+            },
+          },
+        },
+      });
+
+      // Create audit log entry if user has an organization
+      if (ctx.user?.organizationId) {
+        try {
+          await ctx.db.auditLog.create({
+            data: {
+              organizationId: ctx.user.organizationId,
+              userId: ctx.user.id,
+              action: 'STATUS_CHANGE',
+              entityType: 'spac',
+              entityId: id,
+              metadata: {
+                previousStatus,
+                newStatus: status,
+                reason: reason || null,
+                changedAt: new Date().toISOString(),
+              },
+            },
+          });
+        } catch (auditError) {
+          // Log but don't fail the operation if audit logging fails
+          console.error('Failed to create audit log:', auditError);
+        }
+      }
+
+      return spac;
+    }),
+
+  /**
+   * Get SPAC statistics and summary
+   * Returns count by status for dashboard
+   */
+  getStats: protectedProcedure
+    .query(async ({ ctx }) => {
+      const [
+        totalCount,
+        searchingCount,
+        loiSignedCount,
+        daCount,
+        votePendingCount,
+        completedCount,
+        liquidatedCount,
+      ] = await Promise.all([
+        ctx.db.spac.count(),
+        ctx.db.spac.count({ where: { status: 'SEARCHING' } }),
+        ctx.db.spac.count({ where: { status: 'LOI_SIGNED' } }),
+        ctx.db.spac.count({ where: { status: 'DEFINITIVE_AGREEMENT' } }),
+        ctx.db.spac.count({ where: { status: 'VOTE_PENDING' } }),
+        ctx.db.spac.count({ where: { status: 'DE_SPAC_COMPLETE' } }),
+        ctx.db.spac.count({ where: { status: 'LIQUIDATED' } }),
+      ]);
+
+      return {
+        total: totalCount,
+        byStatus: {
+          PRE_IPO: await ctx.db.spac.count({ where: { status: 'PRE_IPO' } }),
+          SEARCHING: searchingCount,
+          LOI_SIGNED: loiSignedCount,
+          DEFINITIVE_AGREEMENT: daCount,
+          VOTE_PENDING: votePendingCount,
+          DE_SPAC_COMPLETE: completedCount,
+          LIQUIDATED: liquidatedCount,
+        },
+        active: totalCount - liquidatedCount - completedCount,
+      };
     }),
 });

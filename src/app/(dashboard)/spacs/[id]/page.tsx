@@ -1,7 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useMemo } from 'react';
+import { useRouter, useParams } from 'next/navigation';
 import Link from 'next/link';
 import {
   ArrowLeft,
@@ -19,177 +19,460 @@ import {
   CheckCircle2,
   ExternalLink,
   MoreHorizontal,
+  Download,
+  Eye,
+  Landmark,
+  PiggyBank,
+  BarChart3,
+  Milestone,
+  Circle,
+  User,
+  Mail,
+  Phone,
+  Briefcase,
+  RefreshCw,
+  AlertCircle,
 } from 'lucide-react';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
 import { Badge } from '@/components/ui/Badge';
+import { Avatar, AvatarGroup } from '@/components/ui/Avatar';
+import { Tabs, TabsList, TabTrigger, TabContent } from '@/components/ui/Tabs';
+import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { PageLoader, LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { SpacStatusBadge } from '@/components/spacs';
+import { StatusTransition, type SpacStatus as StatusTransitionStatus } from '@/components/spac';
 import {
   formatLargeNumber,
   formatDate,
   formatCurrency,
   daysUntil,
   formatPercent,
+  formatRelativeTime,
+  formatFileSize,
   cn,
 } from '@/lib/utils';
-import { SPAC_PHASE_LABELS, TARGET_STATUS_LABELS } from '@/lib/constants';
+import {
+  SPAC_PHASE_LABELS,
+  TARGET_STATUS_LABELS,
+  DOCUMENT_CATEGORY_LABELS,
+  FILING_TYPE_LABELS,
+  CONTACT_TYPE_LABELS,
+} from '@/lib/constants';
+import { trpc } from '@/lib/trpc/client';
+import type { SPACStatus, SPACPhase, DocumentCategory, FilingType, ContactType } from '@/types';
 
-// Mock data for a single SPAC
-const mockSpac = {
-  id: '1',
-  name: 'Alpha Acquisition Corp',
-  ticker: 'ALPH',
-  status: 'DA_ANNOUNCED',
-  phase: 'SEC_REVIEW',
-  description:
-    'Alpha Acquisition Corp is a blank check company formed for the purpose of effecting a merger, share exchange, asset acquisition, share purchase, reorganization or similar business combination with one or more businesses.',
-  investmentThesis:
-    'Focused on identifying technology companies with strong growth potential in the enterprise software and cybersecurity sectors.',
-  ipoDate: new Date('2023-06-15'),
-  ipoSize: 250000000,
-  unitPrice: 10.0,
-  sharesOutstanding: 25000000,
-  warrantsOutstanding: 8333333,
-  trustBalance: 258000000,
-  trustPerShare: 10.32,
-  interestEarned: 8000000,
-  deadline: new Date(Date.now() + 45 * 24 * 60 * 60 * 1000),
-  extensionCount: 1,
-  maxExtensions: 6,
-  daAnnouncedDate: new Date('2024-01-15'),
-  proxyFiledDate: null,
-  voteDate: null,
-  closingDate: null,
-  targetSectors: ['Technology', 'Healthcare'],
-  targetGeographies: ['North America', 'Europe'],
-  targetSizeMin: 500000000,
-  targetSizeMax: 2000000000,
-  createdAt: new Date('2023-05-01'),
-  updatedAt: new Date('2024-01-20'),
-};
+// ============================================================================
+// TAB TYPES
+// ============================================================================
 
-// Mock targets
-const mockTargets = [
-  {
-    id: '1',
-    name: 'TechVision Inc.',
-    status: 'DEFINITIVE',
-    sector: 'Technology',
-    enterpriseValue: 1200000000,
-    probability: 85,
-    priority: 1,
-  },
-  {
-    id: '2',
-    name: 'CloudSecure Corp',
-    status: 'PASSED',
-    sector: 'Technology',
-    enterpriseValue: 800000000,
-    probability: 0,
-    priority: 2,
-  },
-];
+type TabType = 'overview' | 'timeline' | 'documents' | 'team' | 'financials';
 
-// Mock documents
-const mockDocuments = [
-  {
-    id: '1',
-    name: 'S-4 Registration Statement',
-    type: 'SEC_FILING',
-    status: 'FILED',
-    uploadedAt: new Date('2024-01-20'),
-  },
-  {
-    id: '2',
-    name: 'Definitive Agreement',
-    type: 'LEGAL_AGREEMENT',
-    status: 'APPROVED',
-    uploadedAt: new Date('2024-01-15'),
-  },
-  {
-    id: '3',
-    name: 'Financial Model v3.2',
-    type: 'FINANCIAL_MODEL',
-    status: 'DRAFT',
-    uploadedAt: new Date('2024-01-10'),
-  },
-];
+// ============================================================================
+// HELPER COMPONENTS
+// ============================================================================
 
-// Mock activity
-const mockActivity = [
-  {
-    id: '1',
-    action: 'DA Announced',
-    description: 'Definitive Agreement announced with TechVision Inc.',
-    user: 'John Smith',
-    timestamp: new Date('2024-01-15T10:30:00'),
-  },
-  {
-    id: '2',
-    action: 'Document Uploaded',
-    description: 'S-4 Registration Statement filed with SEC',
-    user: 'Sarah Johnson',
-    timestamp: new Date('2024-01-20T14:15:00'),
-  },
-  {
-    id: '3',
-    action: 'Trust Updated',
-    description: 'Trust balance updated with interest earnings',
-    user: 'System',
-    timestamp: new Date('2024-01-18T09:00:00'),
-  },
-];
+function TimelineIcon({ type, status }: { type: string; status: 'completed' | 'upcoming' | 'current' }) {
+  const iconClass = cn(
+    'h-4 w-4',
+    status === 'completed' ? 'text-success-600' : status === 'current' ? 'text-primary-600' : 'text-slate-400'
+  );
 
-type TabType = 'overview' | 'targets' | 'documents' | 'activity';
+  switch (type) {
+    case 'formation':
+      return <Building2 className={iconClass} />;
+    case 'ipo':
+      return <TrendingUp className={iconClass} />;
+    case 'search':
+      return <Target className={iconClass} />;
+    case 'loi':
+    case 'da':
+      return <FileText className={iconClass} />;
+    case 'filing':
+      return <FileText className={iconClass} />;
+    case 'sec':
+      return <AlertTriangle className={iconClass} />;
+    case 'vote':
+      return <Users className={iconClass} />;
+    case 'closing':
+      return <CheckCircle2 className={iconClass} />;
+    case 'task':
+      return <Activity className={iconClass} />;
+    default:
+      return <Circle className={iconClass} />;
+  }
+}
 
-export default function SPACDetailPage({ params }: { params: { id: string } }) {
-  const router = useRouter();
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+function getDocumentStatusBadge(status: string) {
+  switch (status) {
+    case 'FINAL':
+    case 'ACCEPTED':
+      return <Badge variant="success" size="sm">Final</Badge>;
+    case 'APPROVED':
+    case 'SUBMITTED':
+      return <Badge variant="primary" size="sm">Approved</Badge>;
+    case 'UNDER_REVIEW':
+    case 'REVIEW':
+      return <Badge variant="warning" size="sm">Under Review</Badge>;
+    case 'DRAFT':
+      return <Badge variant="secondary" size="sm">Draft</Badge>;
+    case 'AMENDED':
+      return <Badge variant="warning" size="sm">Amended</Badge>;
+    default:
+      return <Badge variant="secondary" size="sm">{status}</Badge>;
+  }
+}
 
-  const spac = mockSpac; // In production, fetch by params.id
-  const days = daysUntil(spac.deadline);
-  const isUrgent = days !== null && days <= 30;
-  const isCritical = days !== null && days <= 14;
+function getTaskStatusBadge(status: string) {
+  switch (status) {
+    case 'COMPLETED':
+      return <Badge variant="success" size="sm">Completed</Badge>;
+    case 'IN_PROGRESS':
+      return <Badge variant="primary" size="sm">In Progress</Badge>;
+    case 'BLOCKED':
+      return <Badge variant="danger" size="sm">Blocked</Badge>;
+    case 'NOT_STARTED':
+      return <Badge variant="secondary" size="sm">Not Started</Badge>;
+    case 'CANCELLED':
+      return <Badge variant="secondary" size="sm">Cancelled</Badge>;
+    default:
+      return <Badge variant="secondary" size="sm">{status}</Badge>;
+  }
+}
 
-  const tabs: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }> }[] = [
-    { id: 'overview', label: 'Overview', icon: Building2 },
-    { id: 'targets', label: 'Targets', icon: Target },
-    { id: 'documents', label: 'Documents', icon: FileText },
-    { id: 'activity', label: 'Activity', icon: Activity },
-  ];
+function getTaskPriorityBadge(priority: string) {
+  switch (priority) {
+    case 'CRITICAL':
+      return <Badge variant="danger" size="sm">Critical</Badge>;
+    case 'HIGH':
+      return <Badge variant="warning" size="sm">High</Badge>;
+    case 'MEDIUM':
+      return <Badge variant="secondary" size="sm">Medium</Badge>;
+    case 'LOW':
+      return <Badge variant="secondary" size="sm">Low</Badge>;
+    default:
+      return <Badge variant="secondary" size="sm">{priority}</Badge>;
+  }
+}
 
+// ============================================================================
+// SKELETON COMPONENTS FOR LOADING STATE
+// ============================================================================
+
+function DetailSkeleton() {
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="space-y-6 animate-pulse">
+      {/* Header skeleton */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="flex items-start gap-4">
-          <Button
-            variant="ghost"
-            size="icon"
-            onClick={() => router.push('/spacs')}
-            className="mt-1"
-          >
-            <ArrowLeft className="h-5 w-5" />
-          </Button>
-          <div>
-            <div className="flex items-center gap-3">
-              <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary-100">
-                <Building2 className="h-7 w-7 text-primary-600" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-slate-900">{spac.name}</h1>
-                <div className="mt-1 flex items-center gap-3">
-                  <span className="text-lg font-medium text-slate-500">{spac.ticker}</span>
-                  <SpacStatusBadge status={spac.status} />
-                  <Badge variant="secondary">
-                    {SPAC_PHASE_LABELS[spac.phase] || spac.phase}
-                  </Badge>
-                </div>
+          <div className="h-10 w-10 rounded-lg bg-slate-200" />
+          <div className="flex items-center gap-3">
+            <div className="h-14 w-14 rounded-xl bg-slate-200" />
+            <div>
+              <div className="h-7 w-48 bg-slate-200 rounded mb-2" />
+              <div className="flex items-center gap-3">
+                <div className="h-5 w-16 bg-slate-200 rounded" />
+                <div className="h-5 w-24 bg-slate-200 rounded" />
               </div>
             </div>
           </div>
         </div>
         <div className="flex gap-2">
+          <div className="h-10 w-28 bg-slate-200 rounded" />
+          <div className="h-10 w-28 bg-slate-200 rounded" />
+        </div>
+      </div>
+
+      {/* Metrics skeleton */}
+      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+        {[1, 2, 3, 4].map((i) => (
+          <Card key={i}>
+            <CardContent className="p-4">
+              <div className="flex items-center gap-3">
+                <div className="h-10 w-10 rounded-lg bg-slate-200" />
+                <div className="flex-1">
+                  <div className="h-4 w-20 bg-slate-200 rounded mb-2" />
+                  <div className="h-6 w-24 bg-slate-200 rounded mb-1" />
+                  <div className="h-3 w-16 bg-slate-200 rounded" />
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      {/* Tabs skeleton */}
+      <div className="h-10 w-full bg-slate-200 rounded" />
+
+      {/* Content skeleton */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        <div className="lg:col-span-2 space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="h-5 w-24 bg-slate-200 rounded" />
+            </CardHeader>
+            <CardContent>
+              <div className="h-20 bg-slate-200 rounded" />
+            </CardContent>
+          </Card>
+        </div>
+        <div className="space-y-6">
+          <Card>
+            <CardHeader>
+              <div className="h-5 w-24 bg-slate-200 rounded" />
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-3">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="h-8 bg-slate-200 rounded" />
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// ERROR STATE COMPONENT
+// ============================================================================
+
+function ErrorState({ id, message, onRetry }: { id: string; message?: string; onRetry: () => void }) {
+  const router = useRouter();
+
+  return (
+    <div className="flex flex-col items-center justify-center py-20">
+      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-danger-100 mb-6">
+        <AlertCircle className="h-10 w-10 text-danger-600" />
+      </div>
+      <h2 className="text-xl font-semibold text-slate-900 mb-2">Failed to Load SPAC</h2>
+      <p className="text-slate-500 text-center max-w-md mb-6">
+        {message || `Unable to load SPAC with ID "${id}". Please try again.`}
+      </p>
+      <div className="flex gap-3">
+        <Button variant="secondary" onClick={() => router.back()}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Go Back
+        </Button>
+        <Button variant="primary" onClick={onRetry}>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Retry
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+function NotFoundState({ id }: { id: string }) {
+  const router = useRouter();
+
+  return (
+    <div className="flex flex-col items-center justify-center py-20">
+      <div className="flex h-20 w-20 items-center justify-center rounded-full bg-slate-100 mb-6">
+        <Building2 className="h-10 w-10 text-slate-400" />
+      </div>
+      <h2 className="text-xl font-semibold text-slate-900 mb-2">SPAC Not Found</h2>
+      <p className="text-slate-500 text-center max-w-md mb-6">
+        The SPAC with ID "{id}" could not be found. It may have been deleted or you may not have access to it.
+      </p>
+      <div className="flex gap-3">
+        <Button variant="secondary" onClick={() => router.back()}>
+          <ArrowLeft className="mr-2 h-4 w-4" />
+          Go Back
+        </Button>
+        <Button variant="primary" onClick={() => router.push('/spacs')}>
+          View All SPACs
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+// ============================================================================
+// MAIN PAGE COMPONENT
+// ============================================================================
+
+export default function SPACDetailPage() {
+  const router = useRouter();
+  const params = useParams();
+  const id = params.id as string;
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
+
+  // ============================================================================
+  // DATA FETCHING - Connected to tRPC
+  // ============================================================================
+
+  const {
+    data: spac,
+    isLoading,
+    isError,
+    error,
+    refetch,
+  } = trpc.spac.getById.useQuery(
+    { id },
+    {
+      enabled: !!id,
+      retry: 1,
+    }
+  );
+
+  // ============================================================================
+  // COMPUTED VALUES
+  // ============================================================================
+
+  const days = useMemo(() => daysUntil(spac?.deadlineDate), [spac?.deadlineDate]);
+  const isUrgent = days !== null && days <= 30;
+  const isCritical = days !== null && days <= 14;
+
+  // Convert trust amount from Decimal to number
+  const trustBalance = useMemo(() => {
+    if (!spac?.trustAmount) return 0;
+    return Number(spac.trustAmount);
+  }, [spac?.trustAmount]);
+
+  // Get trust per share (default SPAC unit price since sharesOutstanding is not in schema)
+  const trustPerShare = 10.0;
+
+  // Derive timeline events from tasks and key dates
+  const timelineEvents = useMemo(() => {
+    const events: Array<{
+      id: string;
+      date: Date;
+      type: string;
+      title: string;
+      description: string;
+      status: 'completed' | 'upcoming' | 'current';
+    }> = [];
+
+    if (!spac) return events;
+
+    // Add IPO date if available
+    if (spac.ipoDate) {
+      events.push({
+        id: 'ipo',
+        date: new Date(spac.ipoDate),
+        type: 'ipo',
+        title: 'IPO Completed',
+        description: `SPAC went public${trustBalance ? ` raising ${formatLargeNumber(trustBalance)}` : ''}`,
+        status: 'completed',
+      });
+    }
+
+    // Add tasks as timeline events
+    if (spac.tasks) {
+      spac.tasks.forEach((task) => {
+        const taskDate = task.dueDate ? new Date(task.dueDate) : new Date(task.createdAt);
+        const isCompleted = task.status === 'COMPLETED';
+        const isPast = taskDate < new Date();
+
+        events.push({
+          id: task.id,
+          date: taskDate,
+          type: 'task',
+          title: task.title,
+          description: task.description || '',
+          status: isCompleted ? 'completed' : isPast ? 'current' : 'upcoming',
+        });
+      });
+    }
+
+    // Add deadline if available
+    if (spac.deadlineDate) {
+      const deadlineDate = new Date(spac.deadlineDate);
+      const isPast = deadlineDate < new Date();
+      events.push({
+        id: 'deadline',
+        date: deadlineDate,
+        type: 'closing',
+        title: 'SPAC Deadline',
+        description: 'Final deadline for business combination',
+        status: isPast ? 'completed' : 'upcoming',
+      });
+    }
+
+    // Sort by date
+    events.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    return events;
+  }, [spac, trustBalance]);
+
+  // ============================================================================
+  // LOADING STATE
+  // ============================================================================
+
+  if (isLoading) {
+    return <DetailSkeleton />;
+  }
+
+  // ============================================================================
+  // ERROR STATE
+  // ============================================================================
+
+  if (isError) {
+    const errorMessage = error?.message;
+    if (errorMessage?.includes('not found') || errorMessage?.includes('NOT_FOUND')) {
+      return <NotFoundState id={id} />;
+    }
+    return <ErrorState id={id} message={errorMessage} onRetry={() => refetch()} />;
+  }
+
+  if (!spac) {
+    return <NotFoundState id={id} />;
+  }
+
+  // ============================================================================
+  // TAB DEFINITIONS
+  // ============================================================================
+
+  const tabs: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }[] = [
+    { id: 'overview', label: 'Overview', icon: Building2 },
+    { id: 'timeline', label: 'Timeline', icon: Milestone, count: timelineEvents.length },
+    { id: 'documents', label: 'Documents', icon: FileText, count: spac._count?.documents || 0 },
+    { id: 'team', label: 'Team', icon: Users },
+    { id: 'financials', label: 'Financials', icon: DollarSign, count: spac._count?.financials || 0 },
+  ];
+
+  // ============================================================================
+  // RENDER
+  // ============================================================================
+
+  return (
+    <div className="space-y-6">
+      {/* ================================================================== */}
+      {/* HEADER */}
+      {/* ================================================================== */}
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div className="flex items-start gap-4">
+          {/* Back Button */}
+          <Link
+            href="/spacs"
+            className="mt-1 flex h-10 w-10 items-center justify-center rounded-lg border border-slate-200 bg-white text-slate-500 transition-colors hover:bg-slate-50 hover:text-slate-700"
+          >
+            <ArrowLeft className="h-5 w-5" />
+          </Link>
+
+          {/* SPAC Info */}
+          <div className="flex items-center gap-3">
+            <div className="flex h-14 w-14 items-center justify-center rounded-xl bg-primary-100">
+              <Building2 className="h-7 w-7 text-primary-600" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-slate-900">{spac.name}</h1>
+              <div className="mt-1 flex flex-wrap items-center gap-2 sm:gap-3">
+                {spac.ticker && (
+                  <span className="text-lg font-medium text-slate-500">{spac.ticker}</span>
+                )}
+                <SpacStatusBadge status={spac.status} />
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Action Buttons */}
+        <div className="flex flex-wrap gap-2">
           <Button variant="secondary" size="md">
             <ExternalLink className="mr-2 h-4 w-4" />
             SEC Filings
@@ -205,7 +488,30 @@ export default function SPACDetailPage({ params }: { params: { id: string } }) {
         </div>
       </div>
 
-      {/* Key Metrics Row */}
+      {/* ================================================================== */}
+      {/* STATUS TRANSITION */}
+      {/* ================================================================== */}
+      <Card className="bg-slate-50/50">
+        <CardContent className="py-3 px-4">
+          <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex items-center gap-2">
+              <span className="text-sm font-medium text-slate-700">Status Transition:</span>
+            </div>
+            <StatusTransition
+              currentStatus={spac.status as StatusTransitionStatus}
+              spacId={spac.id}
+              onStatusChange={() => {
+                // Refetch data when status changes
+                refetch();
+              }}
+            />
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* ================================================================== */}
+      {/* KEY METRICS ROW */}
+      {/* ================================================================== */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {/* Trust Balance */}
         <Card>
@@ -217,10 +523,10 @@ export default function SPACDetailPage({ params }: { params: { id: string } }) {
               <div>
                 <p className="text-sm text-slate-500">Trust Balance</p>
                 <p className="text-xl font-bold text-slate-900">
-                  {formatLargeNumber(spac.trustBalance)}
+                  {trustBalance > 0 ? formatLargeNumber(trustBalance) : '-'}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {formatCurrency(spac.trustPerShare)} per share
+                  {formatCurrency(trustPerShare)} per share
                 </p>
               </div>
             </div>
@@ -274,46 +580,46 @@ export default function SPACDetailPage({ params }: { params: { id: string } }) {
                 >
                   {days !== null ? `${days} days` : '-'}
                 </p>
-                <p className="text-xs text-slate-500">{formatDate(spac.deadline)}</p>
+                <p className="text-xs text-slate-500">{formatDate(spac.deadlineDate)}</p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* IPO Size */}
+        {/* Targets Count */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100">
-                <TrendingUp className="h-5 w-5 text-primary-600" />
+                <Target className="h-5 w-5 text-primary-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">IPO Size</p>
+                <p className="text-sm text-slate-500">Active Targets</p>
                 <p className="text-xl font-bold text-slate-900">
-                  {formatLargeNumber(spac.ipoSize)}
+                  {spac._count?.targets || 0}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {spac.sharesOutstanding?.toLocaleString()} shares
+                  acquisition candidates
                 </p>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        {/* Extensions */}
+        {/* Documents Count */}
         <Card>
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
               <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-                <Calendar className="h-5 w-5 text-slate-600" />
+                <FileText className="h-5 w-5 text-slate-600" />
               </div>
               <div>
-                <p className="text-sm text-slate-500">Extensions Used</p>
+                <p className="text-sm text-slate-500">Documents</p>
                 <p className="text-xl font-bold text-slate-900">
-                  {spac.extensionCount} / {spac.maxExtensions}
+                  {spac._count?.documents || 0}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {spac.maxExtensions - spac.extensionCount} remaining
+                  {spac._count?.filings || 0} SEC filings
                 </p>
               </div>
             </div>
@@ -321,359 +627,710 @@ export default function SPACDetailPage({ params }: { params: { id: string } }) {
         </Card>
       </div>
 
-      {/* Tabs */}
-      <div className="border-b border-slate-200">
-        <nav className="-mb-px flex gap-6">
+      {/* ================================================================== */}
+      {/* TABS */}
+      {/* ================================================================== */}
+      <Tabs defaultValue="overview" onValueChange={(v) => setActiveTab(v as TabType)}>
+        <TabsList variant="default" aria-label="SPAC Details">
           {tabs.map((tab) => {
             const Icon = tab.icon;
             return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={cn(
-                  'flex items-center gap-2 border-b-2 px-1 py-3 text-sm font-medium transition-colors',
-                  activeTab === tab.id
-                    ? 'border-primary-600 text-primary-600'
-                    : 'border-transparent text-slate-500 hover:border-slate-300 hover:text-slate-700'
+              <TabTrigger key={tab.id} value={tab.id}>
+                <Icon className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">{tab.label}</span>
+                <span className="sm:hidden">{tab.label.slice(0, 3)}</span>
+                {tab.count !== undefined && tab.count > 0 && (
+                  <span className="ml-1.5 rounded-full bg-slate-200 px-1.5 py-0.5 text-xs font-medium text-slate-600">
+                    {tab.count}
+                  </span>
                 )}
-              >
-                <Icon className="h-4 w-4" />
-                {tab.label}
-              </button>
+              </TabTrigger>
             );
           })}
-        </nav>
-      </div>
+        </TabsList>
 
-      {/* Tab Content */}
-      {activeTab === 'overview' && (
-        <div className="grid gap-6 lg:grid-cols-3">
-          {/* Left Column */}
-          <div className="space-y-6 lg:col-span-2">
-            {/* Description */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Description</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-slate-600">{spac.description || 'No description provided.'}</p>
-              </CardContent>
-            </Card>
-
-            {/* Investment Thesis */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Investment Thesis</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <p className="text-sm text-slate-600">
-                  {spac.investmentThesis || 'No investment thesis provided.'}
-                </p>
-                <div className="mt-4 flex flex-wrap gap-4">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Target Sectors</p>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {spac.targetSectors.map((sector) => (
-                        <Badge key={sector} variant="secondary" size="sm">
-                          {sector}
-                        </Badge>
-                      ))}
+        {/* ================================================================== */}
+        {/* OVERVIEW TAB */}
+        {/* ================================================================== */}
+        <TabContent value="overview">
+          <div className="grid gap-6 lg:grid-cols-3">
+            {/* Left Column */}
+            <div className="space-y-6 lg:col-span-2">
+              {/* SPAC Details */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>SPAC Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">Name</p>
+                      <p className="text-sm text-slate-900">{spac.name}</p>
                     </div>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Target Geographies</p>
-                    <div className="mt-1 flex flex-wrap gap-1">
-                      {spac.targetGeographies.map((geo) => (
-                        <Badge key={geo} variant="secondary" size="sm">
-                          {geo}
-                        </Badge>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-                <div className="mt-4 grid grid-cols-2 gap-4 border-t border-slate-100 pt-4">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Target Size Range</p>
-                    <p className="text-sm font-medium text-slate-900">
-                      {formatLargeNumber(spac.targetSizeMin)} - {formatLargeNumber(spac.targetSizeMax)}
-                    </p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Key Dates */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Key Dates</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">IPO Date</p>
-                    <p className="text-sm text-slate-900">{formatDate(spac.ipoDate)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">DA Announced</p>
-                    <p className="text-sm text-slate-900">{formatDate(spac.daAnnouncedDate)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Proxy Filed</p>
-                    <p className="text-sm text-slate-900">{formatDate(spac.proxyFiledDate)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Vote Date</p>
-                    <p className="text-sm text-slate-900">{formatDate(spac.voteDate)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Expected Closing</p>
-                    <p className="text-sm text-slate-900">{formatDate(spac.closingDate)}</p>
-                  </div>
-                  <div>
-                    <p className="text-xs font-medium text-slate-500">Deadline</p>
-                    <p className="text-sm text-slate-900">{formatDate(spac.deadline)}</p>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Right Column */}
-          <div className="space-y-6">
-            {/* Trust Details */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Trust Account</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Current Balance</span>
-                    <span className="font-medium text-slate-900">
-                      {formatLargeNumber(spac.trustBalance)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Per Share Value</span>
-                    <span className="font-medium text-slate-900">
-                      {formatCurrency(spac.trustPerShare)}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Interest Earned</span>
-                    <span className="font-medium text-success-600">
-                      +{formatLargeNumber(spac.interestEarned)}
-                    </span>
-                  </div>
-                  <div className="border-t border-slate-100 pt-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-sm text-slate-500">Original IPO Size</span>
-                      <span className="font-medium text-slate-900">
-                        {formatLargeNumber(spac.ipoSize)}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Share Structure */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Share Structure</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Shares Outstanding</span>
-                    <span className="font-medium text-slate-900">
-                      {spac.sharesOutstanding?.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Warrants Outstanding</span>
-                    <span className="font-medium text-slate-900">
-                      {spac.warrantsOutstanding?.toLocaleString()}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-500">Unit Price</span>
-                    <span className="font-medium text-slate-900">
-                      {formatCurrency(spac.unitPrice)}
-                    </span>
-                  </div>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Recent Documents */}
-            <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Recent Documents</CardTitle>
-                <Link
-                  href={`/spacs/${spac.id}/documents`}
-                  className="text-sm font-medium text-primary-600 hover:text-primary-700"
-                >
-                  View All
-                </Link>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {mockDocuments.slice(0, 3).map((doc) => (
-                    <div
-                      key={doc.id}
-                      className="flex items-center justify-between rounded-lg border border-slate-100 p-3"
-                    >
-                      <div className="flex items-center gap-3">
-                        <FileText className="h-5 w-5 text-slate-400" />
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">{doc.name}</p>
-                          <p className="text-xs text-slate-500">{formatDate(doc.uploadedAt)}</p>
-                        </div>
+                    {spac.ticker && (
+                      <div>
+                        <p className="text-xs font-medium text-slate-500">Ticker Symbol</p>
+                        <p className="text-sm text-slate-900">{spac.ticker}</p>
                       </div>
-                      <Badge
-                        variant={doc.status === 'FILED' ? 'success' : doc.status === 'APPROVED' ? 'primary' : 'secondary'}
-                        size="sm"
-                      >
-                        {doc.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </div>
-        </div>
-      )}
-
-      {activeTab === 'targets' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-slate-900">Associated Targets</h3>
-            <Button variant="primary" size="sm">
-              <Target className="mr-2 h-4 w-4" />
-              Add Target
-            </Button>
-          </div>
-          <div className="grid gap-4 lg:grid-cols-2">
-            {mockTargets.map((target) => (
-              <Card key={target.id} className="cursor-pointer transition-all hover:shadow-md">
-                <CardContent className="p-4">
-                  <div className="flex items-start justify-between">
+                    )}
                     <div>
-                      <h4 className="font-semibold text-slate-900">{target.name}</h4>
-                      <p className="text-sm text-slate-500">{target.sector}</p>
+                      <p className="text-xs font-medium text-slate-500">Status</p>
+                      <div className="mt-1">
+                        <SpacStatusBadge status={spac.status} />
+                      </div>
                     </div>
-                    <Badge
-                      variant={
-                        target.status === 'DEFINITIVE'
-                          ? 'success'
-                          : target.status === 'PASSED'
-                            ? 'danger'
-                            : 'secondary'
-                      }
-                    >
-                      {TARGET_STATUS_LABELS[target.status] || target.status}
-                    </Badge>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">Created</p>
+                      <p className="text-sm text-slate-900">{formatDate(spac.createdAt)}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">Last Updated</p>
+                      <p className="text-sm text-slate-900">{formatRelativeTime(spac.updatedAt)}</p>
+                    </div>
+                    {spac.redemptionRate !== null && spac.redemptionRate !== undefined && (
+                      <div>
+                        <p className="text-xs font-medium text-slate-500">Redemption Rate</p>
+                        <p className="text-sm text-slate-900">{formatPercent(Number(spac.redemptionRate) * 100)}</p>
+                      </div>
+                    )}
                   </div>
-                  <div className="mt-4 grid grid-cols-2 gap-4">
+                </CardContent>
+              </Card>
+
+              {/* Key Dates */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Key Dates</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
                     <div>
-                      <p className="text-xs text-slate-500">Enterprise Value</p>
-                      <p className="font-medium text-slate-900">
-                        {formatLargeNumber(target.enterpriseValue)}
-                      </p>
+                      <p className="text-xs font-medium text-slate-500">IPO Date</p>
+                      <p className="text-sm text-slate-900">{formatDate(spac.ipoDate) || '-'}</p>
                     </div>
                     <div>
-                      <p className="text-xs text-slate-500">Probability</p>
-                      <p className="font-medium text-slate-900">{target.probability}%</p>
+                      <p className="text-xs font-medium text-slate-500">Deadline</p>
+                      <p className="text-sm text-slate-900">{formatDate(spac.deadlineDate) || '-'}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-slate-500">Days Remaining</p>
+                      <p className={cn(
+                        'text-sm font-medium',
+                        isCritical ? 'text-danger-600' : isUrgent ? 'text-warning-600' : 'text-slate-900'
+                      )}>
+                        {days !== null ? `${days} days` : '-'}
+                      </p>
                     </div>
                   </div>
                 </CardContent>
               </Card>
-            ))}
-          </div>
-        </div>
-      )}
 
-      {activeTab === 'documents' && (
-        <div className="space-y-4">
-          <div className="flex items-center justify-between">
-            <h3 className="text-lg font-medium text-slate-900">Documents</h3>
-            <Button variant="primary" size="sm">
-              <FileText className="mr-2 h-4 w-4" />
-              Upload Document
-            </Button>
+              {/* Active Targets */}
+              {spac.targets && spac.targets.length > 0 && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle>Active Targets</CardTitle>
+                    <CardDescription>Potential acquisition candidates</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Table>
+                      <TableHead>
+                        <TableRow>
+                          <TableCell header>Target</TableCell>
+                          <TableCell header>Industry</TableCell>
+                          <TableCell header>Status</TableCell>
+                          <TableCell header>Valuation</TableCell>
+                        </TableRow>
+                      </TableHead>
+                      <TableBody>
+                        {spac.targets.slice(0, 5).map((target) => (
+                          <TableRow key={target.id}>
+                            <TableCell>
+                              <span className="font-medium text-slate-900">{target.name}</span>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-slate-600">{target.industry || '-'}</span>
+                            </TableCell>
+                            <TableCell>
+                              <Badge variant="secondary" size="sm">
+                                {TARGET_STATUS_LABELS[target.status as keyof typeof TARGET_STATUS_LABELS] || target.status}
+                              </Badge>
+                            </TableCell>
+                            <TableCell>
+                              <span className="text-sm text-slate-900">
+                                {target.valuation ? formatLargeNumber(Number(target.valuation)) : '-'}
+                              </span>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                    {spac.targets.length > 5 && (
+                      <div className="mt-4 text-center">
+                        <Button variant="ghost" size="sm">
+                          View all {spac.targets.length} targets
+                        </Button>
+                      </div>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-6">
+              {/* Trust Details */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Trust Account</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">Current Balance</span>
+                      <span className="font-medium text-slate-900">
+                        {trustBalance > 0 ? formatLargeNumber(trustBalance) : '-'}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">Per Share Value</span>
+                      <span className="font-medium text-slate-900">
+                        {formatCurrency(trustPerShare)}
+                      </span>
+                    </div>
+                    {spac.redemptionRate !== null && spac.redemptionRate !== undefined && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-500">Redemption Rate</span>
+                        <span className="font-medium text-slate-900">
+                          {formatPercent(Number(spac.redemptionRate) * 100)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Summary Stats */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Summary</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">Targets</span>
+                      <span className="font-medium text-slate-900">
+                        {spac._count?.targets || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">Documents</span>
+                      <span className="font-medium text-slate-900">
+                        {spac._count?.documents || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">SEC Filings</span>
+                      <span className="font-medium text-slate-900">
+                        {spac._count?.filings || 0}
+                      </span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="text-sm text-slate-500">Active Tasks</span>
+                      <span className="font-medium text-slate-900">
+                        {spac._count?.tasks || 0}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Quick Links */}
+              <Card>
+                <CardHeader>
+                  <CardTitle>Quick Actions</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-2">
+                  <Button variant="secondary" className="w-full justify-start" size="sm" onClick={() => setActiveTab('documents')}>
+                    <FileText className="mr-2 h-4 w-4" />
+                    View Documents
+                  </Button>
+                  <Button variant="secondary" className="w-full justify-start" size="sm" onClick={() => setActiveTab('timeline')}>
+                    <Milestone className="mr-2 h-4 w-4" />
+                    View Timeline
+                  </Button>
+                  <Button variant="secondary" className="w-full justify-start" size="sm" onClick={() => setActiveTab('financials')}>
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Financial Dashboard
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
           </div>
+        </TabContent>
+
+        {/* ================================================================== */}
+        {/* TIMELINE TAB */}
+        {/* ================================================================== */}
+        <TabContent value="timeline">
           <Card>
-            <div className="divide-y divide-slate-100">
-              {mockDocuments.map((doc) => (
-                <div key={doc.id} className="flex items-center justify-between p-4">
+            <CardHeader>
+              <CardTitle>SPAC Lifecycle Timeline</CardTitle>
+              <CardDescription>Track key milestones and events in the SPAC journey</CardDescription>
+            </CardHeader>
+            <CardContent>
+              {timelineEvents.length === 0 ? (
+                <EmptyState
+                  icon={<Milestone className="h-12 w-12" />}
+                  title="No timeline events"
+                  description="Timeline events will appear as key dates and tasks are added"
+                />
+              ) : (
+                <div className="relative">
+                  {timelineEvents.map((event, index) => (
+                    <div key={event.id} className="relative flex gap-4 pb-8 last:pb-0">
+                      {/* Timeline Line */}
+                      {index !== timelineEvents.length - 1 && (
+                        <div
+                          className={cn(
+                            'absolute left-[15px] top-8 h-full w-0.5',
+                            event.status === 'completed' ? 'bg-success-200' : 'bg-slate-200'
+                          )}
+                        />
+                      )}
+
+                      {/* Timeline Icon */}
+                      <div
+                        className={cn(
+                          'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border-2',
+                          event.status === 'completed'
+                            ? 'border-success-500 bg-success-50'
+                            : event.status === 'current'
+                              ? 'border-primary-500 bg-primary-50'
+                              : 'border-slate-200 bg-white'
+                        )}
+                      >
+                        <TimelineIcon type={event.type} status={event.status} />
+                      </div>
+
+                      {/* Timeline Content */}
+                      <div className="flex-1 min-w-0">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1">
+                          <h4 className="font-medium text-slate-900">{event.title}</h4>
+                          <span
+                            className={cn(
+                              'text-sm',
+                              event.status === 'completed'
+                                ? 'text-slate-500'
+                                : event.status === 'current'
+                                  ? 'text-primary-600 font-medium'
+                                  : 'text-slate-400'
+                            )}
+                          >
+                            {formatDate(event.date)}
+                          </span>
+                        </div>
+                        {event.description && (
+                          <p className="mt-1 text-sm text-slate-600">{event.description}</p>
+                        )}
+                        {event.status === 'upcoming' && (
+                          <Badge variant="secondary" size="sm" className="mt-2">
+                            Upcoming
+                          </Badge>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Active Tasks */}
+          {spac.tasks && spac.tasks.length > 0 && (
+            <Card className="mt-6">
+              <CardHeader>
+                <CardTitle>Active Tasks</CardTitle>
+                <CardDescription>Outstanding tasks for this SPAC</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell header>Task</TableCell>
+                      <TableCell header>Priority</TableCell>
+                      <TableCell header>Status</TableCell>
+                      <TableCell header>Due Date</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {spac.tasks.map((task) => (
+                      <TableRow key={task.id}>
+                        <TableCell>
+                          <div>
+                            <p className="font-medium text-slate-900">{task.title}</p>
+                            {task.description && (
+                              <p className="text-xs text-slate-500 truncate max-w-xs">{task.description}</p>
+                            )}
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          {getTaskPriorityBadge(task.priority)}
+                        </TableCell>
+                        <TableCell>
+                          {getTaskStatusBadge(task.status)}
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-slate-600">
+                            {formatDate(task.dueDate) || '-'}
+                          </span>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          )}
+        </TabContent>
+
+        {/* ================================================================== */}
+        {/* DOCUMENTS TAB */}
+        {/* ================================================================== */}
+        <TabContent value="documents">
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <h3 className="text-lg font-medium text-slate-900">
+                Documents ({spac.documents?.length || 0})
+              </h3>
+              <Button variant="primary" size="sm">
+                <FileText className="mr-2 h-4 w-4" />
+                Upload Document
+              </Button>
+            </div>
+
+            {(!spac.documents || spac.documents.length === 0) ? (
+              <EmptyState
+                icon={<FileText className="h-12 w-12" />}
+                title="No documents yet"
+                description="Upload your first document to get started"
+                action={{
+                  label: 'Upload Document',
+                  onClick: () => {},
+                }}
+              />
+            ) : (
+              <Card>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell header>Document</TableCell>
+                      <TableCell header>Type</TableCell>
+                      <TableCell header>Size</TableCell>
+                      <TableCell header>Uploaded</TableCell>
+                      <TableCell header className="w-20">Actions</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {spac.documents.map((doc) => (
+                      <TableRow key={doc.id} className="cursor-pointer hover:bg-slate-50">
+                        <TableCell>
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+                              <FileText className="h-5 w-5 text-slate-600" />
+                            </div>
+                            <div>
+                              <p className="font-medium text-slate-900">{doc.name}</p>
+                              {doc.mimeType && (
+                                <p className="text-xs text-slate-500">{doc.mimeType}</p>
+                              )}
+                            </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <Badge variant="secondary" size="sm">
+                            {doc.type}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <span className="text-sm text-slate-600">
+                            {doc.fileSize ? formatFileSize(doc.fileSize) : '-'}
+                          </span>
+                        </TableCell>
+                        <TableCell>
+                          <div>
+                            <p className="text-sm text-slate-900">{formatDate(doc.createdAt)}</p>
+                            <p className="text-xs text-slate-500">{formatRelativeTime(doc.createdAt)}</p>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex items-center gap-1">
+                            <Button variant="ghost" size="icon-sm">
+                              <Eye className="h-4 w-4" />
+                            </Button>
+                            {doc.fileUrl && (
+                              <Button variant="ghost" size="icon-sm">
+                                <Download className="h-4 w-4" />
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </Card>
+            )}
+
+            {/* SEC Filings Section */}
+            {spac.filings && spac.filings.length > 0 && (
+              <div className="mt-8">
+                <h3 className="text-lg font-medium text-slate-900 mb-4">
+                  SEC Filings ({spac.filings.length})
+                </h3>
+                <Card>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell header>Form Type</TableCell>
+                        <TableCell header>Status</TableCell>
+                        <TableCell header>Filing Date</TableCell>
+                        <TableCell header>Due Date</TableCell>
+                        <TableCell header className="w-20">Actions</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {spac.filings.map((filing) => (
+                        <TableRow key={filing.id}>
+                          <TableCell>
+                            <span className="font-medium text-slate-900">{filing.formType}</span>
+                          </TableCell>
+                          <TableCell>
+                            {getDocumentStatusBadge(filing.status)}
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-slate-600">
+                              {formatDate(filing.filingDate) || '-'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-slate-600">
+                              {formatDate(filing.dueDate) || '-'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            {filing.edgarUrl && (
+                              <Button variant="ghost" size="icon-sm" asChild>
+                                <a href={filing.edgarUrl} target="_blank" rel="noopener noreferrer">
+                                  <ExternalLink className="h-4 w-4" />
+                                </a>
+                              </Button>
+                            )}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </Card>
+              </div>
+            )}
+          </div>
+        </TabContent>
+
+        {/* ================================================================== */}
+        {/* TEAM TAB */}
+        {/* Note: Team/Contacts data is not currently linked to SPACs in the schema */}
+        {/* ================================================================== */}
+        <TabContent value="team">
+          <div className="space-y-6">
+            <EmptyState
+              icon={<Users className="h-12 w-12" />}
+              title="Team data not available"
+              description="Team, sponsor, and management information is not currently linked to this SPAC in the database schema. This feature requires additional data model updates."
+            />
+
+            {/* Placeholder for future implementation */}
+            <Card className="border-dashed">
+              <CardHeader>
+                <CardTitle className="text-slate-400">Coming Soon</CardTitle>
+                <CardDescription>
+                  The following team information will be available in a future update:
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-slate-500">
+                  <li className="flex items-center gap-2">
+                    <Circle className="h-2 w-2 fill-slate-400" />
+                    Sponsors and their commitment amounts
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Circle className="h-2 w-2 fill-slate-400" />
+                    Management team members
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Circle className="h-2 w-2 fill-slate-400" />
+                    Board of Directors
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Circle className="h-2 w-2 fill-slate-400" />
+                    Legal and financial advisors
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+        </TabContent>
+
+        {/* ================================================================== */}
+        {/* FINANCIALS TAB */}
+        {/* ================================================================== */}
+        <TabContent value="financials">
+          <div className="space-y-6">
+            {/* Trust Account Overview */}
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              <Card>
+                <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-                      <FileText className="h-5 w-5 text-slate-600" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success-100">
+                      <PiggyBank className="h-5 w-5 text-success-600" />
                     </div>
                     <div>
-                      <p className="font-medium text-slate-900">{doc.name}</p>
-                      <p className="text-sm text-slate-500">
-                        {doc.type.replace(/_/g, ' ')} - Uploaded {formatDate(doc.uploadedAt)}
+                      <p className="text-sm text-slate-500">Trust Balance</p>
+                      <p className="text-xl font-bold text-slate-900">
+                        {trustBalance > 0 ? formatLargeNumber(trustBalance) : '-'}
                       </p>
                     </div>
                   </div>
+                </CardContent>
+              </Card>
+              <Card>
+                <CardContent className="p-4">
                   <div className="flex items-center gap-3">
-                    <Badge
-                      variant={
-                        doc.status === 'FILED'
-                          ? 'success'
-                          : doc.status === 'APPROVED'
-                            ? 'primary'
-                            : 'secondary'
-                      }
-                      size="sm"
-                    >
-                      {doc.status}
-                    </Badge>
-                    <Button variant="ghost" size="icon-sm">
-                      <MoreHorizontal className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </Card>
-        </div>
-      )}
-
-      {activeTab === 'activity' && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-medium text-slate-900">Activity Timeline</h3>
-          <Card>
-            <CardContent className="p-6">
-              <div className="space-y-6">
-                {mockActivity.map((item, index) => (
-                  <div key={item.id} className="relative flex gap-4">
-                    {index !== mockActivity.length - 1 && (
-                      <div className="absolute left-[15px] top-8 h-full w-0.5 bg-slate-200" />
-                    )}
-                    <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-primary-100">
-                      <Activity className="h-4 w-4 text-primary-600" />
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100">
+                      <DollarSign className="h-5 w-5 text-primary-600" />
                     </div>
-                    <div className="flex-1 pb-6">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-slate-900">{item.action}</p>
-                        <span className="text-sm text-slate-500">
-                          {formatDate(item.timestamp, 'MMM d, h:mm a')}
-                        </span>
+                    <div>
+                      <p className="text-sm text-slate-500">Per Share Value</p>
+                      <p className="text-xl font-bold text-slate-900">
+                        {formatCurrency(trustPerShare)}
+                      </p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+              {spac.redemptionRate !== null && spac.redemptionRate !== undefined && (
+                <Card>
+                  <CardContent className="p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-100">
+                        <BarChart3 className="h-5 w-5 text-warning-600" />
                       </div>
-                      <p className="mt-1 text-sm text-slate-600">{item.description}</p>
-                      <p className="mt-1 text-xs text-slate-400">by {item.user}</p>
+                      <div>
+                        <p className="text-sm text-slate-500">Redemption Rate</p>
+                        <p className="text-xl font-bold text-slate-900">
+                          {formatPercent(Number(spac.redemptionRate) * 100)}
+                        </p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
+                  </CardContent>
+                </Card>
+              )}
+            </div>
+
+            {/* Financial Records */}
+            {spac.financials && spac.financials.length > 0 ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Financial Records</CardTitle>
+                  <CardDescription>Historical financial data and models</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Table>
+                    <TableHead>
+                      <TableRow>
+                        <TableCell header>Type</TableCell>
+                        <TableCell header>Period</TableCell>
+                        <TableCell header>Created</TableCell>
+                        <TableCell header>Last Updated</TableCell>
+                      </TableRow>
+                    </TableHead>
+                    <TableBody>
+                      {spac.financials.map((financial) => (
+                        <TableRow key={financial.id}>
+                          <TableCell>
+                            <Badge variant="secondary" size="sm">
+                              {financial.type.replace(/_/g, ' ')}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-slate-600">
+                              {financial.period || '-'}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-slate-600">
+                              {formatDate(financial.createdAt)}
+                            </span>
+                          </TableCell>
+                          <TableCell>
+                            <span className="text-sm text-slate-600">
+                              {formatRelativeTime(financial.updatedAt)}
+                            </span>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-12">
+                  <EmptyState
+                    icon={<BarChart3 className="h-12 w-12" />}
+                    title="No financial records"
+                    description="Financial records will appear here once they are added"
+                  />
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Note about missing data */}
+            <Card className="border-dashed">
+              <CardHeader>
+                <CardTitle className="text-slate-400">Additional Financial Data</CardTitle>
+                <CardDescription>
+                  The following financial information requires additional data in the schema:
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2 text-sm text-slate-500">
+                  <li className="flex items-center gap-2">
+                    <Circle className="h-2 w-2 fill-slate-400" />
+                    Trust account interest earnings and historical balance
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Circle className="h-2 w-2 fill-slate-400" />
+                    Redemption scenarios and projections
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Circle className="h-2 w-2 fill-slate-400" />
+                    Detailed expense breakdown
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Circle className="h-2 w-2 fill-slate-400" />
+                    PIPE and forward purchase commitments
+                  </li>
+                  <li className="flex items-center gap-2">
+                    <Circle className="h-2 w-2 fill-slate-400" />
+                    Share structure (shares outstanding, warrants)
+                  </li>
+                </ul>
+              </CardContent>
+            </Card>
+          </div>
+        </TabContent>
+      </Tabs>
     </div>
   );
 }
