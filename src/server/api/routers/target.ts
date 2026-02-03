@@ -168,7 +168,7 @@ export const targetRouter = createTRPCRouter({
       }
 
       // Execute query with pagination
-      const [items, total] = await Promise.all([
+      const [rawItems, total] = await Promise.all([
         ctx.db.target.findMany({
           where,
           include: {
@@ -185,6 +185,20 @@ export const targetRouter = createTRPCRouter({
         }),
         ctx.db.target.count({ where }),
       ]);
+
+      // Transform Decimal/BigInt fields to serializable types
+      const items = rawItems.map((target) => ({
+        ...target,
+        valuation: target.valuation ? Number(target.valuation) : null,
+        enterpriseValue: target.enterpriseValue ? Number(target.enterpriseValue) : null,
+        revenue: target.revenue ? Number(target.revenue) : null,
+        ebitda: target.ebitda ? Number(target.ebitda) : null,
+        evRevenue: target.evRevenue ? Number(target.evRevenue) : null,
+        evEbitda: target.evEbitda ? Number(target.evEbitda) : null,
+        aiScore: target.aiScore ? Number(target.aiScore) : null,
+        overallScore: target.overallScore ? Number(target.overallScore) : null,
+        probability: target.probability ? Number(target.probability) : null,
+      }));
 
       return {
         items,
@@ -241,7 +255,23 @@ export const targetRouter = createTRPCRouter({
         });
       }
 
-      return target;
+      // Transform Decimal/BigInt fields to serializable types
+      return {
+        ...target,
+        valuation: target.valuation ? Number(target.valuation) : null,
+        enterpriseValue: target.enterpriseValue ? Number(target.enterpriseValue) : null,
+        revenue: target.revenue ? Number(target.revenue) : null,
+        ebitda: target.ebitda ? Number(target.ebitda) : null,
+        evRevenue: target.evRevenue ? Number(target.evRevenue) : null,
+        evEbitda: target.evEbitda ? Number(target.evEbitda) : null,
+        aiScore: target.aiScore ? Number(target.aiScore) : null,
+        overallScore: target.overallScore ? Number(target.overallScore) : null,
+        probability: target.probability ? Number(target.probability) : null,
+        transactions: target.transactions.map((t) => ({
+          ...t,
+          amount: t.amount ? Number(t.amount) : null,
+        })),
+      };
     }),
 
   /**

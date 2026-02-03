@@ -89,7 +89,7 @@ export const spacRouter = createTRPCRouter({
         : { updatedAt: 'desc' as const };
 
       // Execute query with pagination
-      const [items, total] = await Promise.all([
+      const [rawItems, total] = await Promise.all([
         ctx.db.spac.findMany({
           where,
           include: {
@@ -108,6 +108,16 @@ export const spacRouter = createTRPCRouter({
         }),
         ctx.db.spac.count({ where }),
       ]);
+
+      // Transform Decimal/BigInt fields to serializable types
+      const items = rawItems.map((spac) => ({
+        ...spac,
+        trustAmount: spac.trustAmount ? Number(spac.trustAmount) : null,
+        ipoSize: spac.ipoSize ? Number(spac.ipoSize) : null,
+        trustBalance: spac.trustBalance ? Number(spac.trustBalance) : null,
+        sharesOutstanding: spac.sharesOutstanding ? Number(spac.sharesOutstanding) : null,
+        redemptionRate: spac.redemptionRate ? Number(spac.redemptionRate) : null,
+      }));
 
       const totalPages = Math.ceil(total / limit);
 
@@ -171,7 +181,27 @@ export const spacRouter = createTRPCRouter({
         });
       }
 
-      return spac;
+      // Transform Decimal/BigInt fields to serializable types
+      return {
+        ...spac,
+        trustAmount: spac.trustAmount ? Number(spac.trustAmount) : null,
+        ipoSize: spac.ipoSize ? Number(spac.ipoSize) : null,
+        trustBalance: spac.trustBalance ? Number(spac.trustBalance) : null,
+        sharesOutstanding: spac.sharesOutstanding ? Number(spac.sharesOutstanding) : null,
+        redemptionRate: spac.redemptionRate ? Number(spac.redemptionRate) : null,
+        targets: spac.targets.map((t) => ({
+          ...t,
+          valuation: t.valuation ? Number(t.valuation) : null,
+          enterpriseValue: t.enterpriseValue ? Number(t.enterpriseValue) : null,
+          revenue: t.revenue ? Number(t.revenue) : null,
+          ebitda: t.ebitda ? Number(t.ebitda) : null,
+          evRevenue: t.evRevenue ? Number(t.evRevenue) : null,
+          evEbitda: t.evEbitda ? Number(t.evEbitda) : null,
+          aiScore: t.aiScore ? Number(t.aiScore) : null,
+          overallScore: t.overallScore ? Number(t.overallScore) : null,
+          probability: t.probability ? Number(t.probability) : null,
+        })),
+      };
     }),
 
   /**
