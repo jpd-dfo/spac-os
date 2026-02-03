@@ -6,60 +6,107 @@ This document serves as the central tracking document for the SPAC OS applicatio
 
 ## RECOVERY INFORMATION
 
-### Current State (Updated: February 2, 2026)
-- **Last Completed Sprint:** Sprint 6 - SEC & Compliance + Sprint 5 P2 Carryover
-- **Current Sprint:** Sprint 7 - Financial Module (NEXT)
-- **Current PRD Version:** v4.5
+### Current State (Updated: February 3, 2026)
+- **Last Completed Sprint:** Sprint 7 - Financial Module + Critical Wiring
+- **Current Sprint:** Sprint 8 - CRM & Contacts (NEXT)
+- **Current PRD Version:** v4.6
 - **Current Branch:** develop (after merge)
 - **Base Branch:** main
 
-### Sprint 6 Summary (Just Completed)
-Sprint 6 delivered SEC & Compliance features plus Sprint 5 P2 carryover:
+### Sprint 7 Summary (Just Completed)
+Sprint 7 delivered Financial Module plus critical frontend/backend wiring fixes:
 
-**Part A - Sprint 5 P2 Carryover (5 features):**
-- PDF export for investment memos (jsPDF)
-- Analysis caching in database (DocumentAnalysis model)
-- Score history tracking (ScoreHistory model)
-- DocumentCard risk badge integration
-- AI progress indicators with cancellation
+**Track A - Critical Wiring (P0) - 5 features:**
+- Filings page wired to tRPC (replaced placeholder)
+- Compliance calendar wired to real SPAC/filing data
+- Dashboard mock data reduced (trust widget + compliance from real data)
+- Tasks page full tRPC integration with CRUD
+- Filing detail page wired to filing.getById
 
-**Part B - SEC & Compliance (5 features):**
-- SEC EDGAR integration with rate limiting
-- Filing deadline tracker with urgency colors
-- Compliance alerts (ComplianceAlert model)
-- Filing status monitoring with timeline
-- Regulatory calendar with month/week views
+**Track B - Financial Module (P1) - 3 features:**
+- Trust Account Dashboard with balance history chart
+- Cap Table Management with share class grouping
+- Financial Summary Dashboard with key metrics
+
+**Key Technical Fixes:**
+- Added missing router registrations to tRPC root (financial, task, compliance)
+- Fixed Zod schema issues with `.partial()` on `.refine()` wrapped schemas
+- Established placeholder data pattern for empty database states
+- Fixed React hooks order violations
 
 **Quality Gate Results:**
 - Build: PASS
-- Lint: PASS (warnings only)
-- Unit Tests: PASS
-- E2E Tests: 15/15 Sprint 6 tests PASS
+- Lint: PASS
+- TypeScript: PASS (0 errors)
 
-**Database Changes:**
-- Added DocumentAnalysis model
-- Added ScoreHistory model
-- Added ComplianceAlert model
+**Files Created:**
+- Trust account page: `/financial/trust/page.tsx`
+- Cap table page: `/financial/cap-table/page.tsx`
+- Financial dashboard: `/financial/page.tsx`
 
-### What Sprint 7 Will Build
-**Financial Module:**
-- Trust account tracking
-- Cap table management
-- Financial modeling tools
-- Redemption calculations
-- Dilution analysis
+### What Sprint 8 Will Build
+**CRM & Contacts:**
+- Contact management
+- Relationship mapping
+- Activity tracking
+- Email integration
+- Meeting scheduling
 
 ### Quick Recovery Steps
 1. `git checkout develop`
 2. `npm install`
 3. `npm run dev`
-4. Review `/docs/SPAC_OS_PRD_v4.5.md` for current state
+4. Review `/docs/PRD/SPAC_OS_PRD_v4.6.md` for current state
 5. Review `/docs/sprints/` for sprint plans
 6. Review `/.project-tracking/` for QA and product review reports
 
 ---
 
 ## PROJECT LOG
+
+### February 3, 2026 - Sprint 7 Completed
+**Sprint:** Sprint 7 - Financial Module + Critical Wiring
+**Status:** COMPLETED
+
+**Accomplishments:**
+
+Track A - Critical Wiring (P0) - 5 features:
+- Filings page wired to `trpc.filing.list` and `trpc.filing.getStatistics`
+- Compliance calendar replaced mock events with real SPAC/filing data
+- Dashboard trust widget wired to `trpc.financial.trustAccountGetBalanceHistory`
+- Tasks page fully rewritten with `trpc.task.list`, `trpc.task.updateStatus`, `trpc.task.create`
+- Filing detail page wired to `trpc.filing.getById` with proper type transformations
+
+Track B - Financial Module (P1) - 3 features:
+- Trust Account Dashboard with balance history chart, per-share value, holdings breakdown
+- Cap Table Management with share class grouping, holder visualization, SPAC selector
+- Financial Summary Dashboard with key metrics and navigation to detail pages
+
+**Key Technical Fixes:**
+- Added missing router registrations to tRPC root (financial, task, compliance were built but not registered)
+- Fixed Zod schema issues with `.partial()` on `.refine()` wrapped schemas
+- Established placeholder data generation pattern for empty database states
+- Fixed React hooks order violations (useMemo before early returns)
+- TypeScript type mapping between Prisma enums and UI display types
+
+**Quality Gate Results:**
+- Build: PASS
+- Lint: PASS
+- TypeScript: PASS (0 errors)
+
+**Files Modified:**
+- `src/server/api/root.ts` - Added router registrations
+- `src/server/api/routers/financial.router.ts` - Fixed Zod schemas
+- `src/app/(dashboard)/dashboard/page.tsx` - Trust widget + compliance wiring
+- `src/app/(dashboard)/tasks/page.tsx` - Full rewrite
+- `src/app/(dashboard)/filings/[id]/page.tsx` - tRPC wiring
+- `src/app/(dashboard)/financial/page.tsx` - Financial dashboard
+- `src/app/(dashboard)/financial/trust/page.tsx` - Trust account page
+- `src/app/(dashboard)/financial/cap-table/page.tsx` - Cap table page
+
+**PR:** #5 (feature/sprint-7-financial-wiring → develop)
+
+---
 
 ### February 2, 2026 - Sprint 6 Completed
 **Sprint:** Sprint 6 - SEC & Compliance + Sprint 5 P2 Carryover
@@ -231,7 +278,8 @@ Part B - SEC & Compliance (5 features):
 | 4 | Document Management | Completed | Feb 3, 2026 | Upload, storage, PDF viewer, versioning |
 | 5 | AI Integration | Completed | Feb 3, 2026 | Claude API, AI components, 28/28 E2E |
 | 6 | SEC & Compliance + S5 Carryover | Completed | Feb 2, 2026 | SEC EDGAR, compliance alerts, 3 new models |
-| 7 | Financial Module | Planned | - | Trust tracking, cap table, redemptions |
+| 7 | Financial Module + Critical Wiring | Completed | Feb 3, 2026 | Trust dashboard, cap table, frontend/backend wiring |
+| 8 | CRM & Contacts | Planned | - | Contact management, relationship mapping |
 
 ---
 
