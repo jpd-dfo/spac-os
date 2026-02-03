@@ -26,7 +26,6 @@ import {
 } from '@/components/dashboard/AIInsightsWidget';
 import {
   ComplianceCalendarWidget,
-  mockComplianceData,
 } from '@/components/dashboard/ComplianceCalendarWidget';
 import {
   DealPipelineWidget,
@@ -50,7 +49,6 @@ import {
 } from '@/components/dashboard/StatsCard';
 import {
   TrustAccountWidget,
-  mockTrustAccountData,
 } from '@/components/dashboard/TrustAccountWidget';
 
 // Import new dashboard components
@@ -290,6 +288,41 @@ export default function DashboardPage() {
     }
   );
 
+  // Fetch primary SPAC for subsequent queries
+  const primarySpacId = useMemo(() => {
+    if (!spacsQuery.data?.items?.length) {
+      return null;
+    }
+    const activeSpac = spacsQuery.data.items.find(
+      (s) => s.status !== 'LIQUIDATED' && s.status !== 'COMPLETED'
+    ) || spacsQuery.data.items[0];
+    return activeSpac?.id || null;
+  }, [spacsQuery.data]);
+
+  // Fetch filings for compliance calendar widget
+  const filingsQuery = trpc.filing.list.useQuery(
+    {
+      page: 1,
+      pageSize: 20,
+      sortBy: 'deadline',
+      sortOrder: 'asc',
+    },
+    {
+      refetchOnWindowFocus: false,
+      retry: 2,
+    }
+  );
+
+  // Fetch trust account balance history for primary SPAC
+  const balanceHistoryQuery = trpc.financial.trustAccountGetBalanceHistory.useQuery(
+    { spacId: primarySpacId! },
+    {
+      enabled: !!primarySpacId,
+      refetchOnWindowFocus: false,
+      retry: 1,
+    }
+  );
+
   // ============================================================================
   // RETRY HANDLERS
   // ============================================================================
@@ -373,11 +406,42 @@ export default function DashboardPage() {
   // ============================================================================
 
   const trustAccountData = useMemo(() => {
-    if (!primarySpac) {return null;}
+    if (!primarySpac) {
+      return null;
+    }
 
     // Convert Decimal to number (Prisma Decimal fields need explicit conversion)
     const trustAmount = primarySpac.trustAmount ? Number(primarySpac.trustAmount) : 0;
     const sharesOutstanding = trustAmount > 0 ? Math.floor(trustAmount / 10) : 25300000;
+
+    // Transform real balance history data to widget format, or generate from current trust amount
+    let balanceHistory: { date: string; balance: number }[] = [];
+    if (balanceHistoryQuery.data && balanceHistoryQuery.data.length > 0) {
+      // Use real balance history from database
+      balanceHistory = balanceHistoryQuery.data
+        .filter((entry): entry is typeof entry & { date: Date } => entry.date != null)
+        .map((entry) => ({
+          date: new Date(entry.date).toISOString().split('T')[0] as string,
+          balance: entry.balance,
+        }));
+    } else if (trustAmount > 0) {
+      // Generate placeholder history based on IPO date if no real history exists
+      const ipoDate = primarySpac.ipoDate ? new Date(primarySpac.ipoDate) : new Date();
+      const today = new Date();
+      const monthsDiff = Math.max(1, Math.floor((today.getTime() - ipoDate.getTime()) / (30 * 24 * 60 * 60 * 1000)));
+
+      for (let i = 0; i <= Math.min(monthsDiff, 12); i++) {
+        const date = new Date(ipoDate);
+        date.setMonth(date.getMonth() + i);
+        // Simulate gradual interest accrual (~0.4% per month)
+        const growth = 1 + (0.004 * i);
+        const dateStr = date.toISOString().split('T')[0] ?? date.toISOString().substring(0, 10);
+        balanceHistory.push({
+          date: dateStr,
+          balance: Math.round(trustAmount * growth),
+        });
+      }
+    }
 
     return {
       id: `trust-${primarySpac.id}`,
@@ -394,9 +458,9 @@ export default function DashboardPage() {
       redemptionPrice: trustAmount > 0 ? trustAmount / sharesOutstanding : 10.0,
       withdrawals: 0,
       extensions: 0,
-      balanceHistory: mockTrustAccountData.balanceHistory, // Use mock history for visualization
+      balanceHistory,
     };
-  }, [primarySpac]);
+  }, [primarySpac, balanceHistoryQuery.data]);
 
   // ============================================================================
   // DERIVED DATA: DEAL PIPELINE DATA
@@ -451,6 +515,95 @@ export default function DashboardPage() {
       },
     };
   }, [targetsQuery.data]);
+
+  // ============================================================================
+  // DERIVED DATA: COMPLIANCE CALENDAR DATA (from filings)
+  // ============================================================================
+
+  const complianceData = useMemo(() => {
+    if (!filingsQuery.data?.items) {
+      return null;
+    }
+
+    const filings = filingsQuery.data.items;
+    const today = new Date();
+
+    // Transform filings to compliance deadlines
+    const deadlines = filings
+      .filter((f) => f.dueDate) // Only filings with deadlines
+      .map((f) => {
+        const dueDateValue = new Date(f.dueDate!);
+        const daysUntilDue = Math.ceil((dueDateValue.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+
+        // Determine status based on filing status and days until due
+        let status: 'ON_TRACK' | 'DUE_SOON' | 'OVERDUE' | 'COMPLETED' = 'ON_TRACK';
+        if (f.status === 'FILED' || f.status === 'EFFECTIVE') {
+          status = 'COMPLETED';
+        } else if (daysUntilDue < 0) {
+          status = 'OVERDUE';
+        } else if (daysUntilDue <= 7) {
+          status = 'DUE_SOON';
+        }
+
+        // Determine priority based on days until due
+        let priority: 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' = 'MEDIUM';
+        if (daysUntilDue < 0) {
+          priority = 'CRITICAL';
+        } else if (daysUntilDue <= 3) {
+          priority = 'HIGH';
+        } else if (daysUntilDue <= 14) {
+          priority = 'MEDIUM';
+        } else {
+          priority = 'LOW';
+        }
+
+        // Map Filing type to ComplianceCalendar expected types
+        const filingTypeMap: Record<string, '10-K' | '10-Q' | '8-K' | 'DEF14A' | 'S-1' | 'S-4' | 'PROXY' | '13F' | 'OTHER'> = {
+          'FORM_10K': '10-K',
+          'FORM_10Q': '10-Q',
+          'FORM_8K': '8-K',
+          'DEF14A': 'DEF14A',
+          'FORM_S1': 'S-1',
+          'FORM_S4': 'S-4',
+          'PROXY': 'PROXY',
+          'FORM_13F': '13F',
+        };
+
+        return {
+          id: f.id,
+          title: f.title || `${f.type} Filing`,
+          filingType: filingTypeMap[f.type] || 'OTHER',
+          dueDate: dueDateValue,
+          status,
+          description: f.description || `${f.type} filing`,
+          spacName: f.spac?.name || undefined,
+          priority,
+        };
+      })
+      .slice(0, 10); // Limit to 10 deadlines
+
+    // Calculate summary stats
+    const upcomingCount = deadlines.filter((d) => d.status !== 'COMPLETED' && d.status !== 'OVERDUE').length;
+    const overdueCount = deadlines.filter((d) => d.status === 'OVERDUE').length;
+    const completedThisMonth = filings.filter((f) => {
+      if (f.status !== 'FILED' && f.status !== 'EFFECTIVE') {
+        return false;
+      }
+      const filedDate = f.filedDate ? new Date(f.filedDate) : null;
+      if (!filedDate) {
+        return false;
+      }
+      const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
+      return filedDate >= monthStart;
+    }).length;
+
+    return {
+      deadlines,
+      upcomingCount,
+      overdueCount,
+      completedThisMonth,
+    };
+  }, [filingsQuery.data]);
 
   // ============================================================================
   // DERIVED DATA: QUICK STATS
@@ -1033,7 +1186,8 @@ export default function DashboardPage() {
             />
           )}
           <ComplianceCalendarWidget
-            data={mockComplianceData}
+            data={complianceData}
+            isLoading={filingsQuery.isLoading}
             onViewCalendar={handleViewCalendar}
             onDeadlineClick={handleDeadlineClick}
           />

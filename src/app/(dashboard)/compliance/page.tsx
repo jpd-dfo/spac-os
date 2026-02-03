@@ -38,7 +38,7 @@ import { UpcomingDeadlines } from '@/components/dashboard/UpcomingDeadlines';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { generateMockCalendarEvents } from '@/lib/services/calendarService';
+import { generateCalendarEvents, type SPACCalendarData } from '@/lib/services/calendarService';
 import { trpc } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 import {
@@ -184,12 +184,6 @@ const mockSpacs: SpacData[] = [
   },
 ];
 
-// Mock SPACs for calendar filter (matching calendarService mock data)
-const calendarSpacOptions = [
-  { id: 'spac-1', name: 'Acme Acquisition Corp', ticker: 'ACME' },
-  { id: 'spac-2', name: 'Beta Holdings', ticker: 'BETA' },
-  { id: 'spac-3', name: 'Gamma Capital', ticker: 'GAMA' },
-];
 
 // ============================================================================
 // DEADLINE FILTER OPTIONS
@@ -217,8 +211,72 @@ function RegulatoryCalendarView() {
   const [viewMode, setViewMode] = useState<ViewMode>('calendar');
   const [selectedSpacId, setSelectedSpacId] = useState<string>('');
 
-  // Generate mock calendar events for demo
-  const calendarEvents = useMemo(() => generateMockCalendarEvents(25), []);
+  // Fetch real SPAC data
+  const { data: spacsData } = trpc.spac.list.useQuery(
+    { page: 1, limit: 50 },
+    { refetchOnWindowFocus: false }
+  );
+
+  // Fetch real filings data
+  const { data: filingsData } = trpc.filing.list.useQuery(
+    { page: 1, pageSize: 100 },
+    { refetchOnWindowFocus: false }
+  );
+
+  // Transform SPACs to calendar data format
+  const spacCalendarData = useMemo((): SPACCalendarData[] => {
+    if (!spacsData?.items) {
+      return [];
+    }
+    return spacsData.items.map((spac) => ({
+      id: spac.id,
+      name: spac.name,
+      ticker: spac.ticker || 'N/A',
+      status: spac.status,
+      phase: spac.phase || 'UNKNOWN',
+      ipoDate: spac.ipoDate ? new Date(spac.ipoDate) : null,
+      deadline: spac.deadlineDate ? new Date(spac.deadlineDate) : null,
+      daAnnouncedDate: spac.daAnnouncedDate ? new Date(spac.daAnnouncedDate) : null,
+      voteDate: spac.voteDate ? new Date(spac.voteDate) : null,
+      closingDate: spac.closingDate ? new Date(spac.closingDate) : null,
+      extensionCount: spac.extensionCount || 0,
+    }));
+  }, [spacsData]);
+
+  // Transform filings for calendar
+  const filingCalendarData = useMemo(() => {
+    if (!filingsData?.items) {
+      return [];
+    }
+    return filingsData.items.map((filing) => ({
+      id: filing.id,
+      spacId: filing.spacId,
+      type: filing.type as any,
+      title: filing.title || `${filing.type} Filing`,
+      description: filing.description || undefined,
+      status: filing.status as any,
+      dueDate: filing.filedDate ? new Date(filing.filedDate) : null,
+      filedDate: filing.filedDate ? new Date(filing.filedDate) : undefined,
+      edgarUrl: filing.edgarUrl || undefined,
+    }));
+  }, [filingsData]);
+
+  // Generate real calendar events from SPACs and filings
+  const calendarEvents = useMemo(() => {
+    if (spacCalendarData.length === 0) {
+      return [];
+    }
+    return generateCalendarEvents(spacCalendarData, filingCalendarData as any);
+  }, [spacCalendarData, filingCalendarData]);
+
+  // Build SPAC options from real data
+  const spacOptions = useMemo(() => {
+    return spacCalendarData.map((spac) => ({
+      id: spac.id,
+      name: spac.name,
+      ticker: spac.ticker,
+    }));
+  }, [spacCalendarData]);
 
   // Filter events by SPAC if selected
   const filteredEvents = useMemo(() => {
@@ -253,7 +311,7 @@ function RegulatoryCalendarView() {
             className="rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
           >
             <option value="">All SPACs</option>
-            {calendarSpacOptions.map((spac) => (
+            {spacOptions.map((spac) => (
               <option key={spac.id} value={spac.id}>
                 {spac.name} ({spac.ticker})
               </option>

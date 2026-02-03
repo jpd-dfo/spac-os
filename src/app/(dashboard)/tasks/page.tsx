@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 
 import {
   Plus,
@@ -12,75 +12,22 @@ import {
   AlertCircle,
   Calendar,
   User,
+  RefreshCw,
+  Loader2,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS } from '@/lib/constants';
-import { formatDate, formatRelativeTime, cn } from '@/lib/utils';
+import { trpc } from '@/lib/trpc';
+import { formatDate, cn } from '@/lib/utils';
 
-// Mock data
-const mockTasks = [
-  {
-    id: '1',
-    title: 'Complete financial due diligence review',
-    description: 'Review Q3 financials and prepare summary report',
-    status: 'IN_PROGRESS',
-    priority: 'HIGH',
-    dueDate: new Date(Date.now() + 2 * 24 * 60 * 60 * 1000),
-    assignee: 'John Doe',
-    spac: 'Alpha Acquisition Corp',
-    category: 'Due Diligence',
-  },
-  {
-    id: '2',
-    title: 'Draft management presentation deck',
-    description: 'Prepare investor presentation for board meeting',
-    status: 'NOT_STARTED',
-    priority: 'MEDIUM',
-    dueDate: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
-    assignee: 'Jane Smith',
-    spac: 'Beta Holdings SPAC',
-    category: 'Investor Relations',
-  },
-  {
-    id: '3',
-    title: 'Review SEC comment letter',
-    description: 'Analyze and draft response to SEC comments',
-    status: 'IN_PROGRESS',
-    priority: 'CRITICAL',
-    dueDate: new Date(Date.now() + 1 * 24 * 60 * 60 * 1000),
-    assignee: 'Mike Johnson',
-    spac: 'Alpha Acquisition Corp',
-    category: 'Compliance',
-  },
-  {
-    id: '4',
-    title: 'Conduct management interviews',
-    description: 'Schedule and conduct interviews with target management',
-    status: 'COMPLETED',
-    priority: 'HIGH',
-    dueDate: new Date(Date.now() - 2 * 24 * 60 * 60 * 1000),
-    assignee: 'Sarah Wilson',
-    spac: 'Gamma Ventures',
-    category: 'Due Diligence',
-    completedDate: new Date(Date.now() - 1 * 24 * 60 * 60 * 1000),
-  },
-  {
-    id: '5',
-    title: 'Update valuation model',
-    description: 'Incorporate latest projections into DCF model',
-    status: 'BLOCKED',
-    priority: 'HIGH',
-    dueDate: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
-    assignee: 'John Doe',
-    spac: 'Beta Holdings SPAC',
-    category: 'Valuation',
-  },
-];
+// Types - must match Prisma TaskStatus enum
+type TaskStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'BLOCKED' | 'COMPLETED' | 'CANCELLED';
+type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
-const statusFilters = ['all', 'NOT_STARTED', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED'];
+const statusFilters: Array<'all' | TaskStatus> = ['all', 'NOT_STARTED', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED'];
 
 function getStatusIcon(status: string) {
   switch (status) {
@@ -90,6 +37,8 @@ function getStatusIcon(status: string) {
       return <Clock className="h-5 w-5 text-primary-500" />;
     case 'BLOCKED':
       return <AlertCircle className="h-5 w-5 text-danger-500" />;
+    case 'CANCELLED':
+      return <Circle className="h-5 w-5 text-slate-300 line-through" />;
     default:
       return <Circle className="h-5 w-5 text-slate-300" />;
   }
@@ -111,23 +60,108 @@ function getPriorityBadge(priority: string) {
 
 export default function TasksPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [statusFilter, setStatusFilter] = useState('all');
-  const [viewMode, setViewMode] = useState<'list' | 'board'>('list');
+  const [statusFilter, setStatusFilter] = useState<'all' | TaskStatus>('all');
 
-  const filteredTasks = mockTasks.filter((task) => {
-    const matchesSearch =
-      task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      task.description?.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesStatus = statusFilter === 'all' || task.status === statusFilter;
-    return matchesSearch && matchesStatus;
+  // tRPC queries
+  const tasksQuery = trpc.task.list.useQuery(
+    {
+      page: 1,
+      pageSize: 50,
+      status: statusFilter !== 'all' ? [statusFilter] : undefined,
+      search: searchQuery || undefined,
+      sortBy: 'dueDate',
+      sortOrder: 'asc',
+    },
+    {
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // Mutations
+  const updateStatusMutation = trpc.task.updateStatus.useMutation({
+    onSuccess: () => {
+      tasksQuery.refetch();
+    },
   });
 
-  const groupedByStatus = {
-    NOT_STARTED: filteredTasks.filter((t) => t.status === 'NOT_STARTED'),
-    IN_PROGRESS: filteredTasks.filter((t) => t.status === 'IN_PROGRESS'),
-    BLOCKED: filteredTasks.filter((t) => t.status === 'BLOCKED'),
-    COMPLETED: filteredTasks.filter((t) => t.status === 'COMPLETED'),
+  // Derived data
+  const filteredTasks = useMemo(() => {
+    if (!tasksQuery.data?.items) {
+      return [];
+    }
+    return tasksQuery.data.items;
+  }, [tasksQuery.data]);
+
+  const groupedByStatus = useMemo(() => {
+    const allTasks = tasksQuery.data?.items || [];
+    return {
+      NOT_STARTED: allTasks.filter((t) => t.status === 'NOT_STARTED'),
+      IN_PROGRESS: allTasks.filter((t) => t.status === 'IN_PROGRESS'),
+      BLOCKED: allTasks.filter((t) => t.status === 'BLOCKED'),
+      COMPLETED: allTasks.filter((t) => t.status === 'COMPLETED'),
+    };
+  }, [tasksQuery.data]);
+
+  // Handlers
+  const handleStatusToggle = async (taskId: string, currentStatus: string) => {
+    // Cycle through statuses: NOT_STARTED -> IN_PROGRESS -> COMPLETED
+    let newStatus: TaskStatus;
+    switch (currentStatus) {
+      case 'NOT_STARTED':
+        newStatus = 'IN_PROGRESS';
+        break;
+      case 'IN_PROGRESS':
+        newStatus = 'COMPLETED';
+        break;
+      case 'COMPLETED':
+        newStatus = 'NOT_STARTED';
+        break;
+      default:
+        newStatus = 'IN_PROGRESS';
+    }
+
+    updateStatusMutation.mutate({
+      id: taskId,
+      status: newStatus,
+    });
   };
+
+  const handleRetry = () => {
+    tasksQuery.refetch();
+  };
+
+  // Loading state
+  if (tasksQuery.isLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="text-center">
+          <Loader2 className="mx-auto h-8 w-8 animate-spin text-primary-500" />
+          <p className="mt-2 text-sm text-slate-500">Loading tasks...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (tasksQuery.isError) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="p-6 text-center">
+            <AlertCircle className="mx-auto h-12 w-12 text-danger-500" />
+            <h3 className="mt-4 text-lg font-semibold text-slate-900">Failed to load tasks</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              {tasksQuery.error?.message || 'An error occurred while loading tasks.'}
+            </p>
+            <Button variant="primary" size="md" className="mt-4" onClick={handleRetry}>
+              <RefreshCw className="mr-2 h-4 w-4" />
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
@@ -135,7 +169,10 @@ export default function TasksPage() {
       <div className="flex items-center justify-between">
         <div className="page-header mb-0">
           <h1 className="page-title">Tasks</h1>
-          <p className="page-description">Manage your workflow and track progress</p>
+          <p className="page-description">
+            Manage your workflow and track progress
+            {tasksQuery.data?.total ? ` · ${tasksQuery.data.total} total tasks` : ''}
+          </p>
         </div>
         <Button variant="primary" size="md">
           <Plus className="mr-2 h-4 w-4" />
@@ -167,7 +204,7 @@ export default function TasksPage() {
                   : 'text-slate-600 hover:bg-slate-100'
               )}
             >
-              {status === 'all' ? 'All' : TASK_STATUS_LABELS[status]}
+              {status === 'all' ? 'All' : TASK_STATUS_LABELS[status] || status}
             </button>
           ))}
         </div>
@@ -250,8 +287,16 @@ export default function TasksPage() {
                 key={task.id}
                 className="flex items-start gap-4 p-4 hover:bg-slate-50"
               >
-                <button className="mt-0.5 flex-shrink-0">
-                  {getStatusIcon(task.status)}
+                <button
+                  className="mt-0.5 flex-shrink-0 transition-transform hover:scale-110"
+                  onClick={() => handleStatusToggle(task.id, task.status)}
+                  disabled={updateStatusMutation.isPending}
+                >
+                  {updateStatusMutation.isPending ? (
+                    <Loader2 className="h-5 w-5 animate-spin text-slate-400" />
+                  ) : (
+                    getStatusIcon(task.status)
+                  )}
                 </button>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-4">
@@ -266,25 +311,40 @@ export default function TasksPage() {
                       >
                         {task.title}
                       </h4>
-                      <p className="mt-1 text-sm text-slate-500">{task.description}</p>
+                      {task.description && (
+                        <p className="mt-1 text-sm text-slate-500 line-clamp-2">{task.description}</p>
+                      )}
                     </div>
                     {getPriorityBadge(task.priority)}
                   </div>
                   <div className="mt-3 flex flex-wrap items-center gap-4 text-sm">
-                    <div className="flex items-center gap-1.5 text-slate-500">
-                      <User className="h-4 w-4" />
-                      {task.assignee}
-                    </div>
-                    <div className="flex items-center gap-1.5 text-slate-500">
-                      <Calendar className="h-4 w-4" />
-                      {formatDate(task.dueDate)}
-                    </div>
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                      {task.spac}
-                    </span>
-                    <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
-                      {task.category}
-                    </span>
+                    {task.assignee && (
+                      <div className="flex items-center gap-1.5 text-slate-500">
+                        <User className="h-4 w-4" />
+                        {task.assignee.name || 'Unassigned'}
+                      </div>
+                    )}
+                    {task.dueDate && (
+                      <div className="flex items-center gap-1.5 text-slate-500">
+                        <Calendar className="h-4 w-4" />
+                        {formatDate(task.dueDate)}
+                      </div>
+                    )}
+                    {task.spac && (
+                      <span className="rounded bg-slate-100 px-2 py-0.5 text-xs text-slate-600">
+                        {task.spac.name}
+                      </span>
+                    )}
+                    {task.target && (
+                      <span className="rounded bg-teal-50 px-2 py-0.5 text-xs text-teal-700">
+                        {task.target.name}
+                      </span>
+                    )}
+                    {task.category && (
+                      <span className="rounded bg-primary-50 px-2 py-0.5 text-xs text-primary-700">
+                        {task.category}
+                      </span>
+                    )}
                   </div>
                 </div>
               </div>
@@ -294,7 +354,24 @@ export default function TasksPage() {
           {filteredTasks.length === 0 && (
             <div className="flex flex-col items-center justify-center py-12">
               <CheckCircle2 className="h-12 w-12 text-slate-300" />
-              <p className="mt-4 text-sm text-slate-500">No tasks found</p>
+              <p className="mt-4 text-sm text-slate-500">
+                {searchQuery || statusFilter !== 'all'
+                  ? 'No tasks match your filters'
+                  : 'No tasks yet. Create your first task to get started.'}
+              </p>
+              {(searchQuery || statusFilter !== 'all') && (
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  className="mt-4"
+                  onClick={() => {
+                    setSearchQuery('');
+                    setStatusFilter('all');
+                  }}
+                >
+                  Clear Filters
+                </Button>
+              )}
             </div>
           )}
         </CardContent>

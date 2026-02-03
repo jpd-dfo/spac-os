@@ -351,7 +351,20 @@ export const financialRouter = createTRPCRouter({
   warrantUpdate: orgAuditedProcedure
     .input(z.object({
       id: UuidSchema,
-      data: (WarrantCreateSchema as any)._def.schema.partial().omit({ spacId: true }),
+      data: z.object({
+        type: z.enum(['PUBLIC', 'PRIVATE', 'FOUNDER']).optional(),
+        totalWarrants: z.number().int().positive().optional(),
+        exercisePrice: z.number().positive().optional(),
+        exerciseRatio: z.number().positive().optional(),
+        holderName: z.string().max(255).optional().nullable(),
+        holderId: UuidSchema.optional().nullable(),
+        exercisableDate: z.coerce.date().optional().nullable(),
+        expirationDate: z.coerce.date().optional().nullable(),
+        warrantsExercised: z.number().int().min(0).optional(),
+        warrantsRedeemed: z.number().int().min(0).optional(),
+        notes: z.string().optional().nullable(),
+        metadata: z.record(z.unknown()).optional(),
+      }).partial(),
     }))
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.db.warrant.findUnique({
@@ -473,7 +486,19 @@ export const financialRouter = createTRPCRouter({
   redemptionUpdate: orgAuditedProcedure
     .input(z.object({
       id: UuidSchema,
-      data: (RedemptionCreateSchema as any)._def.schema.partial().omit({ spacId: true }),
+      data: z.object({
+        eventDate: z.coerce.date().optional(),
+        eventType: z.enum(['extension', 'business_combination', 'liquidation', 'other']).optional(),
+        sharesEligible: z.number().int().positive().optional(),
+        sharesRedeemed: z.number().int().min(0).optional(),
+        redemptionRate: z.number().min(0).max(100).optional(),
+        redemptionPrice: z.number().positive().optional(),
+        totalPayout: z.number().min(0).optional(),
+        remainingShares: z.number().int().min(0).optional(),
+        remainingTrust: z.number().min(0).optional(),
+        notes: z.string().optional().nullable(),
+        metadata: z.record(z.unknown()).optional(),
+      }).partial(),
     }))
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.db.redemption.findUnique({
@@ -682,7 +707,20 @@ export const financialRouter = createTRPCRouter({
   earnoutUpdate: orgAuditedProcedure
     .input(z.object({
       id: UuidSchema,
-      data: (EarnoutCreateSchema as any)._def.schema.partial().omit({ spacId: true }),
+      data: z.object({
+        name: z.string().min(1).max(255).optional(),
+        description: z.string().optional().nullable(),
+        status: z.enum(['PENDING', 'PARTIAL', 'ACHIEVED', 'EXPIRED']).optional(),
+        metricType: z.enum(['stock_price', 'revenue', 'ebitda', 'custom']).optional(),
+        targetValue: z.number().optional(),
+        currentValue: z.number().optional().nullable(),
+        earnoutShares: z.number().int().positive().optional(),
+        sharesEarned: z.number().int().min(0).optional(),
+        measurementStart: z.coerce.date().optional().nullable(),
+        measurementEnd: z.coerce.date().optional().nullable(),
+        notes: z.string().optional().nullable(),
+        metadata: z.record(z.unknown()).optional(),
+      }).partial(),
     }))
     .mutation(async ({ ctx, input }) => {
       const existing = await ctx.db.earnout.findUnique({
