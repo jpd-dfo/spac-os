@@ -15,15 +15,16 @@ import {
 } from 'lucide-react';
 
 
+import { useUser } from '@clerk/nextjs';
+
 // Import dashboard widgets
 import {
   ActivityFeed,
-  mockActivityData,
 } from '@/components/dashboard/ActivityFeed';
-import {
-  AIInsightsWidget,
-  mockAIInsightsData,
-} from '@/components/dashboard/AIInsightsWidget';
+// AIInsightsWidget commented out until AI insights endpoint is available
+// import {
+//   AIInsightsWidget,
+// } from '@/components/dashboard/AIInsightsWidget';
 import {
   ComplianceCalendarWidget,
 } from '@/components/dashboard/ComplianceCalendarWidget';
@@ -40,7 +41,6 @@ import {
 } from '@/components/dashboard/RecentActivity';
 import {
   SpacStatusCard,
-  mockSpacStatusData,
 } from '@/components/dashboard/SpacStatusCard';
 import {
   StatsCard,
@@ -160,15 +160,6 @@ function formatLastActivity(updatedAt: Date | string): string {
   return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
 }
 
-// ============================================================================
-// MOCK USER DATA (would come from auth in production)
-// ============================================================================
-
-const currentUser = {
-  name: 'Sarah Chen',
-  role: 'Deal Lead',
-  avatar: undefined,
-};
 
 // ============================================================================
 // ERROR STATE COMPONENT
@@ -247,6 +238,17 @@ function _EmptyStateCard({
 // ============================================================================
 
 export default function DashboardPage() {
+  // ============================================================================
+  // AUTH - USER DATA FROM CLERK
+  // ============================================================================
+
+  const { user } = useUser();
+  const currentUser = {
+    name: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : 'User',
+    role: 'Deal Lead',
+    avatar: user?.imageUrl,
+  };
+
   // ============================================================================
   // tRPC QUERIES WITH ERROR HANDLING
   // ============================================================================
@@ -397,7 +399,7 @@ export default function DashboardPage() {
       businessCombinationDeadline: deadlineDate,
       extensionsUsed: 0, // Not tracked in current schema
       maxExtensions: 2,
-      milestones: mockSpacStatusData.milestones, // Use mock milestones for now
+      milestones: (primarySpac as any)?.milestones || [], // Use real milestones if available
     };
   }, [primarySpac]);
 
@@ -858,18 +860,12 @@ export default function DashboardPage() {
   // ============================================================================
 
   const teamOverview = useMemo(() => ({
-    totalMembers: 8, // Would come from team API
-    activeTasks: primarySpac?._count?.tasks || 23,
-    actionsThisMonth: 156, // Would come from activity API
-    taskCompletion: 94, // Would come from task API
-    recentContributors: [
-      'Sarah Chen',
-      'Michael Ross',
-      'Emily Park',
-      'David Kim',
-      'Jessica Liu',
-    ],
-  }), [primarySpac]);
+    totalMembers: 8, // Keep hardcoded for now (no team API)
+    activeTasks: primarySpac?._count?.tasks || 0,
+    actionsThisMonth: recentActivities.length,
+    taskCompletion: 85, // Placeholder
+    recentContributors: recentActivities.slice(0, 5).map(a => a.user?.name || 'System'),
+  }), [primarySpac, recentActivities]);
 
   // ============================================================================
   // HELPER FUNCTIONS
@@ -914,17 +910,18 @@ export default function DashboardPage() {
     // TODO: Navigate to activity
   };
 
-  const handleViewAllInsights = () => {
-    // TODO: Navigate to AI insights
-  };
+  // AI Insights handlers - commented out until AI insights endpoint is available
+  // const handleViewAllInsights = () => {
+  //   // TODO: Navigate to AI insights
+  // };
 
-  const handleInsightAction = (_insightId: string, _action: 'acknowledge' | 'dismiss' | 'resolve') => {
-    // TODO: Handle insight action
-  };
+  // const handleInsightAction = (_insightId: string, _action: 'acknowledge' | 'dismiss' | 'resolve') => {
+  //   // TODO: Handle insight action
+  // };
 
-  const handleRefreshInsights = () => {
-    // TODO: Refresh AI insights
-  };
+  // const handleRefreshInsights = () => {
+  //   // TODO: Refresh AI insights
+  // };
 
   const handleRecentActivityClick = (_activity: any) => {
     // TODO: Navigate to activity
@@ -1196,14 +1193,49 @@ export default function DashboardPage() {
 
       {/* AI Insights Section */}
       <div className="grid gap-6 lg:grid-cols-2">
-        <AIInsightsWidget
-          data={mockAIInsightsData}
-          onViewAll={handleViewAllInsights}
-          onInsightAction={handleInsightAction}
-          onRefresh={handleRefreshInsights}
-        />
+        {/* AI Insights - Placeholder until AI insights endpoint is available */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertCircle className="h-5 w-5 text-primary-600" />
+              AI Insights
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="flex h-32 items-center justify-center rounded-lg border-2 border-dashed border-slate-200 bg-slate-50">
+              <div className="text-center">
+                <AlertCircle className="mx-auto h-8 w-8 text-slate-300" />
+                <p className="mt-2 text-sm font-medium text-slate-600">
+                  AI Insights coming soon
+                </p>
+                <p className="mt-1 text-xs text-slate-400">
+                  Intelligent analysis and recommendations will be displayed here
+                </p>
+              </div>
+            </div>
+          </CardContent>
+        </Card>
         <ActivityFeed
-          data={mockActivityData}
+          data={{
+            activities: recentActivities.slice(0, 5).map(activity => ({
+              id: activity.id,
+              type: activity.type === 'TARGET_ADDED' ? 'TARGET_UPDATE' as const
+                : activity.type === 'TARGET_UPDATE' ? 'TARGET_UPDATE' as const
+                : activity.type === 'DOCUMENT_UPLOAD' ? 'DOCUMENT_UPLOAD' as const
+                : 'COMMENT' as const, // Default to COMMENT for DEAL_UPDATE and others
+              user: {
+                name: activity.user?.name || currentUser.name,
+                role: currentUser.role,
+              },
+              action: activity.title,
+              subject: activity.relatedItem?.name || activity.description || '',
+              subjectLink: activity.relatedItem?.href,
+              timestamp: activity.timestamp,
+              isNew: activity.isNew,
+            })),
+            hasMore: recentActivities.length > 5,
+            totalCount: recentActivities.length,
+          }}
           onViewAll={handleViewAllActivity}
           onActivityClick={handleActivityClick}
           maxItems={5}
