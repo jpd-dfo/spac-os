@@ -799,6 +799,64 @@ export const targetRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  /**
+   * Update target priority
+   */
+  updatePriority: orgAuditedProcedure
+    .input(z.object({
+      id: UuidSchema,
+      priority: z.number().int().min(1).max(4),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const target = await ctx.db.target.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!target) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Target not found',
+        });
+      }
+
+      const updated = await ctx.db.target.update({
+        where: { id: input.id },
+        data: { priority: input.priority },
+        include: { spac: true },
+      });
+
+      return updated;
+    }),
+
+  /**
+   * Update target stage
+   */
+  updateStage: orgAuditedProcedure
+    .input(z.object({
+      id: UuidSchema,
+      stage: z.enum(['SOURCING', 'SCREENING', 'PRELIMINARY_DD', 'FULL_DD', 'NEGOTIATION', 'DOCUMENTATION', 'CLOSING']),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const target = await ctx.db.target.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!target) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Target not found',
+        });
+      }
+
+      const updated = await ctx.db.target.update({
+        where: { id: input.id },
+        data: { stage: input.stage },
+        include: { spac: true },
+      });
+
+      return updated;
+    }),
+
   // ============================================================================
   // ANALYTICS
   // ============================================================================

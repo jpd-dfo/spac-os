@@ -13,7 +13,9 @@ import {
   Loader2,
   AlertCircle,
   CheckSquare,
+  ArrowRight,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 import { AddTargetForm, type NewTargetData } from '@/components/pipeline/AddTargetForm';
 import { BulkActionBar } from '@/components/pipeline/BulkActionBar';
@@ -25,6 +27,7 @@ import { TargetDetailModal, type TargetDetails } from '@/components/pipeline/Tar
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Dropdown, DropdownItem, DropdownLabel } from '@/components/ui/Dropdown';
+import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '@/components/ui/Modal';
 import { exportToCSV, exportToExcel, type ExportableTarget } from '@/lib/export';
 import { trpc } from '@/lib/trpc/client';
 import { cn } from '@/lib/utils';
@@ -668,6 +671,8 @@ export default function PipelinePage() {
   const [selectedTarget, setSelectedTarget] = useState<Target | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [isAddFormOpen, setIsAddFormOpen] = useState(false);
+  const [_isEditRedirectPending, _setIsEditRedirectPending] = useState(false);
+  const [isMoveStageModalOpen, setIsMoveStageModalOpen] = useState(false);
   const [addFormInitialStage, setAddFormInitialStage] = useState<PipelineStage>('sourcing');
   const [sortBy, setSortBy] = useState<'name' | 'value' | 'score' | 'days'>('value');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
@@ -676,6 +681,16 @@ export default function PipelinePage() {
   // Selection state for bulk operations
   const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set());
   const [isBulkOperationLoading, setIsBulkOperationLoading] = useState(false);
+
+  // Stage configuration for move stage modal
+  const STAGE_OPTIONS: { value: PipelineStage; label: string }[] = [
+    { value: 'sourcing', label: 'Sourcing' },
+    { value: 'initial_screening', label: 'Initial Screening' },
+    { value: 'deep_evaluation', label: 'Deep Evaluation' },
+    { value: 'negotiation', label: 'Negotiation' },
+    { value: 'execution', label: 'Execution' },
+    { value: 'closed_passed', label: 'Closed/Passed' },
+  ];
 
   // Filtered and sorted targets
   const filteredTargets = useMemo(() => {
@@ -741,19 +756,50 @@ export default function PipelinePage() {
           handleTargetClick(target);
           break;
         case 'edit':
-          // TODO: Open edit form
+          // Navigate to target detail page for editing
           setSelectedTarget(target);
+          window.location.href = `/pipeline/${target.id}`;
           break;
         case 'move':
-          // TODO: Open stage picker
+          // Open stage picker modal
+          setSelectedTarget(target);
+          setIsMoveStageModalOpen(true);
           break;
         case 'archive':
-          deleteTargetMutation.mutate({ id: target.id });
+          deleteTargetMutation.mutate({ id: target.id }, {
+            onSuccess: () => {
+              toast.success('Target archived successfully');
+            },
+            onError: (err) => {
+              toast.error(`Failed to archive target: ${err.message}`);
+            },
+          });
           break;
       }
     },
     [handleTargetClick, deleteTargetMutation]
   );
+
+  const handleMoveToStage = useCallback((stage: PipelineStage) => {
+    if (!selectedTarget) {
+      return;
+    }
+
+    const newStatus = mapStageToStatus(stage);
+    updateStatusMutation.mutate({
+      id: selectedTarget.id,
+      status: newStatus as 'IDENTIFIED' | 'PRELIMINARY' | 'NDA_SIGNED' | 'DUE_DILIGENCE' | 'TERM_SHEET' | 'LOI' | 'DEFINITIVE' | 'CLOSED' | 'PASSED' | 'TERMINATED',
+    }, {
+      onSuccess: () => {
+        setIsMoveStageModalOpen(false);
+        setSelectedTarget(null);
+        toast.success(`Target moved to ${stage.replace('_', ' ')}`);
+      },
+      onError: (err) => {
+        toast.error(`Failed to move target: ${err.message}`);
+      },
+    });
+  }, [selectedTarget, updateStatusMutation]);
 
   const handleAddTarget = useCallback((stage?: PipelineStage) => {
     setAddFormInitialStage(stage || 'sourcing');
@@ -1176,7 +1222,11 @@ export default function PipelinePage() {
         target={selectedTarget as TargetDetails}
         onAdvance={handleAdvanceTarget}
         onReject={handleRejectTarget}
-        onEdit={() => { /* TODO: Implement edit target */ }}
+        onEdit={() => {
+          if (selectedTarget) {
+            window.location.href = `/pipeline/${selectedTarget.id}`;
+          }
+        }}
       />
 
       {/* Add Target Form */}
@@ -1186,6 +1236,64 @@ export default function PipelinePage() {
         onSubmit={handleSubmitNewTarget}
         initialStage={addFormInitialStage}
       />
+
+      {/* Move Stage Modal */}
+      <Modal
+        isOpen={isMoveStageModalOpen}
+        onClose={() => {
+          setIsMoveStageModalOpen(false);
+          setSelectedTarget(null);
+        }}
+        size="sm"
+      >
+        <ModalHeader>
+          <ModalTitle>Move to Stage</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          <p className="text-sm text-slate-600 mb-4">
+            Select a new stage for <span className="font-medium">{selectedTarget?.name}</span>
+          </p>
+          <div className="space-y-2">
+            {STAGE_OPTIONS.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => handleMoveToStage(option.value)}
+                disabled={selectedTarget?.stage === option.value || updateStatusMutation.isPending}
+                className={cn(
+                  'w-full flex items-center justify-between px-4 py-3 rounded-lg border transition-colors',
+                  selectedTarget?.stage === option.value
+                    ? 'bg-slate-100 border-slate-300 cursor-not-allowed'
+                    : 'hover:bg-primary-50 hover:border-primary-300 border-slate-200'
+                )}
+              >
+                <span className={cn(
+                  'font-medium',
+                  selectedTarget?.stage === option.value ? 'text-slate-400' : 'text-slate-700'
+                )}>
+                  {option.label}
+                </span>
+                {selectedTarget?.stage === option.value && (
+                  <span className="text-xs text-slate-400">Current</span>
+                )}
+                {selectedTarget?.stage !== option.value && (
+                  <ArrowRight className="h-4 w-4 text-slate-400" />
+                )}
+              </button>
+            ))}
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            variant="secondary"
+            onClick={() => {
+              setIsMoveStageModalOpen(false);
+              setSelectedTarget(null);
+            }}
+          >
+            Cancel
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       {/* Bulk Action Bar */}
       <BulkActionBar

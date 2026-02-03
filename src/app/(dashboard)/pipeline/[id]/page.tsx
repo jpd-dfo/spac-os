@@ -2,9 +2,9 @@
 
 import { useState, useCallback, useMemo } from 'react';
 
+import Image from 'next/image';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-
 import {
   ArrowLeft,
   Building2,
@@ -27,18 +27,25 @@ import {
   MoreHorizontal,
   LinkIcon,
   Loader2,
+  Plus,
+  Flag,
 } from 'lucide-react';
 
+import toast from 'react-hot-toast';
+
+import { UploadModal } from '@/components/documents/UploadModal';
 import { TargetForm } from '@/components/forms/TargetForm';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
-import { Modal, ModalHeader, ModalTitle, ModalBody } from '@/components/ui/Modal';
+import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel } from '@/components/ui/Dropdown';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Textarea } from '@/components/ui/Input';
+import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '@/components/ui/Modal';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { trpc } from '@/lib/trpc/client';
-import { cn, formatLargeNumber, formatDate, formatRelativeTime } from '@/lib/utils';
+import { cn, formatLargeNumber, formatDate, formatRelativeTime, formatFileSize } from '@/lib/utils';
 import type { Target, TargetStatus } from '@/types';
 
 // ============================================================================
@@ -392,6 +399,42 @@ function ScoreBar({ label, score, maxScore = 100 }: { label: string; score: numb
   );
 }
 
+function getTrendColorClass(trend?: 'up' | 'down' | 'neutral'): string {
+  if (trend === 'up') {
+    return 'text-success-600';
+  }
+  if (trend === 'down') {
+    return 'text-danger-600';
+  }
+  return 'text-slate-500';
+}
+
+function getStatusBadgeVariant(status: string): 'success' | 'primary' | 'danger' | 'secondary' {
+  if (status === 'completed') {
+    return 'success';
+  }
+  if (status === 'in_progress') {
+    return 'primary';
+  }
+  if (status === 'flagged') {
+    return 'danger';
+  }
+  return 'secondary';
+}
+
+function mapPriorityStringToNumber(priority?: 'low' | 'medium' | 'high' | 'critical'): number {
+  if (priority === 'critical') {
+    return 1;
+  }
+  if (priority === 'high') {
+    return 2;
+  }
+  if (priority === 'medium') {
+    return 3;
+  }
+  return 4;
+}
+
 function MetricCard({ label, value, subValue, trend }: { label: string; value: string; subValue?: string; trend?: 'up' | 'down' | 'neutral' }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -400,7 +443,7 @@ function MetricCard({ label, value, subValue, trend }: { label: string; value: s
       {subValue && (
         <p className={cn(
           'mt-0.5 text-sm',
-          trend === 'up' ? 'text-success-600' : trend === 'down' ? 'text-danger-600' : 'text-slate-500'
+          getTrendColorClass(trend)
         )}>
           {trend === 'up' && '+'}
           {subValue}
@@ -464,6 +507,14 @@ const STAGE_CONFIG: Record<PipelineStage, { label: string; color: string }> = {
   closed_passed: { label: 'Closed/Passed', color: 'bg-emerald-500' },
 };
 
+// Priority configuration
+const PRIORITY_OPTIONS = [
+  { value: 1, label: 'Critical', color: 'text-red-600' },
+  { value: 2, label: 'High', color: 'text-orange-600' },
+  { value: 3, label: 'Medium', color: 'text-yellow-600' },
+  { value: 4, label: 'Low', color: 'text-green-600' },
+] as const;
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -476,6 +527,9 @@ export default function TargetDetailPage({ params }: PageProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'financials' | 'diligence' | 'documents' | 'activity'>('overview');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   // tRPC Query
   const {
@@ -484,6 +538,18 @@ export default function TargetDetailPage({ params }: PageProps) {
     error,
   } = trpc.target.getById.useQuery(
     { id: params.id },
+    { enabled: !!params.id }
+  );
+
+  // Notes Query
+  const { data: notesData, refetch: refetchNotes } = trpc.note.getByTarget.useQuery(
+    { targetId: params.id },
+    { enabled: !!params.id }
+  );
+
+  // Documents Query - fetch real documents for this target
+  const { data: documentsData, refetch: refetchDocuments } = trpc.document.list.useQuery(
+    { targetId: params.id, page: 1, pageSize: 50 },
     { enabled: !!params.id }
   );
 
@@ -506,6 +572,39 @@ export default function TargetDetailPage({ params }: PageProps) {
     onSuccess: () => {
       utils.target.getById.invalidate({ id: params.id });
       setIsEditModalOpen(false);
+    },
+  });
+
+  const updatePriorityMutation = trpc.target.updatePriority.useMutation({
+    onSuccess: () => {
+      utils.target.getById.invalidate({ id: params.id });
+      toast.success('Priority updated successfully');
+    },
+    onError: (err) => {
+      toast.error(`Failed to update priority: ${err.message}`);
+    },
+  });
+
+  const createNoteMutation = trpc.note.create.useMutation({
+    onSuccess: () => {
+      setIsAddNoteModalOpen(false);
+      setNewNoteContent('');
+      refetchNotes();
+      toast.success('Note added successfully');
+    },
+    onError: (err) => {
+      toast.error(`Failed to add note: ${err.message}`);
+    },
+  });
+
+  const uploadDocumentMutation = trpc.document.uploadNewVersion.useMutation({
+    onSuccess: () => {
+      refetchDocuments();
+      setIsUploadModalOpen(false);
+      toast.success('Document uploaded successfully');
+    },
+    onError: (err) => {
+      toast.error(`Failed to upload document: ${err.message}`);
     },
   });
 
@@ -561,6 +660,30 @@ export default function TargetDetailPage({ params }: PageProps) {
     setIsEditModalOpen(true);
   }, []);
 
+  const handleAddNote = useCallback(() => {
+    setIsAddNoteModalOpen(true);
+  }, []);
+
+  const handleSubmitNote = useCallback(() => {
+    if (!target || !newNoteContent.trim()) {
+      return;
+    }
+    createNoteMutation.mutate({
+      content: newNoteContent.trim(),
+      targetId: target.id,
+    });
+  }, [target, newNoteContent, createNoteMutation]);
+
+  const handleChangePriority = useCallback((priority: number) => {
+    if (!target) {
+      return;
+    }
+    updatePriorityMutation.mutate({
+      id: target.id,
+      priority,
+    });
+  }, [target, updatePriorityMutation]);
+
   const handleEditSubmit = useCallback(async (data: Partial<Target>) => {
     if (!target) {
       return;
@@ -583,6 +706,24 @@ export default function TargetDetailPage({ params }: PageProps) {
     });
     setIsEditModalOpen(false);
   }, [target, updateTargetMutation]);
+
+  const handleUpload = useCallback(async (files: File[], metadata: { category: string; tags: string[] }) => {
+    if (!target) {
+      return;
+    }
+    // For each file, create a document entry
+    for (const file of files) {
+      uploadDocumentMutation.mutate({
+        name: file.name,
+        targetId: target.id,
+        category: metadata.category,
+        fileSize: file.size,
+        mimeType: file.type,
+        // In a real implementation, the file would be uploaded to storage first
+        // and the fileUrl would be set to the storage URL
+      });
+    }
+  }, [target, uploadDocumentMutation]);
 
   if (isLoading) {
     return (
@@ -653,9 +794,11 @@ export default function TargetDetailPage({ params }: PageProps) {
             'bg-gradient-to-br from-primary-50 to-primary-100 text-primary-600'
           )}>
             {target.logoUrl ? (
-              <img
+              <Image
                 src={target.logoUrl}
                 alt={target.name}
+                width={64}
+                height={64}
                 className="h-full w-full rounded-xl object-cover"
               />
             ) : (
@@ -720,6 +863,29 @@ export default function TargetDetailPage({ params }: PageProps) {
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-3">
+          <Button variant="secondary" onClick={handleAddNote}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Note
+          </Button>
+          <Dropdown
+            trigger={
+              <Button variant="secondary">
+                <Flag className="mr-2 h-4 w-4" />
+                Priority
+              </Button>
+            }
+            align="right"
+          >
+            <DropdownLabel>Change Priority</DropdownLabel>
+            {PRIORITY_OPTIONS.map((option) => (
+              <DropdownItem
+                key={option.value}
+                onClick={() => handleChangePriority(option.value)}
+              >
+                <span className={cn('font-medium', option.color)}>{option.label}</span>
+              </DropdownItem>
+            ))}
+          </Dropdown>
           <Button variant="secondary" onClick={handleEdit}>
             <Edit className="mr-2 h-4 w-4" />
             Edit
@@ -799,9 +965,9 @@ export default function TargetDetailPage({ params }: PageProps) {
                   {ddProgress.completed}/{ddProgress.total}
                 </Badge>
               )}
-              {tab === 'documents' && target.documents && (
+              {tab === 'documents' && documentsData && (
                 <Badge variant="secondary" size="sm">
-                  {target.documents.length}
+                  {documentsData.total}
                 </Badge>
               )}
             </button>
@@ -962,11 +1128,7 @@ export default function TargetDetailPage({ params }: PageProps) {
                           <td className="px-4 py-3 text-sm text-slate-500">{item.category}</td>
                           <td className="px-4 py-3">
                             <Badge
-                              variant={
-                                item.status === 'completed' ? 'success' :
-                                item.status === 'in_progress' ? 'primary' :
-                                item.status === 'flagged' ? 'danger' : 'secondary'
-                              }
+                              variant={getStatusBadgeVariant(item.status)}
                               size="sm"
                             >
                               {item.status.replace('_', ' ')}
@@ -982,34 +1144,51 @@ export default function TargetDetailPage({ params }: PageProps) {
             </>
           )}
 
-          {activeTab === 'documents' && target.documents && (
+          {activeTab === 'documents' && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Documents ({target.documents.length})</CardTitle>
-                <Button variant="secondary" size="sm">
+                <CardTitle>Documents ({documentsData?.total || 0})</CardTitle>
+                <Button variant="secondary" size="sm" onClick={() => setIsUploadModalOpen(true)}>
                   <Paperclip className="mr-2 h-4 w-4" />
                   Upload
                 </Button>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="divide-y divide-slate-200">
-                  {target.documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-                          <FileText className="h-5 w-5 text-slate-500" />
+                {documentsData?.items && documentsData.items.length > 0 ? (
+                  <div className="divide-y divide-slate-200">
+                    {documentsData.items.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+                            <FileText className="h-5 w-5 text-slate-500" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">{doc.name}</p>
+                            <p className="text-xs text-slate-500">
+                              {doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown size'} - {formatDate(new Date(doc.createdAt))}
+                              {doc.version && doc.version > 1 && (
+                                <span className="ml-2 text-primary-600">v{doc.version}</span>
+                              )}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">{doc.name}</p>
-                          <p className="text-xs text-slate-500">{doc.size} - Uploaded by {doc.uploadedBy} on {formatDate(doc.uploadedAt)}</p>
-                        </div>
+                        <Button variant="ghost" size="sm">
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="sm">
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={<FileText className="h-12 w-12" />}
+                    title="No documents yet"
+                    description="Upload documents related to this target for easy access and collaboration."
+                    action={{
+                      label: 'Upload Document',
+                      onClick: () => setIsUploadModalOpen(true),
+                    }}
+                  />
+                )}
               </CardContent>
             </Card>
           )}
@@ -1158,7 +1337,7 @@ export default function TargetDetailPage({ params }: PageProps) {
               enterpriseValue: target.enterpriseValue,
               ltmRevenue: target.revenue,
               ltmEbitda: target.ebitda,
-              priority: target.priority === 'critical' ? 1 : target.priority === 'high' ? 2 : target.priority === 'medium' ? 3 : 4,
+              priority: mapPriorityStringToNumber(target.priority),
             }}
             onSubmit={handleEditSubmit}
             onCancel={() => setIsEditModalOpen(false)}
@@ -1166,6 +1345,54 @@ export default function TargetDetailPage({ params }: PageProps) {
           />
         </ModalBody>
       </Modal>
+
+      {/* Add Note Modal */}
+      <Modal isOpen={isAddNoteModalOpen} onClose={() => setIsAddNoteModalOpen(false)} size="md">
+        <ModalHeader>
+          <ModalTitle>Add Note</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          <Textarea
+            label="Note"
+            placeholder="Enter your note about this target..."
+            value={newNoteContent}
+            onChange={(e) => setNewNoteContent(e.target.value)}
+            rows={5}
+          />
+          {notesData && notesData.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium text-slate-700 mb-2">Recent Notes ({notesData.length})</h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {notesData.slice(0, 5).map((note) => (
+                  <div key={note.id} className="p-2 bg-slate-50 rounded-md text-sm">
+                    <p className="text-slate-700">{note.content}</p>
+                    <p className="text-xs text-slate-400 mt-1">{formatRelativeTime(new Date(note.createdAt))}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setIsAddNoteModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleSubmitNote}
+            disabled={!newNoteContent.trim() || createNoteMutation.isPending}
+          >
+            {createNoteMutation.isPending ? 'Adding...' : 'Add Note'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Upload Modal */}
+      <UploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUpload={handleUpload}
+      />
     </div>
   );
 }

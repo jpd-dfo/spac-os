@@ -1,5 +1,143 @@
 # SPAC OS Issues Log
 
+## Sprint 4 Issues
+
+### Test Results
+- **Build**: FAIL (Prisma schema validation error)
+- **Lint**: 770 warnings (exceeds 100 threshold)
+- **E2E**: 10/12 passed (2 failed)
+
+### Issues Found
+
+| ID | Severity | Description | File | Status |
+|----|----------|-------------|------|--------|
+| S4-001 | P0 | Prisma schema validation error - Note model relation to Target missing opposite relation field | `prisma/schema.prisma` | Open |
+| S4-002 | P0 | Prisma schema validation error - Note model relation to Spac missing opposite relation field | `prisma/schema.prisma` | Open |
+| S4-003 | P1 | E2E test failure - "should display sign-in page correctly" - strict mode violation with multiple matching elements | `e2e/auth.spec.ts:17` | Open |
+| S4-004 | P1 | E2E test failure - "should display sign-up page correctly" - strict mode violation with multiple matching elements | `e2e/auth.spec.ts:28` | Open |
+| S4-005 | P1 | Documents page still shows "Coming Soon" placeholder - not updated with new components | `src/app/(dashboard)/documents/page.tsx` | Open |
+| S4-006 | P2 | DocumentUpload.tsx not found - UploadModal.tsx exists instead (naming mismatch) | `src/components/documents/` | Open |
+| S4-007 | P2 | note.router.ts not found - note router not created | `src/server/api/routers/` | Open |
+| S4-008 | P2 | 770 ESLint warnings exceed acceptable threshold (>100) | Various | Open |
+
+### Sprint 4 Build Details
+
+**Build Command**: `npm run build`
+**Status**: FAILED
+**Error**: Prisma schema validation (P1012)
+```
+Error: The relation field `target` on model `Note` is missing an opposite relation field on the model `Target`.
+Error: The relation field `spac` on model `Note` is missing an opposite relation field on the model `Spac`.
+```
+
+**Root Cause Analysis**:
+The Note model (lines 1161-1177) defines relations to Target and Spac models:
+- `target Target? @relation(fields: [targetId], references: [id], onDelete: Cascade)`
+- `spac Spac? @relation(fields: [spacId], references: [id], onDelete: Cascade)`
+
+While Target (line 459) and Spac (line 391) already have `notes Note[]` defined, Prisma is not recognizing these as the opposite relations. This may be due to:
+1. Missing explicit relation names
+2. Order of model definitions
+3. Schema cache issues
+
+**Recommended Fix**: Run `prisma format` or add explicit relation names to both sides:
+```prisma
+// In Note model:
+target Target? @relation("TargetNotes", fields: [targetId], references: [id], onDelete: Cascade)
+spac   Spac?   @relation("SpacNotes", fields: [spacId], references: [id], onDelete: Cascade)
+
+// In Target model:
+notes Note[] @relation("TargetNotes")
+
+// In Spac model:
+notes Note[] @relation("SpacNotes")
+```
+
+### Sprint 4 E2E Test Results
+
+**Test Command**: `npx playwright test`
+**Total Tests**: 12
+**Passed**: 10
+**Failed**: 2
+
+| Test | Status | Notes |
+|------|--------|-------|
+| should protect /spacs route | PASS | |
+| should protect /dashboard route | PASS | |
+| should protect /pipeline route | PASS | |
+| should redirect unauthenticated users to sign-in | PASS | |
+| should display sign-in page correctly | FAIL | Strict mode violation - 4 matching elements |
+| should display sign-up page correctly | FAIL | Strict mode violation - 4 matching elements |
+| should have Google OAuth option on sign-in | PASS | |
+| should protect /compliance route | PASS | |
+| should load the home page | PASS | |
+| should protect /documents route | PASS | |
+| should be responsive | PASS | |
+| should have navigation to sign-in | PASS | |
+
+**E2E Failure Analysis**:
+The Clerk authentication component renders multiple elements matching the test selectors. Tests need to use more specific locators (e.g., `.first()` or more precise selectors).
+
+### Sprint 4 Lint Results
+
+**Lint Command**: `npm run lint`
+**Total Warnings**: 770 warnings
+**Status**: OVER THRESHOLD (>100)
+
+**Warning Categories**:
+1. Nested ternary expressions (no-nested-ternary)
+2. Explicit `any` types (@typescript-eslint/no-explicit-any)
+3. Import order violations (import/order)
+4. Unused variables/imports
+5. React hooks dependency warnings (react-hooks/exhaustive-deps)
+
+### Sprint 4 File Verification
+
+| Required File | Status | Notes |
+|---------------|--------|-------|
+| `/src/components/documents/DocumentUpload.tsx` | MISSING | UploadModal.tsx exists instead |
+| `/src/components/documents/DocumentViewer.tsx` | EXISTS | Fully implemented |
+| `/src/server/api/routers/document.router.ts` | EXISTS | Fully implemented |
+| `/src/server/api/routers/note.router.ts` | MISSING | Not created yet |
+
+### Sprint 4 Feature Verification
+
+| Feature | Status | Notes |
+|---------|--------|-------|
+| Quick Actions (add note) | PARTIAL | QuickActions.tsx component exists but note router missing |
+| Quick Actions (change priority) | PARTIAL | Component exists but wiring incomplete |
+| Document Upload component | EXISTS | As UploadModal.tsx with full drag-drop support |
+| Document Router | EXISTS | CRUD operations implemented |
+| Documents page updated | NOT DONE | Still shows "Coming Soon" placeholder |
+| SPAC/Target integration | PARTIAL | Relations defined but validation failing |
+
+### Document Components Created
+
+1. **AIAnalysisPanel.tsx** - AI-powered document analysis
+2. **DocumentBrowser.tsx** - Browse documents
+3. **DocumentCard.tsx** - Document card display
+4. **DocumentSearch.tsx** - Search functionality
+5. **DocumentViewer.tsx** - View documents with version history
+6. **FolderTree.tsx** - Folder navigation
+7. **UploadModal.tsx** - File upload with categories
+
+### Recommendations for Sprint 4 Completion
+
+#### Critical (Must Fix)
+1. Fix Prisma schema validation by adding explicit relation names
+2. Update E2E tests to use more specific Clerk selectors
+
+#### High Priority
+1. Create note.router.ts with CRUD operations
+2. Update documents page to use new components
+3. Rename UploadModal.tsx to DocumentUpload.tsx or update spec
+
+#### Medium Priority
+1. Wire quick actions to backend mutations
+2. Reduce lint warnings below 100 threshold
+
+---
+
 ## Sprint 3 Issues
 
 ### Open Issues
@@ -163,5 +301,22 @@
 
 ---
 
+## QA Summary
+
+### Sprint 4 QA Status: BLOCKED
+- **Build**: FAILING (Prisma schema validation)
+- **Lint**: 770 warnings (over threshold)
+- **E2E Tests**: 83% pass rate (10/12)
+- **Blockers**: 2 P0 issues (Prisma schema relations)
+
+### Overall Project Health
+- Build cannot complete until Prisma schema is fixed
+- Document management components exist but not integrated into page
+- Note functionality partially implemented (model exists, router missing)
+- Quick actions UI exists but backend wiring incomplete
+
+---
+
 *Last Updated: 2026-02-02*
+*Sprint 4 QA Completed*
 *QA Agent: Claude Opus 4.5*

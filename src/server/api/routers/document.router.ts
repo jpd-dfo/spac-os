@@ -8,6 +8,11 @@ import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
 import {
+  getSignedUrl as getSupabaseSignedUrl,
+  isSupabaseConfigured,
+  DOCUMENTS_BUCKET,
+} from '@/lib/supabase';
+import {
   DocumentCreateSchema,
   DocumentUpdateSchema,
   UuidSchema,
@@ -52,12 +57,18 @@ export const documentRouter = createTRPCRouter({
       status: z.array(DocumentStatusSchema).optional(),
       category: z.string().optional(),
       search: z.string().optional(),
+      latestOnly: z.boolean().optional().default(true),
       ...PaginationSchema.shape,
     }))
     .query(async ({ ctx, input }) => {
-      const { spacId, targetId, type, status, category, search, page, pageSize, sortBy, sortOrder } = input;
+      const { spacId, targetId, type, status, category, search, latestOnly, page, pageSize, sortBy, sortOrder } = input;
 
       const where: Prisma.DocumentWhereInput = { deletedAt: null };
+
+      // Only show latest versions by default
+      if (latestOnly) {
+        where.isLatest = true;
+      }
 
       if (spacId) {where.spacId = spacId;}
       if (targetId) {where.targetId = targetId;}
@@ -92,7 +103,88 @@ export const documentRouter = createTRPCRouter({
     .input(DocumentCreateSchema)
     .mutation(async ({ ctx, input }) => {
       const document = await ctx.db.document.create({
-        data: input as any,
+        data: {
+          ...input as any,
+          version: 1,
+          isLatest: true,
+        },
+        include: {
+          spac: true,
+          target: true,
+        },
+      });
+
+      return document;
+    }),
+
+  /**
+   * Upload a new version of an existing document
+   * Detects if a document with the same name exists for the entity and creates a new version
+   */
+  uploadNewVersion: orgAuditedProcedure
+    .input(z.object({
+      name: z.string(),
+      spacId: UuidSchema.optional(),
+      targetId: UuidSchema.optional(),
+      type: DocumentTypeSchema.optional(),
+      category: z.string().optional(),
+      status: DocumentStatusSchema.optional(),
+      fileUrl: z.string().optional(),
+      fileSize: z.number().optional(),
+      mimeType: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { name, spacId, targetId, ...rest } = input;
+
+      // Find existing document with the same name for this entity
+      const existingDocument = await ctx.db.document.findFirst({
+        where: {
+          name,
+          spacId: spacId || null,
+          targetId: targetId || null,
+          isLatest: true,
+          deletedAt: null,
+        },
+        orderBy: { version: 'desc' },
+      });
+
+      if (existingDocument) {
+        // Mark existing as not latest
+        await ctx.db.document.update({
+          where: { id: existingDocument.id },
+          data: { isLatest: false },
+        });
+
+        // Create new version
+        const newVersion = await ctx.db.document.create({
+          data: {
+            name,
+            spacId,
+            targetId,
+            ...rest as any,
+            version: existingDocument.version + 1,
+            parentId: existingDocument.parentId || existingDocument.id,
+            isLatest: true,
+          },
+          include: {
+            spac: true,
+            target: true,
+          },
+        });
+
+        return newVersion;
+      }
+
+      // No existing document - create as version 1
+      const document = await ctx.db.document.create({
+        data: {
+          name,
+          spacId,
+          targetId,
+          ...rest as any,
+          version: 1,
+          isLatest: true,
+        },
         include: {
           spac: true,
           target: true,
@@ -142,6 +234,47 @@ export const documentRouter = createTRPCRouter({
       });
 
       return { success: true };
+    }),
+
+  // ============================================================================
+  // VERSIONING
+  // ============================================================================
+
+  /**
+   * Get version history for a document
+   */
+  getVersionHistory: protectedProcedure
+    .input(z.object({ id: UuidSchema }))
+    .query(async ({ ctx, input }) => {
+      // First get the document to find its parent chain
+      const document = await ctx.db.document.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!document) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Document not found' });
+      }
+
+      // Get the root document ID (either parentId or self if no parent)
+      const rootId = document.parentId || document.id;
+
+      // Get all versions that share the same parent (or are the parent)
+      const versions = await ctx.db.document.findMany({
+        where: {
+          OR: [
+            { id: rootId },
+            { parentId: rootId },
+          ],
+          deletedAt: null,
+        },
+        orderBy: { version: 'desc' },
+        include: {
+          spac: { select: { id: true, name: true } },
+          target: { select: { id: true, name: true } },
+        },
+      });
+
+      return versions;
     }),
 
   // ============================================================================
@@ -321,5 +454,111 @@ export const documentRouter = createTRPCRouter({
         orderBy: { updatedAt: 'desc' },
         take: input.limit,
       });
+    }),
+
+  // ============================================================================
+  // STORAGE
+  // ============================================================================
+
+  /**
+   * Generate a signed URL for downloading a document
+   * The URL expires after the specified duration (default: 1 hour)
+   */
+  getSignedUrl: protectedProcedure
+    .input(z.object({
+      id: UuidSchema,
+      expiresIn: z.number().int().min(60).max(604800).default(3600), // 1 min to 7 days
+    }))
+    .query(async ({ ctx, input }) => {
+      const document = await ctx.db.document.findUnique({
+        where: { id: input.id },
+        select: { id: true, name: true, fileUrl: true },
+      });
+
+      if (!document) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Document not found' });
+      }
+
+      if (!document.fileUrl) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Document has no file attached' });
+      }
+
+      // Check if Supabase is configured
+      if (!isSupabaseConfigured()) {
+        // Return the fileUrl as-is if Supabase is not configured
+        return {
+          url: document.fileUrl,
+          expiresAt: null,
+        };
+      }
+
+      // Extract the storage path from the fileUrl
+      // The fileUrl format is: documents/{path}
+      const storagePath = document.fileUrl.startsWith(`${DOCUMENTS_BUCKET}/`)
+        ? document.fileUrl.substring(`${DOCUMENTS_BUCKET}/`.length)
+        : document.fileUrl;
+
+      const { url, error } = await getSupabaseSignedUrl(storagePath, input.expiresIn);
+
+      if (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to generate signed URL',
+        });
+      }
+
+      return {
+        url,
+        expiresAt: new Date(Date.now() + input.expiresIn * 1000),
+      };
+    }),
+
+  /**
+   * Get download URL for a document (alias for getSignedUrl for convenience)
+   */
+  getDownloadUrl: protectedProcedure
+    .input(z.object({ id: UuidSchema }))
+    .query(async ({ ctx, input }) => {
+      const document = await ctx.db.document.findUnique({
+        where: { id: input.id },
+        select: { id: true, name: true, fileUrl: true, mimeType: true },
+      });
+
+      if (!document) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Document not found' });
+      }
+
+      if (!document.fileUrl) {
+        throw new TRPCError({ code: 'NOT_FOUND', message: 'Document has no file attached' });
+      }
+
+      // Check if Supabase is configured
+      if (!isSupabaseConfigured()) {
+        return {
+          url: document.fileUrl,
+          fileName: document.name,
+          mimeType: document.mimeType,
+        };
+      }
+
+      // Extract the storage path from the fileUrl
+      const storagePath = document.fileUrl.startsWith(`${DOCUMENTS_BUCKET}/`)
+        ? document.fileUrl.substring(`${DOCUMENTS_BUCKET}/`.length)
+        : document.fileUrl;
+
+      const { url, error } = await getSupabaseSignedUrl(storagePath, 3600);
+
+      if (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to generate download URL',
+        });
+      }
+
+      return {
+        url,
+        fileName: document.name,
+        mimeType: document.mimeType,
+      };
     }),
 });
