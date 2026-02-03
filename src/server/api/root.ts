@@ -4,11 +4,14 @@
  */
 
 import { alertRouter } from './routers/alert.router';
+import { complianceRouter } from './routers/compliance.router';
 import { documentRouter } from './routers/document.router';
 import { filingRouter } from './routers/filing.router';
+import { financialRouter } from './routers/financial.router';
 import { noteRouter } from './routers/note.router';
 import { spacRouter } from './routers/spac';
 import { targetRouter } from './routers/target.router';
+import { taskRouter } from './routers/task.router';
 import { createTRPCRouter } from './trpc';
 
 /**
@@ -25,11 +28,14 @@ import { createTRPCRouter } from './trpc';
  */
 export const appRouter = createTRPCRouter({
   alert: alertRouter,
+  compliance: complianceRouter,
+  document: documentRouter,
   filing: filingRouter,
+  financial: financialRouter,
+  note: noteRouter,
   spac: spacRouter,
   target: targetRouter,
-  note: noteRouter,
-  document: documentRouter,
+  task: taskRouter,
 });
 
 // Export type for client

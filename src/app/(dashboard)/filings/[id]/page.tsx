@@ -38,6 +38,7 @@ import { FilingStatusBadge } from '@/components/filings/FilingStatusBadge';
 import { FilingStatusProgression, type StatusChangeEvent } from '@/components/filings/FilingTimeline';
 import { FILING_DEFINITIONS } from '@/lib/compliance/complianceRules';
 import { FILING_TYPE_LABELS } from '@/lib/constants';
+import { trpc } from '@/lib/trpc';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
 import type { FilingType, FilingStatus } from '@/types';
 
@@ -454,35 +455,168 @@ export default function FilingDetailPage() {
   const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false);
   const [selectedNewStatus, setSelectedNewStatus] = useState<FilingStatus | null>(null);
 
-  // Get mock filing data
-  const filing = useMemo(() => getMockFilingData(filingId), [filingId]);
+  // Fetch filing from API
+  const filingQuery = trpc.filing.getById.useQuery(
+    { id: filingId },
+    { enabled: !!filingId, refetchOnWindowFocus: false }
+  );
 
-  // Valid status transitions
-  const validTransitions = useMemo(() => getValidStatusTransitions(filing.status), [filing.status]);
+  // Transform API data to FilingPageData format
+  const filing = useMemo((): FilingPageData | null => {
+    const data = filingQuery.data;
+    if (!data) {
+      return null;
+    }
 
-  // SEC EDGAR URL
+    const today = new Date();
+
+    // Map filing type from Prisma to frontend format
+    const typeMap: Record<string, FilingType> = {
+      'FORM_10K': 'FORM_10K',
+      'FORM_10Q': 'FORM_10Q',
+      'FORM_8K': 'FORM_8K',
+      'FORM_S1': 'S1',
+      'FORM_S4': 'S4',
+      'DEF14A': 'DEF14A',
+      'DEFA14A': 'DEFA14A',
+      'PREM14A': 'PREM14A',
+      'PROXY': 'DEF14A',
+      'FORM_13F': 'OTHER',
+      'FORM_425': 'FORM_425',
+      'SC_13D': 'SC_13D',
+      'SC_13G': 'SC_13G',
+      'FORM_3': 'FORM_3',
+      'FORM_4': 'FORM_4',
+      'FORM_5': 'FORM_5',
+      'SUPER_8K': 'SUPER_8K',
+    };
+
+    // Map status to expected format - only valid FilingStatus values
+    const statusMap: Record<string, FilingStatus> = {
+      'DRAFTING': 'DRAFT',
+      'INTERNAL_REVIEW': 'INTERNAL_REVIEW',
+      'LEGAL_REVIEW': 'EXTERNAL_REVIEW',
+      'BOARD_APPROVAL': 'INTERNAL_REVIEW',
+      'FILED': 'SUBMITTED',
+      'SEC_COMMENT': 'SEC_COMMENT',
+      'RESPONSE_FILED': 'RESPONSE_FILED',
+      'AMENDED': 'RESPONSE_FILED',
+      'EFFECTIVE': 'EFFECTIVE',
+      'WITHDRAWN': 'COMPLETE',
+      'ACCEPTED': 'EFFECTIVE',
+    };
+
+    // Build status history from available dates - using only valid FilingStatus values
+    const statusHistory: StatusChangeEvent[] = [];
+    if (data.createdAt) {
+      statusHistory.push({ status: 'DRAFT', date: new Date(data.createdAt), description: 'Filing created' });
+    }
+    if (data.internalReviewDate) {
+      statusHistory.push({ status: 'INTERNAL_REVIEW', date: new Date(data.internalReviewDate), description: 'Sent for internal review' });
+    }
+    if (data.externalReviewDate) {
+      statusHistory.push({ status: 'EXTERNAL_REVIEW', date: new Date(data.externalReviewDate), description: 'Sent for external legal review' });
+    }
+    if (data.filedDate) {
+      statusHistory.push({ status: 'SUBMITTED', date: new Date(data.filedDate), description: 'Filed with SEC via EDGAR' });
+    }
+    if (data.secCommentDate) {
+      statusHistory.push({ status: 'SEC_COMMENT', date: new Date(data.secCommentDate), description: `SEC comment letter received - ${data.secCommentCount || 0} comments` });
+    }
+    if (data.responseDate) {
+      statusHistory.push({ status: 'RESPONSE_FILED', date: new Date(data.responseDate), description: 'Response to SEC comments submitted' });
+    }
+    if (data.effectiveDate) {
+      statusHistory.push({ status: 'EFFECTIVE', date: new Date(data.effectiveDate), description: 'Registration declared effective' });
+    }
+
+    return {
+      id: data.id,
+      type: typeMap[data.type] || 'OTHER' as FilingType,
+      title: data.title || `${data.type} Filing`,
+      description: data.description || '',
+      spacId: data.spacId,
+      spacName: data.spac?.name || 'Unknown',
+      ticker: data.spac?.ticker || '',
+      cik: data.cik || data.spac?.cik || undefined,
+      status: statusMap[data.status] || data.status as FilingStatus,
+      priority: 'HIGH',
+      dueDate: data.dueDate ? new Date(data.dueDate) : addDays(today, 30),
+      filedDate: data.filedDate ? new Date(data.filedDate) : undefined,
+      effectiveDate: data.effectiveDate ? new Date(data.effectiveDate) : undefined,
+      accessionNumber: data.accessionNumber || undefined,
+      edgarUrl: data.edgarUrl || undefined,
+      secFileNumber: data.fileNumber || undefined,
+      statusHistory,
+      assignee: undefined,
+      reviewers: [],
+      documents: (data.documents || []).map((d: any) => ({
+        id: d.document?.id || d.id,
+        name: d.document?.name || 'Document',
+        type: d.document?.type || 'application/pdf',
+        size: d.document?.size || 0,
+        version: 1,
+        uploadedAt: d.document?.createdAt ? new Date(d.document.createdAt) : new Date(),
+        uploadedBy: 'System',
+      })),
+      comments: (data.secComments || []).map((c: any) => ({
+        id: c.id,
+        type: 'SEC_COMMENT' as const,
+        author: 'SEC Staff',
+        content: c.commentText,
+        createdAt: new Date(c.receivedDate),
+        status: c.isResolved ? 'RESOLVED' as const : 'OPEN' as const,
+      })),
+      amendments: (data.amendments || []).map((a: any) => ({
+        id: a.id,
+        version: `Amendment ${a.amendmentNumber}`,
+        filedDate: a.filedDate ? new Date(a.filedDate) : new Date(),
+        accessionNumber: a.accessionNumber || '',
+        description: `Amendment ${a.amendmentNumber}`,
+        edgarUrl: undefined,
+      })),
+      workflowSteps: [],
+      checklist: [],
+      createdAt: new Date(data.createdAt),
+      updatedAt: new Date(data.updatedAt),
+    };
+  }, [filingQuery.data]);
+
+  // Valid status transitions - must call before early returns
+  const validTransitions = useMemo(() => {
+    if (!filing) {
+      return [];
+    }
+    return getValidStatusTransitions(filing.status);
+  }, [filing]);
+
+  // SEC EDGAR URL - must call before early returns
   const secEdgarUrl = useMemo(() => {
+    if (!filing) {
+      return '';
+    }
     return filing.edgarUrl || buildSecEdgarUrl(filing.cik, filing.type);
-  }, [filing.edgarUrl, filing.cik, filing.type]);
+  }, [filing]);
 
-  const statusConfig = getStatusConfig(filing.status);
-  const priorityConfig = getPriorityConfig(filing.priority);
-  const filingDefinition = FILING_DEFINITIONS[filing.type];
+  // Derived values - safe to compute even with null filing (used after early return)
+  const statusConfig = filing ? getStatusConfig(filing.status) : { icon: FileText, label: 'Unknown', colorClass: 'text-slate-500', bgClass: 'bg-slate-100' };
+  const priorityConfig = filing ? getPriorityConfig(filing.priority) : { label: 'Unknown', variant: 'secondary' as const };
+  const filingDefinition = filing ? FILING_DEFINITIONS[filing.type] : null;
 
-  const daysUntilDue = differenceInDays(startOfDay(filing.dueDate), startOfDay(new Date()));
-  const isOverdue = daysUntilDue < 0 && !['COMPLETE', 'EFFECTIVE', 'SUBMITTED'].includes(filing.status);
+  const daysUntilDue = filing ? differenceInDays(startOfDay(filing.dueDate), startOfDay(new Date())) : 0;
+  const isOverdue = filing ? daysUntilDue < 0 && !['COMPLETE', 'EFFECTIVE', 'SUBMITTED'].includes(filing.status) : false;
 
   // Calculate checklist progress
-  const checklistProgress = {
+  const checklistProgress = filing ? {
     total: filing.checklist.length,
     complete: filing.checklist.filter((c) => c.status === 'COMPLETE').length,
     inProgress: filing.checklist.filter((c) => c.status === 'IN_PROGRESS').length,
-  };
+  } : { total: 0, complete: 0, inProgress: 0 };
 
   // Open SEC comments
-  const openSecComments = filing.comments.filter(
+  const openSecComments = filing ? filing.comments.filter(
     (c) => c.type === 'SEC_COMMENT' && c.status === 'OPEN'
-  ).length;
+  ).length : 0;
 
   const handleAddComment = () => {
     if (newComment.trim()) {
@@ -490,6 +624,39 @@ export default function FilingDetailPage() {
       setNewComment('');
     }
   };
+
+  // Loading state
+  if (filingQuery.isLoading) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <div className="text-center">
+          <RefreshCw className="mx-auto h-8 w-8 animate-spin text-primary-500" />
+          <p className="mt-2 text-sm text-slate-500">Loading filing...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Error state
+  if (filingQuery.isError || !filing) {
+    return (
+      <div className="flex h-[50vh] items-center justify-center">
+        <Card className="max-w-md">
+          <CardContent className="p-6 text-center">
+            <AlertTriangle className="mx-auto h-12 w-12 text-danger-500" />
+            <h3 className="mt-4 text-lg font-semibold text-slate-900">Filing not found</h3>
+            <p className="mt-2 text-sm text-slate-500">
+              {filingQuery.error?.message || 'The requested filing could not be found.'}
+            </p>
+            <Button variant="primary" size="md" className="mt-4" onClick={() => router.push('/filings')}>
+              <ArrowLeft className="mr-2 h-4 w-4" />
+              Back to Filings
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">
