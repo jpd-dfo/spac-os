@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -29,14 +29,17 @@ import {
   Loader2,
 } from 'lucide-react';
 
+import { TargetForm } from '@/components/forms/TargetForm';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
+import { Modal, ModalHeader, ModalTitle, ModalBody } from '@/components/ui/Modal';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { trpc } from '@/lib/trpc/client';
 import { cn, formatLargeNumber, formatDate, formatRelativeTime } from '@/lib/utils';
+import type { Target, TargetStatus } from '@/types';
 
 // ============================================================================
 // Types
@@ -166,9 +169,12 @@ function mapStatusToStage(status: string): PipelineStage {
   return statusToStageMap[status] || 'sourcing';
 }
 
+// Schema TargetStatus type for mutations
+type SchemaTargetStatus = 'IDENTIFIED' | 'PRELIMINARY' | 'NDA_SIGNED' | 'DUE_DILIGENCE' | 'TERM_SHEET' | 'LOI' | 'DEFINITIVE' | 'CLOSED' | 'PASSED' | 'TERMINATED';
+
 // Map UI stage to database status for mutations
-function mapStageToStatus(stage: PipelineStage): string {
-  const stageToStatusMap: Record<PipelineStage, string> = {
+function mapStageToStatus(stage: PipelineStage): SchemaTargetStatus {
+  const stageToStatusMap: Record<PipelineStage, SchemaTargetStatus> = {
     'sourcing': 'IDENTIFIED',
     'initial_screening': 'NDA_SIGNED',
     'deep_evaluation': 'DUE_DILIGENCE',
@@ -469,6 +475,7 @@ interface PageProps {
 export default function TargetDetailPage({ params }: PageProps) {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'financials' | 'diligence' | 'documents' | 'activity'>('overview');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // tRPC Query
   const {
@@ -492,6 +499,13 @@ export default function TargetDetailPage({ params }: PageProps) {
   const deleteTargetMutation = trpc.target.delete.useMutation({
     onSuccess: () => {
       router.push('/pipeline');
+    },
+  });
+
+  const updateTargetMutation = trpc.target.update.useMutation({
+    onSuccess: () => {
+      utils.target.getById.invalidate({ id: params.id });
+      setIsEditModalOpen(false);
     },
   });
 
@@ -542,6 +556,33 @@ export default function TargetDetailPage({ params }: PageProps) {
     }
     deleteTargetMutation.mutate({ id: target.id });
   }, [target, deleteTargetMutation]);
+
+  const handleEdit = useCallback(() => {
+    setIsEditModalOpen(true);
+  }, []);
+
+  const handleEditSubmit = useCallback(async (data: Partial<Target>) => {
+    if (!target) {
+      return;
+    }
+    updateTargetMutation.mutate({
+      id: target.id,
+      data: {
+        name: data.name,
+        description: data.description,
+        industry: data.industry,
+        sector: data.sector,
+        enterpriseValue: data.enterpriseValue,
+        revenue: data.ltmRevenue,
+        ebitda: data.ltmEbitda,
+        priority: data.priority,
+        probability: data.probability,
+        status: data.status as SchemaTargetStatus | undefined,
+        stage: data.stage,
+      },
+    });
+    setIsEditModalOpen(false);
+  }, [target, updateTargetMutation]);
 
   if (isLoading) {
     return (
@@ -679,7 +720,7 @@ export default function TargetDetailPage({ params }: PageProps) {
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="secondary">
+          <Button variant="secondary" onClick={handleEdit}>
             <Edit className="mr-2 h-4 w-4" />
             Edit
           </Button>
@@ -1099,6 +1140,32 @@ export default function TargetDetailPage({ params }: PageProps) {
           )}
         </div>
       </div>
+
+      {/* Edit Target Modal */}
+      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} size="xl">
+        <ModalHeader>
+          <ModalTitle>Edit Target</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          <TargetForm
+            spacId={target.associatedSpac?.id || ''}
+            initialData={{
+              name: target.name,
+              description: target.description,
+              industry: target.industry,
+              sector: target.subIndustry,
+              status: mapStageToStatus(target.stage) as TargetStatus,
+              enterpriseValue: target.enterpriseValue,
+              ltmRevenue: target.revenue,
+              ltmEbitda: target.ebitda,
+              priority: target.priority === 'critical' ? 1 : target.priority === 'high' ? 2 : target.priority === 'medium' ? 3 : 4,
+            }}
+            onSubmit={handleEditSubmit}
+            onCancel={() => setIsEditModalOpen(false)}
+            isLoading={updateTargetMutation.isPending}
+          />
+        </ModalBody>
+      </Modal>
     </div>
   );
 }

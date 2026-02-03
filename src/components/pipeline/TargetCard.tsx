@@ -76,8 +76,11 @@ interface TargetCardProps {
   target: Target;
   isDragging?: boolean;
   isOverlay?: boolean;
+  isSelected?: boolean;
+  showCheckbox?: boolean;
   onClick?: (target: Target) => void;
   onQuickAction?: (target: Target, action: QuickAction) => void;
+  onSelectionChange?: (target: Target, selected: boolean) => void;
 }
 
 // ============================================================================
@@ -182,8 +185,11 @@ export function TargetCard({
   target,
   isDragging = false,
   isOverlay = false,
+  isSelected = false,
+  showCheckbox = false,
   onClick,
   onQuickAction,
+  onSelectionChange,
 }: TargetCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -194,6 +200,15 @@ export function TargetCard({
     onClick?.(target);
   };
 
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    onSelectionChange?.(target, e.target.checked);
+  };
+
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   const handleQuickAction = (action: QuickAction) => {
     onQuickAction?.(target, action);
   };
@@ -201,10 +216,12 @@ export function TargetCard({
   return (
     <div
       className={cn(
-        'group rounded-lg border bg-white shadow-sm transition-all duration-200',
+        'group relative rounded-lg border bg-white shadow-sm transition-all duration-200',
         isDragging
           ? 'border-primary-300 shadow-lg ring-2 ring-primary-200'
-          : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
+          : isSelected
+            ? 'border-primary-400 bg-primary-50/50 ring-1 ring-primary-200'
+            : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
         isOverlay && 'rotate-2 scale-105',
         onClick && 'cursor-pointer'
       )}
@@ -212,8 +229,27 @@ export function TargetCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Selection Checkbox */}
+      {showCheckbox && (
+        <div
+          data-no-click
+          className={cn(
+            'absolute left-2 top-2 z-10 transition-opacity duration-200',
+            isHovered || isSelected ? 'opacity-100' : 'opacity-0'
+          )}
+          onClick={handleCheckboxClick}
+        >
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={handleCheckboxChange}
+            className="h-4 w-4 cursor-pointer rounded border-slate-300 text-primary-600 focus:ring-primary-500 focus:ring-offset-0"
+          />
+        </div>
+      )}
+
       {/* Card Header */}
-      <div className="p-4">
+      <div className={cn('p-4', showCheckbox && 'pl-8')}>
         <div className="mb-3 flex items-start justify-between gap-2">
           {/* Company Info */}
           <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -398,6 +434,8 @@ interface TargetCardCompactProps {
   onClick?: (target: Target) => void;
   onQuickAction?: (target: Target, action: QuickAction) => void;
   selected?: boolean;
+  showCheckbox?: boolean;
+  onSelectionChange?: (target: Target, selected: boolean) => void;
 }
 
 export function TargetCardCompact({
@@ -405,7 +443,14 @@ export function TargetCardCompact({
   onClick,
   onQuickAction,
   selected = false,
+  showCheckbox = false,
+  onSelectionChange,
 }: TargetCardCompactProps) {
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    onSelectionChange?.(target, e.target.checked);
+  };
+
   return (
     <div
       className={cn(
@@ -417,6 +462,17 @@ export function TargetCardCompact({
       )}
       onClick={() => onClick?.(target)}
     >
+      {/* Selection Checkbox */}
+      {showCheckbox && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={handleCheckboxChange}
+            className="h-4 w-4 cursor-pointer rounded border-slate-300 text-primary-600 focus:ring-primary-500 focus:ring-offset-0"
+          />
+        </div>
+      )}
       {/* Logo */}
       <div className={cn(
         'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg',

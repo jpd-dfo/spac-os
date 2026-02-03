@@ -12,9 +12,11 @@ import {
   BarChart3,
   Loader2,
   AlertCircle,
+  CheckSquare,
 } from 'lucide-react';
 
 import { AddTargetForm, type NewTargetData } from '@/components/pipeline/AddTargetForm';
+import { BulkActionBar } from '@/components/pipeline/BulkActionBar';
 import { KanbanBoard, DEFAULT_COLUMNS } from '@/components/pipeline/KanbanBoard';
 import { PipelineFilters, DEFAULT_FILTERS, type PipelineFiltersState } from '@/components/pipeline/PipelineFilters';
 import { PipelineStats, PipelineStatsBar } from '@/components/pipeline/PipelineStats';
@@ -23,6 +25,7 @@ import { TargetDetailModal, type TargetDetails } from '@/components/pipeline/Tar
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Dropdown, DropdownItem, DropdownLabel } from '@/components/ui/Dropdown';
+import { exportToCSV, exportToExcel, type ExportableTarget } from '@/lib/export';
 import { trpc } from '@/lib/trpc/client';
 import { cn } from '@/lib/utils';
 
@@ -668,6 +671,11 @@ export default function PipelinePage() {
   const [addFormInitialStage, setAddFormInitialStage] = useState<PipelineStage>('sourcing');
   const [sortBy, setSortBy] = useState<'name' | 'value' | 'score' | 'days'>('value');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Selection state for bulk operations
+  const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set());
+  const [isBulkOperationLoading, setIsBulkOperationLoading] = useState(false);
 
   // Filtered and sorted targets
   const filteredTargets = useMemo(() => {
@@ -815,6 +823,122 @@ export default function PipelinePage() {
     }
   }, [sortBy]);
 
+  // Selection handlers for bulk operations
+  const toggleSelection = useCallback((target: Target, selected: boolean) => {
+    setSelectedTargets((prev) => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(target.id);
+      } else {
+        newSet.delete(target.id);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    const allIds = new Set(filteredTargets.map((t) => t.id));
+    setSelectedTargets(allIds);
+  }, [filteredTargets]);
+
+  const deselectAll = useCallback(() => {
+    setSelectedTargets(new Set());
+  }, []);
+
+  // Bulk operation handlers
+  const handleBulkMoveToStage = useCallback(async (stage: PipelineStage) => {
+    if (selectedTargets.size === 0) {return;}
+
+    setIsBulkOperationLoading(true);
+    const newStatus = mapStageToStatus(stage);
+
+    try {
+      // Process all selected targets
+      const promises = Array.from(selectedTargets).map((targetId) =>
+        updateStatusMutation.mutateAsync({
+          id: targetId,
+          status: newStatus as 'IDENTIFIED' | 'PRELIMINARY' | 'NDA_SIGNED' | 'DUE_DILIGENCE' | 'TERM_SHEET' | 'LOI' | 'DEFINITIVE' | 'CLOSED' | 'PASSED' | 'TERMINATED',
+        })
+      );
+
+      await Promise.all(promises);
+
+      // Clear selection after successful operation
+      setSelectedTargets(new Set());
+      utils.target.list.invalidate();
+    } catch {
+      // Error handling - mutations already have error handling
+      console.error('Bulk move operation failed');
+    } finally {
+      setIsBulkOperationLoading(false);
+    }
+  }, [selectedTargets, updateStatusMutation, utils.target.list]);
+
+  const handleBulkArchive = useCallback(async () => {
+    if (selectedTargets.size === 0) {return;}
+
+    setIsBulkOperationLoading(true);
+
+    try {
+      // Process all selected targets for deletion
+      const promises = Array.from(selectedTargets).map((targetId) =>
+        deleteTargetMutation.mutateAsync({ id: targetId })
+      );
+
+      await Promise.all(promises);
+
+      // Clear selection after successful operation
+      setSelectedTargets(new Set());
+      utils.target.list.invalidate();
+    } catch {
+      // Error handling - mutations already have error handling
+      console.error('Bulk archive operation failed');
+    } finally {
+      setIsBulkOperationLoading(false);
+    }
+  }, [selectedTargets, deleteTargetMutation, utils.target.list]);
+
+  // Transform filtered targets to exportable format
+  const getExportData = useCallback((): ExportableTarget[] => {
+    return filteredTargets.map((target) => ({
+      id: target.id,
+      name: target.name,
+      industry: target.industry,
+      stage: target.stage,
+      enterpriseValue: target.enterpriseValue,
+      revenue: target.revenue,
+      ebitda: target.ebitda,
+      evaluationScore: target.evaluationScore,
+      priority: target.priority,
+      headquarters: target.headquarters,
+      employeeCount: target.employeeCount,
+      description: target.description,
+      tags: target.tags,
+      createdAt: target.createdAt,
+      updatedAt: target.updatedAt,
+    }));
+  }, [filteredTargets]);
+
+  const handleExportCSV = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const data = getExportData();
+      await exportToCSV(data, 'spac-pipeline');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [getExportData]);
+
+  const handleExportExcel = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const data = getExportData();
+      await exportToExcel(data, 'spac-pipeline');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [getExportData]);
+
   return (
     <div className="space-y-6">
       {/* Page Header */}
@@ -826,6 +950,18 @@ export default function PipelinePage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {/* Select All / Deselect Toggle */}
+          <Button
+            variant={selectedTargets.size > 0 ? 'primary' : 'secondary'}
+            size="md"
+            onClick={selectedTargets.size === filteredTargets.length ? deselectAll : selectAll}
+          >
+            <CheckSquare className="mr-2 h-4 w-4" />
+            {selectedTargets.size === filteredTargets.length && filteredTargets.length > 0
+              ? 'Deselect All'
+              : 'Select All'}
+          </Button>
+
           {/* View Toggle */}
           <div className="flex rounded-lg border border-slate-200 bg-white p-1">
             <button
@@ -915,16 +1051,23 @@ export default function PipelinePage() {
           {/* Export */}
           <Dropdown
             trigger={
-              <Button variant="secondary" size="md">
-                <Download className="mr-2 h-4 w-4" />
-                Export
+              <Button variant="secondary" size="md" disabled={isExporting}>
+                {isExporting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                {isExporting ? 'Exporting...' : 'Export'}
               </Button>
             }
             align="right"
           >
-            <DropdownItem>Export as CSV</DropdownItem>
-            <DropdownItem>Export as Excel</DropdownItem>
-            <DropdownItem>Export as PDF</DropdownItem>
+            <DropdownItem onClick={handleExportCSV} disabled={isExporting}>
+              Export as CSV
+            </DropdownItem>
+            <DropdownItem onClick={handleExportExcel} disabled={isExporting}>
+              Export as Excel
+            </DropdownItem>
           </Dropdown>
 
           {/* Add Target */}
@@ -982,11 +1125,15 @@ export default function PipelinePage() {
           onTargetClick={handleTargetClick}
           onTargetQuickAction={handleQuickAction}
           onAddTarget={handleAddTarget}
+          selectedTargets={selectedTargets}
+          onSelectionChange={toggleSelection}
+          showCheckboxes={true}
         />
       ) : !isLoading && !error && (
         <div className="space-y-3">
           {/* List Header */}
           <div className="flex items-center gap-4 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600">
+            <div className="w-4" /> {/* Checkbox */}
             <div className="w-8" /> {/* Logo */}
             <div className="min-w-[180px] flex-1">Target</div>
             <div className="w-24 text-right">EV</div>
@@ -1004,6 +1151,9 @@ export default function PipelinePage() {
               target={target}
               onClick={handleTargetClick}
               onQuickAction={handleQuickAction}
+              selected={selectedTargets.has(target.id)}
+              showCheckbox={true}
+              onSelectionChange={toggleSelection}
             />
           ))}
 
@@ -1035,6 +1185,15 @@ export default function PipelinePage() {
         onClose={() => setIsAddFormOpen(false)}
         onSubmit={handleSubmitNewTarget}
         initialStage={addFormInitialStage}
+      />
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedTargets.size}
+        onMoveToStage={handleBulkMoveToStage}
+        onArchive={handleBulkArchive}
+        onClearSelection={deselectAll}
+        isLoading={isBulkOperationLoading}
       />
     </div>
   );
