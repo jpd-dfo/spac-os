@@ -9,7 +9,6 @@ import {
   Clock,
   TrendingUp,
   Users,
-  BarChart3,
   AlertCircle,
   RefreshCw,
 } from 'lucide-react';
@@ -31,6 +30,12 @@ import {
 import {
   DealPipelineWidget,
 } from '@/components/dashboard/DealPipelineWidget';
+import {
+  DeadlineCountdown,
+} from '@/components/dashboard/DeadlineCountdown';
+import {
+  PipelineChart,
+} from '@/components/dashboard/PipelineChart';
 import {
   QuickActions,
   defaultQuickActions,
@@ -66,6 +71,28 @@ import { trpc } from '@/lib/trpc';
 // ============================================================================
 
 type PipelineStage = 'SOURCING' | 'SCREENING' | 'EVALUATION' | 'NEGOTIATION' | 'EXECUTION';
+
+// Deal stage type for PipelineChart component
+type DealStage =
+  | 'ORIGINATION'
+  | 'PRELIMINARY_REVIEW'
+  | 'DEEP_DIVE'
+  | 'NEGOTIATION'
+  | 'DOCUMENTATION'
+  | 'CLOSING'
+  | 'TERMINATED';
+
+interface PipelineStageData {
+  stage: DealStage;
+  count: number;
+  value: number;
+  deals?: Array<{
+    id: string;
+    name: string;
+    value: number;
+    probability?: number;
+  }>;
+}
 
 interface PipelineTarget {
   id: string;
@@ -126,6 +153,34 @@ function mapTargetStageToPipelineStage(
       return 'SOURCING'; // Rejected deals go back to sourcing for tracking
     default:
       return 'SOURCING';
+  }
+}
+
+// ============================================================================
+// HELPER: MAP TARGET STATUS TO DEAL STAGE (for PipelineChart)
+// ============================================================================
+
+function mapTargetStatusToDealStage(status: string): DealStage {
+  // Map based on actual TargetStatus enum values to DealStage for PipelineChart
+  switch (status) {
+    case 'IDENTIFIED':
+      return 'ORIGINATION';
+    case 'INITIAL_OUTREACH':
+      return 'PRELIMINARY_REVIEW';
+    case 'NDA_SIGNED':
+      return 'DEEP_DIVE';
+    case 'DUE_DILIGENCE':
+      return 'DEEP_DIVE';
+    case 'LOI_SUBMITTED':
+      return 'NEGOTIATION';
+    case 'NEGOTIATION':
+      return 'NEGOTIATION';
+    case 'CLOSED_WON':
+      return 'CLOSING';
+    case 'REJECTED':
+      return 'TERMINATED';
+    default:
+      return 'ORIGINATION';
   }
 }
 
@@ -813,6 +868,72 @@ export default function DashboardPage() {
   }, [spacsQuery.data, targetsQuery.data]);
 
   // ============================================================================
+  // DERIVED DATA: PIPELINE CHART DATA (for PipelineChart component)
+  // ============================================================================
+
+  const pipelineChartData = useMemo((): PipelineStageData[] => {
+    if (!targetsQuery.data?.items) {return [];}
+
+    const targets = targetsQuery.data.items;
+
+    // Initialize all stages with zero counts
+    const stageMap: Record<DealStage, { count: number; value: number; deals: Array<{ id: string; name: string; value: number }> }> = {
+      ORIGINATION: { count: 0, value: 0, deals: [] },
+      PRELIMINARY_REVIEW: { count: 0, value: 0, deals: [] },
+      DEEP_DIVE: { count: 0, value: 0, deals: [] },
+      NEGOTIATION: { count: 0, value: 0, deals: [] },
+      DOCUMENTATION: { count: 0, value: 0, deals: [] },
+      CLOSING: { count: 0, value: 0, deals: [] },
+      TERMINATED: { count: 0, value: 0, deals: [] },
+    };
+
+    // Aggregate targets by deal stage
+    targets.forEach((target) => {
+      const dealStage = mapTargetStatusToDealStage(target.status);
+      const targetValue = Number(target.valuation || target.revenue || 0);
+
+      stageMap[dealStage].count += 1;
+      stageMap[dealStage].value += targetValue;
+      stageMap[dealStage].deals.push({
+        id: target.id,
+        name: target.name,
+        value: targetValue,
+      });
+    });
+
+    // Convert to array format expected by PipelineChart
+    return (Object.entries(stageMap) as [DealStage, typeof stageMap[DealStage]][]).map(([stage, data]) => ({
+      stage,
+      count: data.count,
+      value: data.value,
+      deals: data.deals,
+    }));
+  }, [targetsQuery.data]);
+
+  // ============================================================================
+  // DERIVED DATA: NEXT SPAC DEADLINE (for DeadlineCountdown)
+  // ============================================================================
+
+  const nextSpacDeadline = useMemo(() => {
+    if (!primarySpac || !primarySpac.deadlineDate) {return null;}
+
+    const deadlineDate = new Date(primarySpac.deadlineDate);
+
+    return {
+      id: primarySpac.id,
+      title: 'Business Combination Deadline',
+      description: `Complete business combination for ${primarySpac.name}`,
+      deadlineDate,
+      type: 'business_combination' as const,
+      spacName: primarySpac.name,
+      spacTicker: primarySpac.ticker || undefined,
+      isCompleted: primarySpac.status === 'COMPLETED' || primarySpac.status === 'LIQUIDATED',
+      extensionsRemaining: 2, // Placeholder - would come from SPAC data
+      extensionMonths: 3, // Placeholder - typical extension period
+    };
+  }, [primarySpac]);
+
+  // ============================================================================
   // DERIVED DATA: DEAL SUMMARY
   // ============================================================================
 
@@ -1352,28 +1473,41 @@ export default function DashboardPage() {
         </Card>
       </div>
 
-      {/* Pipeline Overview Placeholder */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BarChart3 className="h-5 w-5 text-primary-600" />
-            Pipeline Overview
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex h-64 items-center justify-center rounded-lg border-2 border-dashed border-slate-200 bg-slate-50">
-            <div className="text-center">
-              <BarChart3 className="mx-auto h-12 w-12 text-slate-300" />
-              <p className="mt-4 text-sm font-medium text-slate-600">
-                Pipeline Chart Visualization
-              </p>
-              <p className="mt-1 text-xs text-slate-400">
-                Full pipeline funnel chart will be displayed here
-              </p>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+      {/* Pipeline Overview with PipelineChart */}
+      {hasTargetError ? (
+        <ErrorCard
+          title="Failed to load pipeline chart"
+          message={targetsQuery.error?.message || 'Unable to retrieve pipeline data'}
+          onRetry={handleRetryTargets}
+          isRetrying={isRefetchingTargets}
+        />
+      ) : (
+        <PipelineChart
+          data={pipelineChartData}
+          variant="bar"
+          title="Pipeline Overview"
+          showValue={true}
+          showCount={true}
+          showConversionRates={false}
+          isLoading={isLoadingTargets}
+          error={null}
+        />
+      )}
+
+      {/* SPAC Deadline Countdown */}
+      {nextSpacDeadline && !hasSpacError && (
+        <DeadlineCountdown
+          deadline={nextSpacDeadline}
+          showExtensionOption={true}
+          warningDays={90}
+          criticalDays={30}
+          onViewDetails={() => {
+            if (primarySpac?.id) {
+              window.location.href = `/spacs/${primarySpac.id}`;
+            }
+          }}
+        />
+      )}
     </div>
   );
 }

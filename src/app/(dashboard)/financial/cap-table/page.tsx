@@ -7,9 +7,25 @@ import Link from 'next/link';
 import { ArrowLeft, Download, Plus, Settings, Filter, Loader2, Building2, AlertCircle } from 'lucide-react';
 
 import { CapTableView } from '@/components/financial/CapTableView';
+import { DilutionWaterfall, SOREN_DILUTION_STAGES } from '@/components/financial/DilutionWaterfall';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { trpc } from '@/lib/trpc';
+
+// Types for dilution waterfall
+type DilutionStage = 'pre_ipo' | 'post_ipo' | 'post_pipe' | 'post_earnout' | 'post_warrants';
+
+interface OwnershipStage {
+  id: DilutionStage;
+  name: string;
+  description: string;
+  publicOwnership: number;
+  sponsorOwnership: number;
+  targetOwnership: number;
+  pipeOwnership: number;
+  earnoutOwnership: number;
+  totalShares: number;
+}
 
 // Share class type definition
 type ShareClass = 'class_a' | 'class_b' | 'public_warrants' | 'private_warrants' | 'options' | 'rsus';
@@ -44,6 +60,98 @@ export default function CapTablePage() {
     { spacId: activeSpacId },
     { enabled: !!activeSpacId, refetchOnWindowFocus: false }
   );
+
+  // Generate dilution waterfall stages from cap table data
+  const dilutionStages = useMemo((): OwnershipStage[] => {
+    if (!activeSpac) {
+      return SOREN_DILUTION_STAGES;
+    }
+
+    const entries = capTableQuery.data || [];
+    const totalShares = activeSpac.sharesOutstanding
+      ? Number(activeSpac.sharesOutstanding)
+      : 25300000; // Default SPAC IPO size
+
+    // Calculate current ownership breakdown from cap table entries
+    let publicOwnership = 0;
+    let sponsorOwnership = 0;
+
+    if (entries.length > 0) {
+      for (const entry of entries) {
+        const pct = Number(entry.ownershipPct);
+        if (entry.holderType === 'PUBLIC' || entry.holderType === 'INSTITUTIONAL') {
+          publicOwnership += pct;
+        } else if (entry.holderType === 'SPONSOR' || entry.holderType === 'MANAGEMENT') {
+          sponsorOwnership += pct;
+        }
+      }
+    } else {
+      // Default SPAC ownership structure (80% public, 20% sponsor)
+      publicOwnership = 80;
+      sponsorOwnership = 20;
+    }
+
+    // Generate dilution stages based on typical SPAC lifecycle
+    const stages: OwnershipStage[] = [
+      {
+        id: 'pre_ipo',
+        name: 'Pre-IPO',
+        description: 'Before public offering - Sponsor owns 100%',
+        publicOwnership: 0,
+        sponsorOwnership: 100,
+        targetOwnership: 0,
+        pipeOwnership: 0,
+        earnoutOwnership: 0,
+        totalShares: Math.round(totalShares * 0.2), // Founder shares
+      },
+      {
+        id: 'post_ipo',
+        name: 'Post-IPO',
+        description: `After IPO of ${activeSpac.name}`,
+        publicOwnership: publicOwnership,
+        sponsorOwnership: sponsorOwnership,
+        targetOwnership: 0,
+        pipeOwnership: 0,
+        earnoutOwnership: 0,
+        totalShares: totalShares,
+      },
+      {
+        id: 'post_pipe',
+        name: 'Post-PIPE',
+        description: 'After PIPE investment for business combination',
+        publicOwnership: publicOwnership * 0.75,
+        sponsorOwnership: sponsorOwnership * 0.75,
+        targetOwnership: 40,
+        pipeOwnership: 100 - (publicOwnership * 0.75) - (sponsorOwnership * 0.75) - 40,
+        earnoutOwnership: 0,
+        totalShares: Math.round(totalShares * 1.5),
+      },
+      {
+        id: 'post_earnout',
+        name: 'Post-Earnout',
+        description: 'After earnout milestones achieved',
+        publicOwnership: publicOwnership * 0.70,
+        sponsorOwnership: sponsorOwnership * 0.70,
+        targetOwnership: 42,
+        pipeOwnership: (100 - (publicOwnership * 0.75) - (sponsorOwnership * 0.75) - 40) * 0.9,
+        earnoutOwnership: 5,
+        totalShares: Math.round(totalShares * 1.6),
+      },
+      {
+        id: 'post_warrants',
+        name: 'Fully Diluted',
+        description: 'All warrants exercised and securities converted',
+        publicOwnership: publicOwnership * 0.65,
+        sponsorOwnership: sponsorOwnership * 0.65,
+        targetOwnership: 38,
+        pipeOwnership: (100 - (publicOwnership * 0.75) - (sponsorOwnership * 0.75) - 40) * 0.85,
+        earnoutOwnership: 4.5,
+        totalShares: Math.round(totalShares * 1.8),
+      },
+    ];
+
+    return stages;
+  }, [activeSpac, capTableQuery.data]);
 
   // Transform data to CapTableView format
   const capTableData = useMemo(() => {
@@ -276,6 +384,21 @@ export default function CapTablePage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Dilution Waterfall Visualization */}
+      <Card className="mt-8">
+        <CardContent className="p-6">
+          <DilutionWaterfall
+            stages={dilutionStages}
+            title="Dilution Waterfall Analysis"
+            spacName={activeSpac?.name || 'SPAC'}
+            targetName="Target Company"
+            showDetailedBreakdown={true}
+            highlightStage="post_pipe"
+            className="mt-4"
+          />
+        </CardContent>
+      </Card>
     </div>
   );
 }

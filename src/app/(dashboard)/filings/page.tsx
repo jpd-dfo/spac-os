@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useCallback } from 'react';
 
+import { differenceInDays, startOfDay } from 'date-fns';
 import {
   FileText,
   RefreshCw,
@@ -13,6 +14,16 @@ import {
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 
+import {
+  CreateFilingModal,
+  type NewFilingData,
+  type SPAC as CreateFilingSPAC,
+  type TeamMember,
+} from '@/components/filings/CreateFilingModal';
+import {
+  DeadlineAlerts,
+  type DeadlineAlert,
+} from '@/components/filings/DeadlineAlerts';
 import { FilingList, type FilingListItem } from '@/components/filings/FilingList';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -71,6 +82,24 @@ function calculatePriority(
   return 'LOW';
 }
 
+// Calculate alert type based on due date
+function calculateAlertType(dueDate: Date, status: string): DeadlineAlert['alertType'] | null {
+  if (['COMPLETE', 'EFFECTIVE', 'SUBMITTED', 'FILED', 'WITHDRAWN'].includes(status)) {
+    return null;
+  }
+
+  const today = startOfDay(new Date());
+  const due = startOfDay(dueDate);
+  const days = differenceInDays(due, today);
+
+  if (days < 0) return 'OVERDUE';
+  if (days <= 3) return '3_DAYS';
+  if (days <= 7) return '7_DAYS';
+  if (days <= 14) return '14_DAYS';
+  if (days <= 30) return '30_DAYS';
+  return null;
+}
+
 // ============================================================================
 // STATS CARD COMPONENT
 // ============================================================================
@@ -111,6 +140,7 @@ function FilingStatsCard({
 export default function FilingsPage() {
   const router = useRouter();
   const [viewMode, setViewMode] = useState<'list' | 'timeline'>('list');
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
 
   // Fetch filings from tRPC
   const {
@@ -134,6 +164,15 @@ export default function FilingsPage() {
     }
   );
 
+  // Fetch SPACs for CreateFilingModal
+  const { data: spacsData } = trpc.spac.list.useQuery(
+    {},
+    {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    }
+  );
+
   // Fetch filing statistics
   const { data: statsData } = trpc.filing.getStatistics.useQuery(
     {},
@@ -154,6 +193,14 @@ export default function FilingsPage() {
   const deleteMutation = trpc.filing.delete.useMutation({
     onSuccess: () => {
       void refetch();
+    },
+  });
+
+  // Create filing mutation
+  const createFilingMutation = trpc.filing.create.useMutation({
+    onSuccess: () => {
+      void refetch();
+      setIsCreateModalOpen(false);
     },
   });
 
@@ -186,6 +233,57 @@ export default function FilingsPage() {
       lastUpdated: new Date(filing.updatedAt),
     }));
   }, [filingsData]);
+
+  // Transform SPACs for CreateFilingModal
+  const spacsForModal = useMemo((): CreateFilingSPAC[] => {
+    if (!spacsData?.items) {
+      return [];
+    }
+    return spacsData.items.map((spac) => ({
+      id: spac.id,
+      name: spac.name,
+      ticker: spac.ticker || '',
+    }));
+  }, [spacsData]);
+
+  // Create deadline alerts from filings
+  const deadlineAlerts = useMemo((): DeadlineAlert[] => {
+    if (!filingsData?.items) {
+      return [];
+    }
+
+    return filingsData.items
+      .filter((filing) => {
+        // Only include filings with due dates that have alerts
+        const dueDate = filing.filedDate || filing.dueDate;
+        if (!dueDate) return false;
+        const alertType = calculateAlertType(new Date(dueDate), filing.status);
+        return alertType !== null;
+      })
+      .map((filing) => {
+        const dueDate = new Date(filing.filedDate || filing.dueDate || new Date());
+        const alertType = calculateAlertType(dueDate, filing.status) || '30_DAYS';
+        const priority = calculatePriority(filing.filedDate, filing.status);
+
+        return {
+          id: `alert-${filing.id}`,
+          filingId: filing.id,
+          type: filing.type as FilingType,
+          title: filing.title || `${filing.type} Filing`,
+          spacId: filing.spacId,
+          spacName: filing.spac?.name || 'Unknown SPAC',
+          ticker: filing.spac?.ticker || 'N/A',
+          status: mapFilingStatus(filing.status),
+          dueDate,
+          priority,
+          alertType,
+          assignee: undefined,
+        };
+      });
+  }, [filingsData]);
+
+  // Team members (placeholder - in a real app, fetch from user/team API)
+  const teamMembers: TeamMember[] = useMemo(() => [], []);
 
   // Calculate stats
   const stats = useMemo(() => {
@@ -225,7 +323,43 @@ export default function FilingsPage() {
   }, [deleteMutation]);
 
   const handleNewFiling = useCallback(() => {
-    router.push('/filings/new');
+    setIsCreateModalOpen(true);
+  }, []);
+
+  const handleCreateFiling = useCallback((data: NewFilingData) => {
+    // Map the component's FilingType to the schema's FilingType
+    const schemaTypeMap: Record<string, string> = {
+      'FORM_10K': 'FORM_10K',
+      'FORM_10Q': 'FORM_10Q',
+      'FORM_8K': 'FORM_8K',
+      'S1': 'S1',
+      'S4': 'S4',
+      'DEF14A': 'DEFA14A', // Map DEF14A to DEFA14A
+      'PREM14A': 'PREM14A',
+      'DEFA14A': 'DEFA14A',
+      'SUPER_8K': 'SUPER_8K',
+      'FORM_425': 'FORM_425',
+      'SC_13D': 'SC_13D',
+      'SC_13G': 'SC_13G',
+      'FORM_3': 'FORM_3',
+      'FORM_4': 'FORM_4',
+      'FORM_5': 'FORM_5',
+    };
+
+    const mappedType = schemaTypeMap[data.type] || 'OTHER';
+
+    createFilingMutation.mutate({
+      spacId: data.spacId,
+      type: mappedType as any,
+      title: data.title,
+      description: data.description || null,
+      dueDate: data.dueDate,
+      status: 'DRAFTING',
+    });
+  }, [createFilingMutation]);
+
+  const handleAlertClick = useCallback((alert: DeadlineAlert) => {
+    router.push(`/filings/${alert.filingId}`);
   }, [router]);
 
   const handleExport = useCallback(() => {
@@ -366,6 +500,16 @@ export default function FilingsPage() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Create Filing Modal */}
+        <CreateFilingModal
+          isOpen={isCreateModalOpen}
+          onClose={() => setIsCreateModalOpen(false)}
+          onSubmit={handleCreateFiling}
+          spacs={spacsForModal}
+          teamMembers={teamMembers}
+          isSubmitting={createFilingMutation.isPending}
+        />
       </div>
     );
   }
@@ -433,6 +577,14 @@ export default function FilingsPage() {
           colorClass={stats.secComments > 0 ? 'text-danger-600' : 'text-slate-600'}
         />
       </div>
+
+      {/* Deadline Alerts */}
+      {deadlineAlerts.length > 0 && (
+        <DeadlineAlerts
+          alerts={deadlineAlerts}
+          onAlertClick={handleAlertClick}
+        />
+      )}
 
       {/* View Mode Toggle */}
       <div className="flex items-center justify-between">
@@ -530,6 +682,16 @@ export default function FilingsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Create Filing Modal */}
+      <CreateFilingModal
+        isOpen={isCreateModalOpen}
+        onClose={() => setIsCreateModalOpen(false)}
+        onSubmit={handleCreateFiling}
+        spacs={spacsForModal}
+        teamMembers={teamMembers}
+        isSubmitting={createFilingMutation.isPending}
+      />
     </div>
   );
 }
