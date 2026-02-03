@@ -32,7 +32,7 @@ async function main() {
     await prisma.email.deleteMany({});
     // Core models
     await prisma.auditLog.deleteMany({});
-    await prisma.notification.deleteMany({});
+    // await prisma.notification.deleteMany({}); // Model doesn't exist
     await prisma.comment.deleteMany({});
     await prisma.task.deleteMany({});
     await prisma.document.deleteMany({});
@@ -59,15 +59,6 @@ async function main() {
       id: SAMPLE_ORG_ID,
       name: 'Soren Capital Partners',
       slug: 'soren-capital',
-      domain: 'sorencapital.com',
-      settings: {
-        theme: 'light',
-        timezone: 'America/New_York',
-        notifications: {
-          email: true,
-          slack: false,
-        },
-      },
     },
   });
   console.log(`✅ Created organization: ${organization.name}\n`);
@@ -79,14 +70,6 @@ async function main() {
       id: SAMPLE_USER_ID,
       email: 'demo@spacos.app',
       name: 'Demo User',
-      role: 'admin',
-      preferences: {
-        theme: 'light',
-        notifications: {
-          email: true,
-          push: true,
-        },
-      },
     },
   });
 
@@ -94,8 +77,7 @@ async function main() {
     data: {
       organizationId: organization.id,
       userId: user.id,
-      role: 'admin',
-      permissions: ['*'],
+      role: 'ADMIN',
     },
   });
   console.log(`✅ Created user: ${user.email}\n`);
@@ -1590,6 +1572,100 @@ async function main() {
     }),
   ]);
   console.log('✅ Created compliance items\n');
+
+  // ============================================================================
+  // SPRINT 9 - Filing Workflow Seed Data
+  // ============================================================================
+
+  // Get the first filing to add workflow data
+  const filingsForWorkflow = await prisma.filing.findMany({ take: 3 });
+
+  if (filingsForWorkflow.length > 0) {
+    const filing = filingsForWorkflow[0];
+
+    // Seed Workflow Steps
+    const workflowSteps = [
+      { name: 'Initial Draft', description: 'Prepare initial draft of filing', order: 1, status: 'completed' },
+      { name: 'Internal Review', description: 'Internal team review and feedback', order: 2, status: 'completed' },
+      { name: 'External Legal Review', description: 'External counsel review', order: 3, status: 'completed' },
+      { name: 'Board Approval', description: 'Board review and approval', order: 4, status: 'in_progress' },
+      { name: 'File with SEC', description: 'Submit via EDGAR', order: 5, status: 'pending' },
+      { name: 'SEC Review', description: 'Await SEC review and comments', order: 6, status: 'pending' },
+      { name: 'Response to Comments', description: 'Respond to SEC comments', order: 7, status: 'pending' },
+      { name: 'Declared Effective', description: 'Filing declared effective', order: 8, status: 'pending' },
+    ];
+
+    for (const step of workflowSteps) {
+      await prisma.filingWorkflowStep.upsert({
+        where: { id: `workflow-${filing.id}-${step.order}` },
+        create: {
+          id: `workflow-${filing.id}-${step.order}`,
+          filingId: filing.id,
+          name: step.name,
+          description: step.description,
+          order: step.order,
+          status: step.status,
+          completedAt: step.status === 'completed' ? new Date(Date.now() - (8 - step.order) * 7 * 24 * 60 * 60 * 1000) : null,
+        },
+        update: {},
+      });
+    }
+
+    // Seed Reviewers
+    const reviewers = [
+      { name: 'John Smith', email: 'john@example.com', role: 'primary', status: 'approved' },
+      { name: 'Sarah Johnson', email: 'sarah@example.com', role: 'legal', status: 'approved' },
+      { name: 'External Counsel', email: 'counsel@lawfirm.com', role: 'external', status: 'pending' },
+    ];
+
+    for (let i = 0; i < reviewers.length; i++) {
+      const r = reviewers[i];
+      await prisma.filingReviewer.upsert({
+        where: { id: `reviewer-${filing.id}-${i}` },
+        create: {
+          id: `reviewer-${filing.id}-${i}`,
+          filingId: filing.id,
+          name: r.name,
+          email: r.email,
+          role: r.role,
+          status: r.status,
+          reviewedAt: r.status === 'approved' ? new Date(Date.now() - (3 - i) * 5 * 24 * 60 * 60 * 1000) : null,
+        },
+        update: {},
+      });
+    }
+
+    // Seed Checklist Items
+    const checklistItems = [
+      { item: 'Executive Summary', category: 'Disclosure', order: 1, isCompleted: true },
+      { item: 'Risk Factors', category: 'Disclosure', order: 2, isCompleted: true },
+      { item: 'Business Description', category: 'Disclosure', order: 3, isCompleted: true },
+      { item: 'Audited Financial Statements', category: 'Financial', order: 4, isCompleted: true },
+      { item: 'Pro Forma Financials', category: 'Financial', order: 5, isCompleted: false },
+      { item: 'Management Discussion & Analysis', category: 'Financial', order: 6, isCompleted: false },
+      { item: 'Legal Opinion', category: 'Legal', order: 7, isCompleted: true },
+      { item: 'Material Agreements', category: 'Exhibits', order: 8, isCompleted: false },
+    ];
+
+    for (let i = 0; i < checklistItems.length; i++) {
+      const item = checklistItems[i];
+      await prisma.filingChecklist.upsert({
+        where: { id: `checklist-${filing.id}-${i}` },
+        create: {
+          id: `checklist-${filing.id}-${i}`,
+          filingId: filing.id,
+          item: item.item,
+          category: item.category,
+          order: item.order,
+          isCompleted: item.isCompleted,
+          completedAt: item.isCompleted ? new Date(Date.now() - (8 - item.order) * 3 * 24 * 60 * 60 * 1000) : null,
+        },
+        update: {},
+      });
+    }
+
+    console.log('✅ Filing workflow seed data created');
+  }
 
   // Summary
   console.log('============================================');

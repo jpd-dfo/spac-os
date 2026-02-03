@@ -829,4 +829,161 @@ export const filingRouter = createTRPCRouter({
         });
       }
     }),
+
+  // ============================================================================
+  // SPRINT 9 - WORKFLOW, REVIEWERS, CHECKLIST
+  // ============================================================================
+
+  /**
+   * Get filing workflow steps
+   */
+  getWorkflow: protectedProcedure
+    .input(z.object({ filingId: UuidSchema }))
+    .query(async ({ ctx, input }) => {
+      const steps = await ctx.db.filingWorkflowStep.findMany({
+        where: { filingId: input.filingId },
+        orderBy: { order: 'asc' },
+      });
+      return steps;
+    }),
+
+  /**
+   * Update workflow step status
+   */
+  updateWorkflowStep: orgAuditedProcedure
+    .input(z.object({
+      stepId: UuidSchema,
+      status: z.enum(['pending', 'in_progress', 'completed', 'skipped']),
+      completedById: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const step = await ctx.db.filingWorkflowStep.update({
+        where: { id: input.stepId },
+        data: {
+          status: input.status,
+          completedAt: input.status === 'completed' ? new Date() : null,
+          completedById: input.completedById,
+        },
+      });
+      return step;
+    }),
+
+  /**
+   * Get filing reviewers
+   */
+  getReviewers: protectedProcedure
+    .input(z.object({ filingId: UuidSchema }))
+    .query(async ({ ctx, input }) => {
+      const reviewers = await ctx.db.filingReviewer.findMany({
+        where: { filingId: input.filingId },
+        orderBy: { createdAt: 'asc' },
+      });
+      return reviewers;
+    }),
+
+  /**
+   * Add reviewer to filing
+   */
+  addReviewer: orgAuditedProcedure
+    .input(z.object({
+      filingId: UuidSchema,
+      userId: z.string().optional(),
+      name: z.string().optional(),
+      email: z.string().email().optional(),
+      role: z.enum(['primary', 'secondary', 'legal', 'external']),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const reviewer = await ctx.db.filingReviewer.create({
+        data: {
+          filingId: input.filingId,
+          userId: input.userId,
+          name: input.name,
+          email: input.email,
+          role: input.role,
+          status: 'pending',
+        },
+      });
+      return reviewer;
+    }),
+
+  /**
+   * Update reviewer status
+   */
+  updateReviewerStatus: orgAuditedProcedure
+    .input(z.object({
+      reviewerId: UuidSchema,
+      status: z.enum(['pending', 'approved', 'rejected', 'changes_requested']),
+      comments: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const reviewer = await ctx.db.filingReviewer.update({
+        where: { id: input.reviewerId },
+        data: {
+          status: input.status,
+          comments: input.comments,
+          reviewedAt: ['approved', 'rejected', 'changes_requested'].includes(input.status) ? new Date() : null,
+        },
+      });
+      return reviewer;
+    }),
+
+  /**
+   * Get filing checklist
+   */
+  getChecklist: protectedProcedure
+    .input(z.object({ filingId: UuidSchema }))
+    .query(async ({ ctx, input }) => {
+      const items = await ctx.db.filingChecklist.findMany({
+        where: { filingId: input.filingId },
+        orderBy: [{ category: 'asc' }, { order: 'asc' }],
+      });
+      return items;
+    }),
+
+  /**
+   * Update checklist item
+   */
+  updateChecklistItem: orgAuditedProcedure
+    .input(z.object({
+      itemId: UuidSchema,
+      isCompleted: z.boolean(),
+      completedBy: z.string().optional(),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const item = await ctx.db.filingChecklist.update({
+        where: { id: input.itemId },
+        data: {
+          isCompleted: input.isCompleted,
+          completedAt: input.isCompleted ? new Date() : null,
+          completedBy: input.completedBy,
+        },
+      });
+      return item;
+    }),
+
+  /**
+   * Add checklist item
+   */
+  addChecklistItem: orgAuditedProcedure
+    .input(z.object({
+      filingId: UuidSchema,
+      item: z.string().min(1),
+      category: z.string().optional(),
+      description: z.string().optional(),
+      dueDate: z.coerce.date().optional(),
+      order: z.number().int().default(0),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const checklistItem = await ctx.db.filingChecklist.create({
+        data: {
+          filingId: input.filingId,
+          item: input.item,
+          category: input.category,
+          description: input.description,
+          dueDate: input.dueDate,
+          order: input.order,
+        },
+      });
+      return checklistItem;
+    }),
 });

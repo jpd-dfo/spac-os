@@ -133,236 +133,6 @@ interface FilingPageData {
   updatedAt: Date;
 }
 
-// Generate mock filing data for S-4 (active SEC comment)
-const getMockFilingData = (id: string): FilingPageData => {
-  const today = new Date();
-
-  return {
-    id,
-    type: 'S4',
-    title: 'Business Combination Registration Statement',
-    description: 'Registration statement for proposed merger with TechTarget Inc., including proxy statement for shareholder vote. This filing registers the shares to be issued in connection with the business combination.',
-    spacId: 'spac-001',
-    spacName: 'Alpha Acquisition Corp',
-    ticker: 'AACU',
-    cik: '0001234567',
-    status: 'SEC_COMMENT',
-    priority: 'CRITICAL',
-    dueDate: addDays(today, 15),
-    filedDate: subDays(today, 30),
-    accessionNumber: '0001234567-26-000025',
-    edgarUrl: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=alpha',
-    secFileNumber: '333-123456',
-    statusHistory: [
-      { status: 'DRAFT' as FilingStatus, date: subDays(today, 60), description: 'Filing created' },
-      { status: 'INTERNAL_REVIEW' as FilingStatus, date: subDays(today, 50), description: 'Sent for internal review' },
-      { status: 'EXTERNAL_REVIEW' as FilingStatus, date: subDays(today, 40), description: 'Sent for external legal review' },
-      { status: 'SUBMITTED' as FilingStatus, date: subDays(today, 30), description: 'Filed with SEC via EDGAR' },
-      { status: 'SEC_COMMENT' as FilingStatus, date: subDays(today, 5), description: 'SEC comment letter received - 15 comments' },
-    ],
-    assignee: {
-      id: 'user-002',
-      name: 'Sarah Johnson',
-      email: 'sarah@alpha.com',
-    },
-    reviewers: [
-      {
-        id: 'user-005',
-        name: 'David Wilson',
-        email: 'david@external.com',
-        reviewStatus: 'APPROVED',
-        reviewedAt: subDays(today, 35),
-        comments: 'Approved with minor changes incorporated.',
-      },
-      {
-        id: 'user-001',
-        name: 'John Smith',
-        email: 'john@alpha.com',
-        reviewStatus: 'APPROVED',
-        reviewedAt: subDays(today, 33),
-      },
-      {
-        id: 'user-003',
-        name: 'Michael Chen',
-        email: 'michael@alpha.com',
-        reviewStatus: 'CHANGES_REQUESTED',
-        reviewedAt: subDays(today, 2),
-        comments: 'Pro forma financials need updating for latest redemption estimates.',
-      },
-    ],
-    documents: [
-      {
-        id: 'doc-001',
-        name: 'S-4 Draft v3.docx',
-        type: 'application/docx',
-        size: 2850000,
-        version: 3,
-        uploadedAt: subDays(today, 5),
-        uploadedBy: 'Sarah Johnson',
-      },
-      {
-        id: 'doc-002',
-        name: 'Pro Forma Financial Statements.xlsx',
-        type: 'application/xlsx',
-        size: 450000,
-        version: 2,
-        uploadedAt: subDays(today, 3),
-        uploadedBy: 'Michael Chen',
-      },
-      {
-        id: 'doc-003',
-        name: 'TechTarget Audited Financials.pdf',
-        type: 'application/pdf',
-        size: 12500000,
-        version: 1,
-        uploadedAt: subDays(today, 45),
-        uploadedBy: 'External Auditor',
-      },
-      {
-        id: 'doc-004',
-        name: 'Fairness Opinion.pdf',
-        type: 'application/pdf',
-        size: 890000,
-        version: 1,
-        uploadedAt: subDays(today, 40),
-        uploadedBy: 'Financial Advisor',
-      },
-      {
-        id: 'doc-005',
-        name: 'SEC Comment Letter Round 1.pdf',
-        type: 'application/pdf',
-        size: 125000,
-        version: 1,
-        uploadedAt: subDays(today, 5),
-        uploadedBy: 'SEC Staff',
-      },
-    ],
-    comments: [
-      {
-        id: 'comment-001',
-        type: 'SEC_COMMENT',
-        author: 'SEC Division of Corporation Finance',
-        content: 'Please revise your pro forma financial statements to reflect the impact of estimated redemptions under various scenarios.',
-        createdAt: subDays(today, 5),
-        status: 'ADDRESSED',
-      },
-      {
-        id: 'comment-002',
-        type: 'SEC_COMMENT',
-        author: 'SEC Division of Corporation Finance',
-        content: 'Please provide additional details about the target company\'s revenue recognition policies and how they comply with ASC 606.',
-        createdAt: subDays(today, 5),
-        status: 'OPEN',
-      },
-      {
-        id: 'comment-003',
-        type: 'SEC_COMMENT',
-        author: 'SEC Division of Corporation Finance',
-        content: 'Please disclose the fees paid to the financial advisor for the fairness opinion and any material relationships.',
-        createdAt: subDays(today, 5),
-        status: 'OPEN',
-      },
-      {
-        id: 'comment-004',
-        type: 'INTERNAL_NOTE',
-        author: 'Sarah Johnson',
-        content: 'Working with external counsel to draft responses to SEC comments. Target completion by Friday.',
-        createdAt: subDays(today, 3),
-      },
-      {
-        id: 'comment-005',
-        type: 'REVIEW_FEEDBACK',
-        author: 'Michael Chen',
-        content: 'Pro forma need to be updated with latest redemption assumptions. Working on revised model.',
-        createdAt: subDays(today, 2),
-      },
-    ],
-    amendments: [
-      {
-        id: 'amend-001',
-        version: 'S-4 Initial',
-        filedDate: subDays(today, 30),
-        accessionNumber: '0001234567-26-000025',
-        description: 'Initial S-4 registration statement filing',
-        edgarUrl: 'https://www.sec.gov/Archives/edgar/data/...',
-      },
-    ],
-    workflowSteps: [
-      {
-        id: 'step-001',
-        name: 'Initial Draft',
-        status: 'COMPLETE',
-        completedAt: subDays(today, 45),
-        completedBy: 'Sarah Johnson',
-        notes: 'Initial draft prepared by legal team',
-      },
-      {
-        id: 'step-002',
-        name: 'Internal Review',
-        status: 'COMPLETE',
-        completedAt: subDays(today, 38),
-        completedBy: 'John Smith',
-        notes: 'CFO and management review completed',
-      },
-      {
-        id: 'step-003',
-        name: 'External Legal Review',
-        status: 'COMPLETE',
-        completedAt: subDays(today, 35),
-        completedBy: 'David Wilson',
-        notes: 'External counsel review and sign-off',
-      },
-      {
-        id: 'step-004',
-        name: 'Board Approval',
-        status: 'COMPLETE',
-        completedAt: subDays(today, 32),
-        completedBy: 'Board of Directors',
-      },
-      {
-        id: 'step-005',
-        name: 'Initial SEC Filing',
-        status: 'COMPLETE',
-        completedAt: subDays(today, 30),
-        notes: 'Filed via EDGAR',
-      },
-      {
-        id: 'step-006',
-        name: 'SEC Review & Comments',
-        status: 'CURRENT',
-        notes: 'Received first round of comments - 15 items',
-      },
-      {
-        id: 'step-007',
-        name: 'Response to Comments',
-        status: 'PENDING',
-      },
-      {
-        id: 'step-008',
-        name: 'S-4 Declared Effective',
-        status: 'PENDING',
-      },
-    ],
-    checklist: [
-      { id: 'check-001', name: 'Summary of Transaction', category: 'Disclosure', status: 'COMPLETE', assignee: 'Sarah Johnson' },
-      { id: 'check-002', name: 'Risk Factors', category: 'Disclosure', status: 'COMPLETE', assignee: 'Sarah Johnson' },
-      { id: 'check-003', name: 'Background of Transaction', category: 'Disclosure', status: 'COMPLETE', assignee: 'Sarah Johnson' },
-      { id: 'check-004', name: 'Target Company Business Description', category: 'Disclosure', status: 'COMPLETE', assignee: 'Legal Team' },
-      { id: 'check-005', name: 'Target Company MD&A', category: 'Financial', status: 'COMPLETE', assignee: 'Michael Chen' },
-      { id: 'check-006', name: 'Target Company Audited Financials', category: 'Financial', status: 'COMPLETE', assignee: 'External Auditor' },
-      { id: 'check-007', name: 'SPAC Audited Financials', category: 'Financial', status: 'COMPLETE', assignee: 'Michael Chen' },
-      { id: 'check-008', name: 'Pro Forma Financial Statements', category: 'Financial', status: 'IN_PROGRESS', assignee: 'Michael Chen', notes: 'Updating for SEC comments' },
-      { id: 'check-009', name: 'Fairness Opinion', category: 'Transaction', status: 'COMPLETE', assignee: 'Financial Advisor' },
-      { id: 'check-010', name: 'Material Agreements (Exhibits)', category: 'Exhibits', status: 'COMPLETE', assignee: 'Legal Team' },
-      { id: 'check-011', name: 'Respond to SEC Comment #1', category: 'SEC Response', status: 'COMPLETE', assignee: 'Michael Chen', dueDate: addDays(today, 5) },
-      { id: 'check-012', name: 'Respond to SEC Comment #2', category: 'SEC Response', status: 'IN_PROGRESS', assignee: 'Sarah Johnson', dueDate: addDays(today, 5) },
-      { id: 'check-013', name: 'Respond to SEC Comment #3', category: 'SEC Response', status: 'NOT_STARTED', assignee: 'Sarah Johnson', dueDate: addDays(today, 5) },
-    ],
-    createdAt: subDays(today, 60),
-    updatedAt: subDays(today, 1),
-  };
-};
-
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -461,6 +231,24 @@ export default function FilingDetailPage() {
     { enabled: !!filingId, refetchOnWindowFocus: false }
   );
 
+  // Fetch workflow steps
+  const workflowQuery = trpc.filing.getWorkflow.useQuery(
+    { filingId },
+    { enabled: !!filingId }
+  );
+
+  // Fetch reviewers
+  const reviewersQuery = trpc.filing.getReviewers.useQuery(
+    { filingId },
+    { enabled: !!filingId }
+  );
+
+  // Fetch checklist
+  const checklistQuery = trpc.filing.getChecklist.useQuery(
+    { filingId },
+    { enabled: !!filingId }
+  );
+
   // Transform API data to FilingPageData format
   const filing = useMemo((): FilingPageData | null => {
     const data = filingQuery.data;
@@ -549,7 +337,15 @@ export default function FilingDetailPage() {
       secFileNumber: data.fileNumber || undefined,
       statusHistory,
       assignee: undefined,
-      reviewers: [],
+      reviewers: (reviewersQuery.data || []).map((r) => ({
+        id: r.id,
+        name: r.name || r.email || 'Unknown',
+        email: r.email || '',
+        reviewStatus: r.status === 'approved' ? 'APPROVED' as const :
+                      r.status === 'changes_requested' ? 'CHANGES_REQUESTED' as const : 'PENDING' as const,
+        reviewedAt: r.reviewedAt ? new Date(r.reviewedAt) : undefined,
+        comments: r.comments || undefined,
+      })),
       documents: (data.documents || []).map((d: any) => ({
         id: d.document?.id || d.id,
         name: d.document?.name || 'Document',
@@ -575,12 +371,28 @@ export default function FilingDetailPage() {
         description: `Amendment ${a.amendmentNumber}`,
         edgarUrl: undefined,
       })),
-      workflowSteps: [],
-      checklist: [],
+      workflowSteps: (workflowQuery.data || []).map((step) => ({
+        id: step.id,
+        name: step.name,
+        status: step.status === 'completed' ? 'COMPLETE' as const :
+                step.status === 'in_progress' ? 'CURRENT' as const : 'PENDING' as const,
+        completedAt: step.completedAt ? new Date(step.completedAt) : undefined,
+        completedBy: step.completedById || undefined,
+        notes: step.description || undefined,
+      })),
+      checklist: (checklistQuery.data || []).map((item) => ({
+        id: item.id,
+        name: item.item,
+        category: item.category || 'General',
+        status: item.isCompleted ? 'COMPLETE' as const : 'NOT_STARTED' as const,
+        assignee: item.completedBy || undefined,
+        dueDate: item.dueDate ? new Date(item.dueDate) : undefined,
+        notes: item.description || undefined,
+      })),
       createdAt: new Date(data.createdAt),
       updatedAt: new Date(data.updatedAt),
     };
-  }, [filingQuery.data]);
+  }, [filingQuery.data, workflowQuery.data, reviewersQuery.data, checklistQuery.data]);
 
   // Valid status transitions - must call before early returns
   const validTransitions = useMemo(() => {
@@ -626,7 +438,7 @@ export default function FilingDetailPage() {
   };
 
   // Loading state
-  if (filingQuery.isLoading) {
+  if (filingQuery.isLoading || workflowQuery.isLoading || reviewersQuery.isLoading || checklistQuery.isLoading) {
     return (
       <div className="flex h-[50vh] items-center justify-center">
         <div className="text-center">

@@ -640,10 +640,13 @@ model Filing {
   // Relations
   spacId      String
   spac        Spac             @relation(fields: [spacId], references: [id], onDelete: Cascade)
-  secComments SecComment[]
-  documents   FilingDocument[]
-  tasks       Task[]
-  comments    Comment[]
+  secComments   SecComment[]
+  documents     FilingDocument[]
+  tasks         Task[]
+  comments      Comment[]
+  workflowSteps FilingWorkflowStep[]
+  reviewers     FilingReviewer[]
+  checklist     FilingChecklist[]
 
   @@index([spacId])
   @@index([type])
@@ -1499,4 +1502,75 @@ model ComplianceAlert {
   @@index([isDismissed])
   @@index([dueDate])
   @@map("compliance_alerts")
+}
+
+// ============================================================================
+// SPRINT 9 - FILING WORKFLOW MODELS
+// ============================================================================
+
+/// FilingWorkflowStep - Workflow steps for filing process
+model FilingWorkflowStep {
+  id            String    @id @default(cuid())
+  filingId      String
+  name          String
+  description   String?   @db.Text
+  status        String    @default("pending") // pending, in_progress, completed, skipped
+  order         Int
+  dueDate       DateTime?
+  completedAt   DateTime?
+  completedById String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  filing Filing @relation(fields: [filingId], references: [id], onDelete: Cascade)
+
+  @@index([filingId])
+  @@index([status])
+  @@map("filing_workflow_steps")
+}
+
+/// FilingReviewer - Assigned reviewers for filings
+model FilingReviewer {
+  id         String    @id @default(cuid())
+  filingId   String
+  userId     String?
+  name       String?
+  email      String?
+  role       String // "primary", "secondary", "legal", "external"
+  status     String    @default("pending") // pending, approved, rejected, changes_requested
+  comments   String?   @db.Text
+  reviewedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  filing Filing @relation(fields: [filingId], references: [id], onDelete: Cascade)
+
+  @@index([filingId])
+  @@index([status])
+  @@map("filing_reviewers")
+}
+
+/// FilingChecklist - Checklist items for filing preparation
+model FilingChecklist {
+  id          String    @id @default(cuid())
+  filingId    String
+  item        String
+  category    String?   // "disclosure", "financial", "transaction", "exhibits", "sec_response"
+  description String?   @db.Text
+  isCompleted Boolean   @default(false)
+  completedAt DateTime?
+  completedBy String?
+  order       Int       @default(0)
+  dueDate     DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  filing Filing @relation(fields: [filingId], references: [id], onDelete: Cascade)
+
+  @@index([filingId])
+  @@index([isCompleted])
+  @@map("filing_checklists")
 }
