@@ -12,15 +12,16 @@ export const PAGE_SIZE_OPTIONS = [10, 25, 50, 100];
 
 // Status Labels
 export const SPAC_STATUS_LABELS: Record<string, string> = {
-  PRE_IPO: 'Pre-IPO',
   SEARCHING: 'Searching',
   LOI_SIGNED: 'LOI Signed',
   DA_ANNOUNCED: 'DA Announced',
-  PROXY_FILED: 'Proxy Filed',
-  VOTE_SCHEDULED: 'Vote Scheduled',
+  SEC_REVIEW: 'SEC Review',
+  SHAREHOLDER_VOTE: 'Shareholder Vote',
   CLOSING: 'Closing',
   COMPLETED: 'Completed',
+  LIQUIDATING: 'Liquidating',
   LIQUIDATED: 'Liquidated',
+  TERMINATED: 'Terminated',
 };
 
 export const SPAC_PHASE_LABELS: Record<string, string> = {

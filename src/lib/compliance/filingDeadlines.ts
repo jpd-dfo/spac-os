@@ -4,28 +4,20 @@
 
 import {
   addDays,
-  addBusinessDays,
   subDays,
-  subBusinessDays,
   isWeekend,
   isSameDay,
   isBefore,
-  isAfter,
   startOfDay,
-  endOfDay,
   format,
-  parseISO,
   differenceInDays,
-  differenceInBusinessDays,
   addMonths,
-  setDate,
   lastDayOfMonth,
-  getQuarter,
   getYear,
-  setMonth,
-  setYear,
 } from 'date-fns';
+
 import type { FilingType } from '@/types';
+
 import { FILING_DEFINITIONS, type FilerStatus, FILER_STATUS_DEFINITIONS } from './complianceRules';
 
 // ============================================================================
@@ -75,13 +67,13 @@ export function getFederalHolidays(year: number): Date[] {
 function getNthWeekdayOfMonth(year: number, month: number, weekday: number, n: number): Date {
   const firstDay = new Date(year, month, 1);
   const firstWeekday = firstDay.getDay();
-  let day = 1 + ((weekday - firstWeekday + 7) % 7) + (n - 1) * 7;
+  const day = 1 + ((weekday - firstWeekday + 7) % 7) + (n - 1) * 7;
   return new Date(year, month, day);
 }
 
 function getLastWeekdayOfMonth(year: number, month: number, weekday: number): Date {
   const lastDay = lastDayOfMonth(new Date(year, month, 1));
-  let day = lastDay.getDate();
+  const day = lastDay.getDate();
   const lastDayWeekday = lastDay.getDay();
   const diff = (lastDayWeekday - weekday + 7) % 7;
   return new Date(year, month, day - diff);
@@ -89,8 +81,8 @@ function getLastWeekdayOfMonth(year: number, month: number, weekday: number): Da
 
 function adjustForWeekend(date: Date): Date {
   const day = date.getDay();
-  if (day === 0) return addDays(date, 1); // Sunday -> Monday
-  if (day === 6) return subDays(date, 1); // Saturday -> Friday
+  if (day === 0) {return addDays(date, 1);} // Sunday -> Monday
+  if (day === 6) {return subDays(date, 1);} // Saturday -> Friday
   return date;
 }
 
@@ -193,7 +185,7 @@ export function getFiscalQuarterEnd(year: number, quarter: 1 | 2 | 3 | 4, fiscal
     fiscalYearEndMonth,              // Q4
   ];
 
-  const quarterMonth = quarterEndMonths[quarter - 1];
+  const quarterMonth = quarterEndMonths[quarter - 1] ?? fiscalYearEndMonth;
   const quarterYear = quarterMonth < fiscalYearEndMonth ? year + 1 : year;
 
   return lastDayOfMonth(new Date(quarterYear, quarterMonth, 1));
@@ -515,7 +507,7 @@ export function generateDeadlineAlerts(deadlines: DeadlineCalculation[]): Deadli
   const severityOrder = { CRITICAL: 0, WARNING: 1, INFO: 2 };
   return alerts.sort((a, b) => {
     const severityDiff = severityOrder[a.severity] - severityOrder[b.severity];
-    if (severityDiff !== 0) return severityDiff;
+    if (severityDiff !== 0) {return severityDiff;}
     return a.deadline.getTime() - b.deadline.getTime();
   });
 }
@@ -617,9 +609,9 @@ export function getDeadlineStatus(
   const today = startOfDay(new Date());
   const deadlineDay = startOfDay(deadline);
 
-  if (isBefore(deadlineDay, today)) return 'OVERDUE';
-  if (isSameDay(deadlineDay, today)) return 'DUE_TODAY';
-  if (differenceInDays(deadlineDay, today) <= 7) return 'DUE_SOON';
-  if (differenceInDays(deadlineDay, today) <= 30) return 'UPCOMING';
+  if (isBefore(deadlineDay, today)) {return 'OVERDUE';}
+  if (isSameDay(deadlineDay, today)) {return 'DUE_TODAY';}
+  if (differenceInDays(deadlineDay, today) <= 7) {return 'DUE_SOON';}
+  if (differenceInDays(deadlineDay, today) <= 30) {return 'UPCOMING';}
   return 'FUTURE';
 }

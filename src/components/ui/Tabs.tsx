@@ -9,8 +9,10 @@ import {
   useRef,
   useEffect,
 } from 'react';
-import { cn } from '@/lib/utils';
+
 import { cva, type VariantProps } from 'class-variance-authority';
+
+import { cn } from '@/lib/utils';
 
 // ============================================================================
 // TABS CONTEXT
@@ -126,7 +128,7 @@ export function TabsList({
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
       const tabs = listRef.current?.querySelectorAll('[role="tab"]:not([disabled])');
-      if (!tabs) return;
+      if (!tabs) {return;}
 
       const tabArray = Array.from(tabs) as HTMLButtonElement[];
       const currentIndex = tabArray.findIndex(
@@ -159,7 +161,8 @@ export function TabsList({
       }
 
       const nextTab = tabArray[nextIndex];
-      const nextValue = nextTab?.getAttribute('data-value');
+      if (!nextTab) {return;}
+      const nextValue = nextTab.getAttribute('data-value');
       if (nextValue) {
         setActiveTab(nextValue);
         nextTab.focus();
@@ -172,6 +175,7 @@ export function TabsList({
     <div
       ref={listRef}
       role="tablist"
+      tabIndex={0}
       aria-label={ariaLabel}
       aria-orientation={orientation}
       onKeyDown={handleKeyDown}

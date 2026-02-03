@@ -6,9 +6,11 @@
 import 'server-only';
 
 import { cache } from 'react';
+
 import { headers } from 'next/headers';
-import { createTRPCContext, createCallerFactory } from '@/server/api/trpc';
+
 import { appRouter } from '@/server/api/root';
+import { createTRPCContext, createCallerFactory } from '@/server/api/trpc';
 
 /**
  * Create a tRPC caller factory from the app router

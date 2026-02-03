@@ -1,19 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import {
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  ReferenceLine,
-  BarChart,
-  Bar,
-  Cell,
-} from 'recharts';
+
 import {
   Target,
   CheckCircle,
@@ -27,9 +15,23 @@ import {
   ChevronRight,
   Info,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+import {
+  LineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  ReferenceLine,
+  BarChart,
+  Bar,
+  Cell,
+} from 'recharts';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { Tooltip as UITooltip } from '@/components/ui/Tooltip';
 import { cn, formatLargeNumber, formatPercent, formatDate, formatCurrency } from '@/lib/utils';
 
@@ -210,7 +212,7 @@ interface ChartTooltipProps {
 }
 
 function ChartTooltip({ active, payload, label, unit = '' }: ChartTooltipProps) {
-  if (!active || !payload || !payload.length) return null;
+  if (!active || !payload || !payload.length) {return null;}
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
@@ -432,7 +434,7 @@ export function EarnoutTracker({
 
   // Selected milestone tracking data
   const selectedMilestoneData = useMemo(() => {
-    if (!selectedMilestone) return null;
+    if (!selectedMilestone) {return null;}
     return milestones.find((m) => m.id === selectedMilestone);
   }, [milestones, selectedMilestone]);
 

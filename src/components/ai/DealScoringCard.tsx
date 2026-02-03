@@ -5,11 +5,12 @@
 // ============================================================================
 
 import { useState } from 'react';
-import { cn } from '@/lib/utils';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import type { DealScore, CategoryScore, DealScoreBreakdown } from '@/lib/ai/deal-scorer';
+import { cn } from '@/lib/utils';
 
 // ============================================================================
 // Types
@@ -44,16 +45,16 @@ interface CategoryScoreBarProps {
 // ============================================================================
 
 function getScoreColor(score: number): string {
-  if (score >= 80) return 'text-green-600';
-  if (score >= 60) return 'text-primary-600';
-  if (score >= 40) return 'text-yellow-600';
+  if (score >= 80) {return 'text-green-600';}
+  if (score >= 60) {return 'text-primary-600';}
+  if (score >= 40) {return 'text-yellow-600';}
   return 'text-red-600';
 }
 
 function getScoreBgColor(score: number): string {
-  if (score >= 80) return 'bg-green-500';
-  if (score >= 60) return 'bg-primary-500';
-  if (score >= 40) return 'bg-yellow-500';
+  if (score >= 80) {return 'bg-green-500';}
+  if (score >= 60) {return 'bg-primary-500';}
+  if (score >= 40) {return 'bg-yellow-500';}
   return 'bg-red-500';
 }
 

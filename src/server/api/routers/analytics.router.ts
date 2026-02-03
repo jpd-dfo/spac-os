@@ -4,11 +4,13 @@
  */
 
 import { z } from 'zod';
+
+import { UuidSchema } from '@/schemas';
+
 import {
   createTRPCRouter,
   protectedProcedure,
 } from '../trpc';
-import { UuidSchema } from '@/schemas';
 
 export const analyticsRouter = createTRPCRouter({
   /**
@@ -212,7 +214,7 @@ export const analyticsRouter = createTRPCRouter({
           completionRate: totalTasks > 0 ? completedTasks / totalTasks : 0,
         },
         filings: filingMetrics,
-        trustHistory: (trustHistory?.balanceHistory as Array<{ date: Date; balance: number; perShare: number; note?: string }>) || [],
+        trustHistory: (trustHistory?.balanceHistory as unknown as Array<{ date: Date; balance: number; perShare: number; note?: string }>) || [],
         redemptions: redemptionHistory,
         pipe: {
           investorCount: pipeMetrics._count,

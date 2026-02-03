@@ -1,59 +1,43 @@
 /**
  * SPAC OS - Document Upload API
- * Handles file uploads for documents
+ * Handles file uploads to Supabase Storage
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
-import { authOptions } from '@/lib/auth';
-import { DocumentCreateSchema } from '@/schemas';
-import { z } from 'zod';
+import { type NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
+import { auth } from '@clerk/nextjs/server';
+import { z } from 'zod';
+
 import { logger } from '@/lib/logger';
+import { prisma } from '@/lib/prisma';
+import {
+  uploadToStorage,
+  generateStoragePath,
+  MAX_FILE_SIZE,
+  isValidFileType,
+  isSupabaseConfigured,
+  DOCUMENTS_BUCKET,
+} from '@/lib/supabase';
 
-// Max file size: 50MB
-const MAX_FILE_SIZE = 50 * 1024 * 1024;
-
-// Allowed MIME types
-const ALLOWED_MIME_TYPES = [
-  'application/pdf',
-  'application/msword',
-  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-  'application/vnd.ms-excel',
-  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-  'application/vnd.ms-powerpoint',
-  'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'text/plain',
-  'text/csv',
-  'image/png',
-  'image/jpeg',
-  'image/gif',
-  'application/zip',
-];
-
+// Document types must match Prisma DocumentType enum
 const UploadMetadataSchema = z.object({
-  spacId: z.string().uuid(),
+  name: z.string().min(1).max(255),
   type: z.enum([
-    'LOI', 'NDA', 'TERM_SHEET', 'DEFINITIVE_AGREEMENT', 'PROXY_STATEMENT',
-    'PROSPECTUS', 'S1', 'S4', 'FORM_8K', 'FORM_10K', 'FORM_10Q',
-    'FINANCIAL_STATEMENTS', 'DUE_DILIGENCE', 'BOARD_PRESENTATION',
-    'INVESTOR_PRESENTATION', 'FAIRNESS_OPINION', 'LEGAL_OPINION',
-    'TAX_OPINION', 'AUDIT_REPORT', 'CONTRACT', 'CORRESPONDENCE', 'OTHER',
-  ]),
-  title: z.string().min(1).max(255),
-  description: z.string().max(2000).optional(),
+    'NDA', 'LOI', 'DEFINITIVE_AGREEMENT', 'FINANCIAL_STATEMENT', 'DUE_DILIGENCE',
+    'BOARD_PRESENTATION', 'SEC_FILING', 'INVESTOR_PRESENTATION', 'PRESS_RELEASE',
+    'LEGAL', 'TAX', 'INSURANCE', 'ENVIRONMENTAL', 'TECHNICAL', 'OTHER',
+  ]).default('OTHER'),
+  category: z.string().optional(),
+  status: z.enum(['DRAFT', 'PENDING_REVIEW', 'IN_REVIEW', 'APPROVED', 'REJECTED', 'FINAL', 'ARCHIVED']).optional(),
+  spacId: z.string().uuid().optional(),
   targetId: z.string().uuid().optional(),
-  filingId: z.string().uuid().optional(),
-  accessLevel: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']).default('INTERNAL'),
-  tags: z.array(z.string()).optional(),
 });
 
 export async function POST(request: NextRequest) {
   try {
-    // Authenticate user
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.id) {
+    // Authenticate user using Clerk
+    const { userId, orgId } = await auth();
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -88,9 +72,9 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate MIME type
-    if (!ALLOWED_MIME_TYPES.includes(file.type)) {
+    if (!isValidFileType(file.type)) {
       return NextResponse.json(
-        { error: 'File type not allowed' },
+        { error: 'File type not allowed. Supported: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG, JPEG' },
         { status: 400 }
       );
     }
@@ -106,118 +90,141 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Verify user has access to the SPAC
-    const spac = await prisma.spac.findUnique({
-      where: { id: metadata.spacId },
-      select: { organizationId: true },
-    });
+    // Validate SPAC or Target exists and user has access
+    let organizationId: string | null = null;
 
-    if (!spac) {
-      return NextResponse.json(
-        { error: 'SPAC not found' },
-        { status: 404 }
-      );
+    if (metadata.spacId) {
+      const spac = await prisma.spac.findUnique({
+        where: { id: metadata.spacId },
+        select: { organizationId: true },
+      });
+
+      if (!spac) {
+        return NextResponse.json(
+          { error: 'SPAC not found' },
+          { status: 404 }
+        );
+      }
+
+      organizationId = spac.organizationId;
+    } else if (metadata.targetId) {
+      const target = await prisma.target.findUnique({
+        where: { id: metadata.targetId },
+        include: { spac: { select: { organizationId: true } } },
+      });
+
+      if (!target) {
+        return NextResponse.json(
+          { error: 'Target not found' },
+          { status: 404 }
+        );
+      }
+
+      organizationId = target.spac?.organizationId || null;
     }
 
-    const membership = await prisma.organizationUser.findUnique({
-      where: {
-        organizationId_userId: {
-          organizationId: spac.organizationId,
-          userId: session.user.id,
+    // Verify user has access to the organization (if applicable)
+    if (organizationId) {
+      const membership = await prisma.organizationUser.findUnique({
+        where: {
+          organizationId_userId: {
+            organizationId,
+            userId,
+          },
         },
-      },
-    });
+      });
 
-    if (!membership) {
-      return NextResponse.json(
-        { error: 'Access denied' },
-        { status: 403 }
-      );
+      if (!membership) {
+        return NextResponse.json(
+          { error: 'Access denied' },
+          { status: 403 }
+        );
+      }
     }
 
-    // Read file buffer
-    const buffer = Buffer.from(await file.arrayBuffer());
+    // Generate document ID for storage path
+    const documentId = crypto.randomUUID();
+    const version = 1;
 
-    // Generate file hash for deduplication
-    const fileHash = crypto
-      .createHash('sha256')
-      .update(buffer)
-      .digest('hex');
+    // Generate storage path
+    const storagePath = generateStoragePath({
+      spacId: metadata.spacId,
+      targetId: metadata.targetId,
+      documentId,
+      version,
+      fileName: file.name,
+    });
 
-    // Generate unique storage path
-    const fileExtension = file.name.split('.').pop() || '';
-    const storagePath = `documents/${metadata.spacId}/${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${fileExtension}`;
+    // Determine file URL - either from Supabase or local path
+    let fileUrl = storagePath;
 
-    // In production, upload to cloud storage (S3, GCS, etc.)
-    // For now, we'll store the path and simulate upload
-    // const uploadResult = await uploadToStorage(buffer, storagePath);
+    // Upload to Supabase Storage if configured
+    if (isSupabaseConfigured()) {
+      const { path: uploadedPath, error: uploadError } = await uploadToStorage(
+        file,
+        storagePath,
+        { contentType: file.type }
+      );
 
-    // Create document record
+      if (uploadError) {
+        logger.error('Supabase upload error:', uploadError);
+        return NextResponse.json(
+          { error: 'Failed to upload file to storage' },
+          { status: 500 }
+        );
+      }
+
+      // Update the file URL to be the Supabase storage path
+      fileUrl = `${DOCUMENTS_BUCKET}/${uploadedPath}`;
+    } else {
+      // Log warning that Supabase is not configured
+      logger.warn('Supabase not configured - storing path only without actual file upload');
+    }
+
+    // Create document record in database
     const document = await prisma.document.create({
       data: {
-        spacId: metadata.spacId,
-        type: metadata.type,
-        title: metadata.title,
-        description: metadata.description,
-        targetId: metadata.targetId,
-        filingId: metadata.filingId,
-        accessLevel: metadata.accessLevel,
-        tags: metadata.tags || [],
-        uploadedById: session.user.id,
-        fileName: file.name,
+        id: documentId,
+        spacId: metadata.spacId || null,
+        targetId: metadata.targetId || null,
+        type: metadata.type as any,
+        name: metadata.name || file.name,
+        category: metadata.category || null,
+        status: (metadata.status as any) || 'DRAFT',
         fileSize: file.size,
         mimeType: file.type,
-        storagePath,
-        fileHash,
-        currentVersion: 1,
-      },
-      include: {
-        uploadedBy: {
-          select: { id: true, name: true, email: true },
-        },
+        fileUrl,
       },
     });
 
-    // Create initial version record
-    await prisma.documentVersion.create({
-      data: {
-        documentId: document.id,
-        version: 1,
-        fileName: file.name,
-        fileSize: file.size,
-        storagePath,
-        uploadedById: session.user.id,
-        changeNotes: 'Initial upload',
-      },
-    });
-
-    // Create audit log
-    await prisma.auditLog.create({
-      data: {
-        action: 'CREATE',
-        entityType: 'Document',
-        entityId: document.id,
-        userId: session.user.id,
-        organizationId: spac.organizationId,
-        metadata: {
-          fileName: file.name,
-          fileSize: file.size,
-          documentType: metadata.type,
+    // Create audit log if organization context exists
+    if (organizationId) {
+      await prisma.auditLog.create({
+        data: {
+          action: 'CREATE',
+          entityType: 'Document',
+          entityId: document.id,
+          userId,
+          organizationId,
+          metadata: {
+            fileName: file.name,
+            fileSize: file.size,
+            documentType: metadata.type,
+            storagePath,
+          },
         },
-      },
-    });
+      });
+    }
 
     return NextResponse.json({
       success: true,
       document: {
         id: document.id,
-        title: document.title,
+        name: document.name,
         type: document.type,
-        fileName: document.fileName,
         fileSize: document.fileSize,
         mimeType: document.mimeType,
-        version: document.currentVersion,
-        uploadedBy: document.uploadedBy,
+        fileUrl: document.fileUrl,
         createdAt: document.createdAt,
       },
     });

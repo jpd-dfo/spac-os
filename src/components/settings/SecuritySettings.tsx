@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   Shield,
   Key,
@@ -23,11 +24,12 @@ import {
   ChevronRight,
   Copy,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+
 import { Badge } from '@/components/ui/Badge';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Modal, ModalHeader, ModalTitle, ModalFooter } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 
 interface Session {
@@ -228,23 +230,23 @@ export function SecuritySettings() {
     const errors: Record<string, string> = {};
 
     if (!currentPassword) {
-      errors.current = 'Current password is required';
+      errors['current'] = 'Current password is required';
     }
     if (!newPassword) {
-      errors.new = 'New password is required';
+      errors['new'] = 'New password is required';
     } else if (newPassword.length < 12) {
-      errors.new = 'Password must be at least 12 characters';
+      errors['new'] = 'Password must be at least 12 characters';
     } else if (!/[A-Z]/.test(newPassword)) {
-      errors.new = 'Password must contain at least one uppercase letter';
+      errors['new'] = 'Password must contain at least one uppercase letter';
     } else if (!/[a-z]/.test(newPassword)) {
-      errors.new = 'Password must contain at least one lowercase letter';
+      errors['new'] = 'Password must contain at least one lowercase letter';
     } else if (!/[0-9]/.test(newPassword)) {
-      errors.new = 'Password must contain at least one number';
+      errors['new'] = 'Password must contain at least one number';
     } else if (!/[!@#$%^&*]/.test(newPassword)) {
-      errors.new = 'Password must contain at least one special character';
+      errors['new'] = 'Password must contain at least one special character';
     }
     if (newPassword !== confirmPassword) {
-      errors.confirm = 'Passwords do not match';
+      errors['confirm'] = 'Passwords do not match';
     }
 
     setPasswordErrors(errors);
@@ -252,7 +254,7 @@ export function SecuritySettings() {
   };
 
   const handleChangePassword = async () => {
-    if (!validatePassword()) return;
+    if (!validatePassword()) {return;}
 
     setIsSaving(true);
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -278,14 +280,14 @@ export function SecuritySettings() {
 
   const handleCreateToken = () => {
     const token = `pat_${Math.random().toString(36).substring(2, 34)}`;
+    const createdAtDate = new Date().toISOString();
+    const expiresAtDate = new Date(Date.now() + 365 * 24 * 60 * 60 * 1000).toISOString();
     const newToken: APIToken = {
       id: Date.now().toString(),
       name: newTokenName,
       token,
-      createdAt: new Date().toISOString().split('T')[0],
-      expiresAt: new Date(Date.now() + 365 * 24 * 60 * 60 * 1000)
-        .toISOString()
-        .split('T')[0],
+      createdAt: createdAtDate.split('T')[0] ?? createdAtDate.substring(0, 10),
+      expiresAt: expiresAtDate.split('T')[0] ?? expiresAtDate.substring(0, 10),
       lastUsed: 'Never',
       scopes: newTokenScopes,
     };
@@ -295,15 +297,15 @@ export function SecuritySettings() {
 
   const getPasswordStrength = (password: string) => {
     let strength = 0;
-    if (password.length >= 8) strength++;
-    if (password.length >= 12) strength++;
-    if (/[A-Z]/.test(password)) strength++;
-    if (/[a-z]/.test(password)) strength++;
-    if (/[0-9]/.test(password)) strength++;
-    if (/[!@#$%^&*]/.test(password)) strength++;
+    if (password.length >= 8) {strength++;}
+    if (password.length >= 12) {strength++;}
+    if (/[A-Z]/.test(password)) {strength++;}
+    if (/[a-z]/.test(password)) {strength++;}
+    if (/[0-9]/.test(password)) {strength++;}
+    if (/[!@#$%^&*]/.test(password)) {strength++;}
 
-    if (strength <= 2) return { label: 'Weak', color: 'bg-danger-500', width: '33%' };
-    if (strength <= 4) return { label: 'Medium', color: 'bg-warning-500', width: '66%' };
+    if (strength <= 2) {return { label: 'Weak', color: 'bg-danger-500', width: '33%' };}
+    if (strength <= 4) {return { label: 'Medium', color: 'bg-warning-500', width: '66%' };}
     return { label: 'Strong', color: 'bg-success-500', width: '100%' };
   };
 
@@ -377,7 +379,7 @@ export function SecuritySettings() {
                   type={showPassword.current ? 'text' : 'password'}
                   value={currentPassword}
                   onChange={(e) => setCurrentPassword(e.target.value)}
-                  error={passwordErrors.current}
+                  error={passwordErrors['current']}
                 />
                 <button
                   type="button"
@@ -400,7 +402,7 @@ export function SecuritySettings() {
                   type={showPassword.new ? 'text' : 'password'}
                   value={newPassword}
                   onChange={(e) => setNewPassword(e.target.value)}
-                  error={passwordErrors.new}
+                  error={passwordErrors['new']}
                 />
                 <button
                   type="button"
@@ -446,7 +448,7 @@ export function SecuritySettings() {
                   type={showPassword.confirm ? 'text' : 'password'}
                   value={confirmPassword}
                   onChange={(e) => setConfirmPassword(e.target.value)}
-                  error={passwordErrors.confirm}
+                  error={passwordErrors['confirm']}
                 />
                 <button
                   type="button"
@@ -771,14 +773,16 @@ export function SecuritySettings() {
           setNewTokenScopes([]);
           setCreatedToken(null);
         }}
-        title="Create Personal Access Token"
-        description={
-          createdToken
-            ? 'Copy your new token now. You will not be able to see it again.'
-            : 'Generate a new personal access token for API access'
-        }
         size="md"
       >
+        <ModalHeader>
+          <ModalTitle>Create Personal Access Token</ModalTitle>
+          <p className="mt-1 text-sm text-slate-500">
+            {createdToken
+              ? 'Copy your new token now. You will not be able to see it again.'
+              : 'Generate a new personal access token for API access'}
+          </p>
+        </ModalHeader>
         {createdToken ? (
           <div className="space-y-4">
             <div className="rounded-lg bg-success-50 border border-success-200 p-4">
@@ -788,11 +792,12 @@ export function SecuritySettings() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label htmlFor="created-token" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Your Token
               </label>
               <div className="flex gap-2">
                 <input
+                  id="created-token"
                   type="text"
                   value={createdToken}
                   readOnly
@@ -836,9 +841,9 @@ export function SecuritySettings() {
               helperText="Give your token a descriptive name"
             />
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <span className="block text-sm font-medium text-slate-700 mb-2">
                 Scopes
-              </label>
+              </span>
               <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 p-3 space-y-2">
                 {availableScopes.map((scope) => (
                   <label key={scope.value} className="flex items-center gap-2">

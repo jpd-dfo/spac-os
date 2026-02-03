@@ -4,13 +4,14 @@
  * Uses Clerk for authentication
  */
 
+import { auth } from '@clerk/nextjs/server';
 import { initTRPC, TRPCError } from '@trpc/server';
 import { type FetchCreateContextFnOptions } from '@trpc/server/adapters/fetch';
-import { auth } from '@clerk/nextjs/server';
 import superjson from 'superjson';
 import { ZodError } from 'zod';
-import { db } from '@/server/db';
+
 import { logger } from '@/lib/logger';
+import { db } from '@/server/db';
 
 /**
  * User type from Clerk context
@@ -191,7 +192,7 @@ const auditMiddleware = t.middleware(async ({ ctx, path, type, rawInput, next })
   if (type === 'mutation' && ctx.user) {
     try {
       const input = rawInput as Record<string, unknown>;
-      const organizationId = (input?.organizationId as string) || ctx.user.organizationId;
+      const organizationId = (input?.['organizationId'] as string | undefined) ?? ctx.user.organizationId;
 
       if (organizationId) {
         await ctx.db.auditLog.create({
@@ -205,10 +206,9 @@ const auditMiddleware = t.middleware(async ({ ctx, path, type, rawInput, next })
               : path.includes('delete')
               ? 'DELETE'
               : 'UPDATE',
-            entityType: path.split('.')[0],
-            entityId: (input?.id as string) || null,
-            newValues: input,
-            metadata: { path, type },
+            entityType: path.split('.')[0] ?? 'unknown',
+            entityId: (input?.['id'] as string) || 'unknown',
+            metadata: { path, type, input: JSON.parse(JSON.stringify(input)) },
           },
         });
       }

@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+
 import Link from 'next/link';
+
 import { useUser } from '@clerk/nextjs';
 import {
   User,
@@ -17,10 +19,11 @@ import {
   Trash2,
   Check,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+
 import { Avatar } from '@/components/ui/Avatar';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
 
 interface ApiKey {

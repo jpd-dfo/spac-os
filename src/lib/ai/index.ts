@@ -108,7 +108,7 @@ export {
 
 // Existing AI Functions (from other files)
 export { extractContractTerms, extractParties, extractDates, extractFinancialTerms, extractConditions, extractTerminationProvisions, extractIndemnificationTerms } from './contractExtractor';
-export { parseFinancials } from './financialParser';
+export { parseFinancialStatements } from './financialParser';
 export { detectRisks, detectCategoryRisks, detectContractRedFlags, detectFinancialRisks, calculateRiskScore, generateMitigationPlan } from './riskDetector';
 export { generateSummary, generateExecutiveBriefing, generateDueDiligenceSummary, generateQuickSummary, generateBulletPoints, generateAudienceSummary } from './summaryGenerator';
 export { compareDocuments } from './comparisonEngine';

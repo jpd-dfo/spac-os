@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+
 import {
   X,
   Search,
@@ -11,10 +12,12 @@ import {
   DollarSign,
   RefreshCw,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { cn, formatLargeNumber } from '@/lib/utils';
+
 import type { PipelineStage, TargetAssignee } from './TargetCard';
 
 // ============================================================================
@@ -442,8 +445,9 @@ export function PipelineFilters({
             >
               <div className="flex gap-4">
                 <div className="flex-1">
-                  <label className="block text-xs text-slate-500 mb-1">From</label>
+                  <label htmlFor="date-range-from" className="block text-xs text-slate-500 mb-1">From</label>
                   <input
+                    id="date-range-from"
                     type="date"
                     value={filters.dateRange.start?.toISOString().split('T')[0] || ''}
                     onChange={(e) =>
@@ -456,8 +460,9 @@ export function PipelineFilters({
                   />
                 </div>
                 <div className="flex-1">
-                  <label className="block text-xs text-slate-500 mb-1">To</label>
+                  <label htmlFor="date-range-to" className="block text-xs text-slate-500 mb-1">To</label>
                   <input
+                    id="date-range-to"
                     type="date"
                     value={filters.dateRange.end?.toISOString().split('T')[0] || ''}
                     onChange={(e) =>

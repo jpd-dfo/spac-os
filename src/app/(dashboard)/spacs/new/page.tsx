@@ -1,18 +1,22 @@
 'use client';
 
 import { useState } from 'react';
+
 import { useRouter } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
+import { ArrowLeft, Save, X, AlertCircle } from 'lucide-react';
+import { useForm } from 'react-hook-form';
 import toast from 'react-hot-toast';
-import { ArrowLeft, Building2, Save, X, AlertCircle, Check } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import { z } from 'zod';
+
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { SPAC_STATUS_LABELS, SPAC_PHASE_LABELS, SECTORS, GEOGRAPHIES } from '@/lib/constants';
 import { trpc } from '@/lib/trpc/client';
+import { SpacStatusSchema } from '@/schemas';
 
 // Zod schema for SPAC form validation
 const spacFormSchema = z.object({
@@ -24,17 +28,7 @@ const spacFormSchema = z.object({
     .max(10, 'Ticker must be less than 10 characters')
     .regex(/^[A-Z0-9.]*$/i, 'Ticker must only contain letters, numbers, or dots')
     .transform((val) => val.toUpperCase()),
-  status: z.enum([
-    'PRE_IPO',
-    'SEARCHING',
-    'LOI_SIGNED',
-    'DA_ANNOUNCED',
-    'PROXY_FILED',
-    'VOTE_SCHEDULED',
-    'CLOSING',
-    'COMPLETED',
-    'LIQUIDATED',
-  ]),
+  status: SpacStatusSchema,
   phase: z.enum([
     'FORMATION',
     'IPO',
@@ -153,7 +147,6 @@ export default function NewSPACPage() {
     handleSubmit,
     formState: { errors },
     setValue,
-    watch,
   } = useForm<SpacFormData>({
     resolver: zodResolver(spacFormSchema),
     defaultValues: {
@@ -161,7 +154,7 @@ export default function NewSPACPage() {
       phase: 'FORMATION',
       targetSectors: [],
       targetGeographies: [],
-      maxExtensions: '6',
+      maxExtensions: 6,
     },
   });
 
@@ -202,20 +195,13 @@ export default function NewSPACPage() {
   };
 
   // Map frontend status enum to backend status enum
-  // The backend has a different set of valid status values
-  function mapFrontendStatusToBackend(frontendStatus: string): 'PRE_IPO' | 'SEARCHING' | 'LOI_SIGNED' | 'DEFINITIVE_AGREEMENT' | 'VOTE_PENDING' | 'DE_SPAC_COMPLETE' | 'LIQUIDATED' {
-    const statusMap: Record<string, 'PRE_IPO' | 'SEARCHING' | 'LOI_SIGNED' | 'DEFINITIVE_AGREEMENT' | 'VOTE_PENDING' | 'DE_SPAC_COMPLETE' | 'LIQUIDATED'> = {
-      PRE_IPO: 'PRE_IPO',
-      SEARCHING: 'SEARCHING',
-      LOI_SIGNED: 'LOI_SIGNED',
-      DA_ANNOUNCED: 'DEFINITIVE_AGREEMENT',
-      PROXY_FILED: 'VOTE_PENDING',
-      VOTE_SCHEDULED: 'VOTE_PENDING',
-      CLOSING: 'DE_SPAC_COMPLETE',
-      COMPLETED: 'DE_SPAC_COMPLETE',
-      LIQUIDATED: 'LIQUIDATED',
-    };
-    return statusMap[frontendStatus] || 'SEARCHING';
+  // Using the shared SpacStatusSchema values
+  function mapFrontendStatusToBackend(frontendStatus: string): 'SEARCHING' | 'LOI_SIGNED' | 'DA_ANNOUNCED' | 'SEC_REVIEW' | 'SHAREHOLDER_VOTE' | 'CLOSING' | 'COMPLETED' | 'LIQUIDATING' | 'LIQUIDATED' | 'TERMINATED' {
+    const validStatuses = ['SEARCHING', 'LOI_SIGNED', 'DA_ANNOUNCED', 'SEC_REVIEW', 'SHAREHOLDER_VOTE', 'CLOSING', 'COMPLETED', 'LIQUIDATING', 'LIQUIDATED', 'TERMINATED'] as const;
+    if (validStatuses.includes(frontendStatus as typeof validStatuses[number])) {
+      return frontendStatus as typeof validStatuses[number];
+    }
+    return 'SEARCHING';
   }
 
   const handleCancel = () => {
@@ -416,9 +402,9 @@ export default function NewSPACPage() {
 
               {/* Target Sectors */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <span className="mb-2 block text-sm font-medium text-slate-700">
                   Target Sectors
-                </label>
+                </span>
                 <div className="flex flex-wrap gap-2">
                   {SECTORS.map((sector) => (
                     <button
@@ -444,9 +430,9 @@ export default function NewSPACPage() {
 
               {/* Target Geographies */}
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <span className="mb-2 block text-sm font-medium text-slate-700">
                   Target Geographies
-                </label>
+                </span>
                 <div className="flex flex-wrap gap-2">
                   {GEOGRAPHIES.map((geo) => (
                     <button

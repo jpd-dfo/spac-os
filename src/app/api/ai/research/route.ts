@@ -2,7 +2,9 @@
 // SPAC OS AI Research Agent API Endpoint
 // ============================================================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
+
+import { getClaudeClient } from '@/lib/ai/claude';
 import {
   researchCompany,
   analyzeMarket,
@@ -13,7 +15,6 @@ import {
   researchIndustryTrends,
   type ResearchOptions,
 } from '@/lib/ai/research-agent';
-import { getClaudeClient } from '@/lib/ai/claude';
 import { logger } from '@/lib/logger';
 
 // ============================================================================

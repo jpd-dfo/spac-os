@@ -1,24 +1,19 @@
 'use client';
 
 import { useState } from 'react';
+
 import Link from 'next/link';
+
 import {
   ArrowLeft,
   Mail,
   Calendar,
   MessageSquare,
   FolderOpen,
-  Key,
-  Webhook,
   Check,
   ExternalLink,
   Settings,
   RefreshCw,
-  Plus,
-  Trash2,
-  Copy,
-  Eye,
-  EyeOff,
   Shield,
   Zap,
   Clock,
@@ -29,12 +24,11 @@ import {
   FileText,
   Cloud,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
+
 import { Badge } from '@/components/ui/Badge';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 
 interface Integration {
@@ -609,77 +603,80 @@ export default function IntegrationsPage() {
           setIsConfigModalOpen(false);
           setSelectedIntegration(null);
         }}
-        title={`Configure ${selectedIntegration?.name}`}
         size="md"
       >
-        {selectedIntegration && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-4 rounded-lg bg-slate-50 p-4">
-              <selectedIntegration.icon className="h-8 w-8 text-primary-600" />
+        <ModalHeader>
+          <ModalTitle>Configure {selectedIntegration?.name}</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          {selectedIntegration && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 rounded-lg bg-slate-50 p-4">
+                <selectedIntegration.icon className="h-8 w-8 text-primary-600" />
+                <div>
+                  <p className="font-medium text-slate-900">{selectedIntegration.name}</p>
+                  <p className="text-sm text-slate-500">{selectedIntegration.account}</p>
+                </div>
+              </div>
+
               <div>
-                <p className="font-medium text-slate-900">{selectedIntegration.name}</p>
-                <p className="text-sm text-slate-500">{selectedIntegration.account}</p>
+                <h4 className="text-sm font-medium text-slate-900 mb-2">Features</h4>
+                <div className="space-y-2">
+                  {selectedIntegration.features.map((feature, index) => (
+                    <label key={index} className="flex items-center gap-2">
+                      <input type="checkbox" defaultChecked className="rounded" />
+                      <span className="text-sm text-slate-600">{feature}</span>
+                    </label>
+                  ))}
+                </div>
               </div>
-            </div>
 
-            <div>
-              <h4 className="text-sm font-medium text-slate-900 mb-2">Features</h4>
-              <div className="space-y-2">
-                {selectedIntegration.features.map((feature, index) => (
-                  <label key={index} className="flex items-center gap-2">
+              <div>
+                <h4 className="text-sm font-medium text-slate-900 mb-2">Sync Settings</h4>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2">
                     <input type="checkbox" defaultChecked className="rounded" />
-                    <span className="text-sm text-slate-600">{feature}</span>
+                    <span className="text-sm text-slate-600">Auto-sync every 15 minutes</span>
                   </label>
-                ))}
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" defaultChecked className="rounded" />
+                    <span className="text-sm text-slate-600">Sync on data changes</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input type="checkbox" className="rounded" />
+                    <span className="text-sm text-slate-600">Include archived items</span>
+                  </label>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-danger-200 bg-danger-50 p-4">
+                <h4 className="text-sm font-medium text-danger-800 mb-1">Danger Zone</h4>
+                <p className="text-sm text-danger-700 mb-3">
+                  Disconnecting will stop all syncing and remove access to this integration.
+                </p>
+                <Button
+                  variant="danger"
+                  size="sm"
+                  onClick={() => {
+                    handleDisconnect(selectedIntegration.id);
+                    setIsConfigModalOpen(false);
+                    setSelectedIntegration(null);
+                  }}
+                >
+                  Disconnect Integration
+                </Button>
               </div>
             </div>
-
-            <div>
-              <h4 className="text-sm font-medium text-slate-900 mb-2">Sync Settings</h4>
-              <div className="space-y-2">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" defaultChecked className="rounded" />
-                  <span className="text-sm text-slate-600">Auto-sync every 15 minutes</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" defaultChecked className="rounded" />
-                  <span className="text-sm text-slate-600">Sync on data changes</span>
-                </label>
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" className="rounded" />
-                  <span className="text-sm text-slate-600">Include archived items</span>
-                </label>
-              </div>
-            </div>
-
-            <div className="rounded-lg border border-danger-200 bg-danger-50 p-4">
-              <h4 className="text-sm font-medium text-danger-800 mb-1">Danger Zone</h4>
-              <p className="text-sm text-danger-700 mb-3">
-                Disconnecting will stop all syncing and remove access to this integration.
-              </p>
-              <Button
-                variant="danger"
-                size="sm"
-                onClick={() => {
-                  handleDisconnect(selectedIntegration.id);
-                  setIsConfigModalOpen(false);
-                  setSelectedIntegration(null);
-                }}
-              >
-                Disconnect Integration
-              </Button>
-            </div>
-
-            <ModalFooter className="px-0 pb-0">
-              <Button variant="secondary" onClick={() => setIsConfigModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="primary" onClick={() => setIsConfigModalOpen(false)}>
-                Save Configuration
-              </Button>
-            </ModalFooter>
-          </div>
-        )}
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setIsConfigModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="primary" onClick={() => setIsConfigModalOpen(false)}>
+            Save Configuration
+          </Button>
+        </ModalFooter>
       </Modal>
     </div>
   );

@@ -1,7 +1,9 @@
 'use client';
 
-import { ReactNode, useMemo } from 'react';
-import { ArrowUpRight, ArrowDownRight, Minus, LucideIcon } from 'lucide-react';
+import { type ReactNode, useMemo } from 'react';
+
+import { ArrowUpRight, ArrowDownRight, Minus, type LucideIcon } from 'lucide-react';
+
 import { Card, CardContent } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn, formatLargeNumber, formatPercent, formatCurrency } from '@/lib/utils';
@@ -48,8 +50,8 @@ interface MetricsCardGroupProps {
 // ============================================================================
 
 function formatValue(value: number | string | null | undefined, format: MetricFormat): string {
-  if (value === null || value === undefined) return '-';
-  if (typeof value === 'string') return value;
+  if (value === null || value === undefined) {return '-';}
+  if (typeof value === 'string') {return value;}
 
   switch (format) {
     case 'currency':
@@ -72,7 +74,7 @@ function calculateChange(current: number | null | undefined, previous: number | 
 }
 
 function getTrendDirection(change: number | null | undefined): TrendDirection {
-  if (change === null || change === undefined || change === 0) return 'neutral';
+  if (change === null || change === undefined || change === 0) {return 'neutral';}
   return change > 0 ? 'up' : 'down';
 }
 
@@ -140,7 +142,7 @@ export function MetricsCard({
 }: MetricsCardProps) {
   // Calculate change and trend
   const change = useMemo(() => {
-    if (providedChange !== undefined) return providedChange;
+    if (providedChange !== undefined) {return providedChange;}
     if (typeof value === 'number' && previousValue !== undefined) {
       return calculateChange(value, previousValue);
     }
@@ -148,7 +150,7 @@ export function MetricsCard({
   }, [providedChange, value, previousValue]);
 
   const trend = useMemo(() => {
-    if (providedTrend) return providedTrend;
+    if (providedTrend) {return providedTrend;}
     return getTrendDirection(change);
   }, [providedTrend, change]);
 
@@ -157,8 +159,8 @@ export function MetricsCard({
     const isPositive = trendInverted ? trend === 'down' : trend === 'up';
     const isNegative = trendInverted ? trend === 'up' : trend === 'down';
 
-    if (isPositive) return 'text-success-600';
-    if (isNegative) return 'text-danger-600';
+    if (isPositive) {return 'text-success-600';}
+    if (isNegative) {return 'text-danger-600';}
     return 'text-slate-500';
   }, [trend, trendInverted]);
 

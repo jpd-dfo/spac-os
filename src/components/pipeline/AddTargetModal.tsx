@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+
 import { Plus, X, Building2, DollarSign, Briefcase } from 'lucide-react';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
+import { Modal, ModalHeader, ModalTitle, ModalFooter } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { cn } from '@/lib/utils';
 import { SECTORS, TARGET_STATUS_LABELS } from '@/lib/constants';
+import { cn } from '@/lib/utils';
 import type { TargetStatus } from '@/types';
 
 // ============================================================================
@@ -155,10 +157,12 @@ export function AddTargetModal({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={title}
-      description="Add a new acquisition target to the pipeline"
       size="lg"
     >
+      <ModalHeader>
+        <ModalTitle>{title}</ModalTitle>
+        <p className="mt-1 text-sm text-slate-500">Add a new acquisition target to the pipeline</p>
+      </ModalHeader>
       <form onSubmit={handleSubmit} className="space-y-6">
         {/* Basic Information */}
         <div className="space-y-4">
@@ -216,9 +220,9 @@ export function AddTargetModal({
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            <span className="block text-sm font-medium text-slate-700 mb-1.5">
               Enterprise Value *
-            </label>
+            </span>
             <div className="space-y-2">
               <Input
                 type="number"
@@ -326,8 +330,8 @@ export function QuickAddTargetModal({
     e.preventDefault();
 
     const newErrors: typeof errors = {};
-    if (!name.trim()) newErrors.name = 'Name is required';
-    if (!industry) newErrors.industry = 'Industry is required';
+    if (!name.trim()) {newErrors.name = 'Name is required';}
+    if (!industry) {newErrors.industry = 'Industry is required';}
 
     if (Object.keys(newErrors).length > 0) {
       setErrors(newErrors);
@@ -360,9 +364,11 @@ export function QuickAddTargetModal({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title="Quick Add Target"
       size="sm"
     >
+      <ModalHeader>
+        <ModalTitle>Quick Add Target</ModalTitle>
+      </ModalHeader>
       <form onSubmit={handleSubmit} className="space-y-4">
         <Input
           label="Target Name *"
@@ -370,7 +376,7 @@ export function QuickAddTargetModal({
           value={name}
           onChange={(e) => {
             setName(e.target.value);
-            if (errors.name) setErrors((prev) => ({ ...prev, name: undefined }));
+            if (errors.name) {setErrors((prev) => ({ ...prev, name: undefined }));}
           }}
           error={errors.name}
         />
@@ -381,16 +387,16 @@ export function QuickAddTargetModal({
           value={industry}
           onChange={(e) => {
             setIndustry(e.target.value);
-            if (errors.industry) setErrors((prev) => ({ ...prev, industry: undefined }));
+            if (errors.industry) {setErrors((prev) => ({ ...prev, industry: undefined }));}
           }}
           placeholder="Select industry"
           error={errors.industry}
         />
 
         <div>
-          <label className="block text-sm font-medium text-slate-700 mb-1.5">
+          <span className="block text-sm font-medium text-slate-700 mb-1.5">
             Enterprise Value
-          </label>
+          </span>
           <div className="flex flex-wrap gap-2">
             {VALUATION_PRESETS.map((preset) => (
               <button

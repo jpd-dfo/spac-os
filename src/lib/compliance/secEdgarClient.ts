@@ -2,8 +2,8 @@
 // SEC EDGAR API Integration Client
 // ============================================================================
 
-import type { FilingType, FilingStatus } from '@/types';
 import { logger } from '@/lib/logger';
+import type { FilingType, FilingStatus } from '@/types';
 
 // ============================================================================
 // TYPES AND INTERFACES
@@ -73,7 +73,6 @@ export interface EdgarCommentLetter {
 
 const SEC_EDGAR_BASE_URL = 'https://data.sec.gov';
 const SEC_EDGAR_SEARCH_URL = 'https://efts.sec.gov/LATEST/search-index';
-const SEC_FILINGS_URL = 'https://www.sec.gov/cgi-bin/browse-edgar';
 
 // SEC requires a User-Agent header with contact info
 const SEC_USER_AGENT = 'SPAC-OS-App/1.0 (contact@example.com)';
@@ -121,12 +120,12 @@ export async function lookupCIK(ticker: string): Promise<string | null> {
         'https://www.sec.gov/files/company_tickers.json'
       );
 
-      if (!tickersResponse.ok) return null;
+      if (!tickersResponse.ok) {return null;}
 
-      const tickers = await tickersResponse.json();
+      const tickers = await tickersResponse.json() as Record<string, { ticker: string; cik_str: string }>;
       const entry = Object.values(tickers).find(
-        (t: { ticker: string }) => t.ticker === ticker.toUpperCase()
-      ) as { cik_str: string } | undefined;
+        (t) => t.ticker === ticker.toUpperCase()
+      );
 
       return entry ? entry.cik_str.toString().padStart(10, '0') : null;
     }
@@ -144,17 +143,17 @@ export async function lookupCIK(ticker: string): Promise<string | null> {
  */
 export async function getCompanyInfo(cik: string): Promise<EdgarCompanyInfo | null> {
   try {
-    const paddedCik = cik.padStart(10, '0');
+    const paddedCik_ = cik.padStart(10, '0');
     const response = await rateLimitedFetch(
-      `${SEC_EDGAR_BASE_URL}/submissions/CIK${paddedCik}.json`
+      `${SEC_EDGAR_BASE_URL}/submissions/CIK${paddedCik_}.json`
     );
 
-    if (!response.ok) return null;
+    if (!response.ok) {return null;}
 
     const data = await response.json();
 
     return {
-      cik: paddedCik,
+      cik: paddedCik_,
       name: data.name,
       ticker: data.tickers?.[0] || '',
       sicCode: data.sic,
@@ -190,12 +189,12 @@ export async function getRecentFilings(
       `${SEC_EDGAR_BASE_URL}/submissions/CIK${paddedCik}.json`
     );
 
-    if (!response.ok) return [];
+    if (!response.ok) {return [];}
 
     const data = await response.json();
     const recent = data.filings?.recent;
 
-    if (!recent) return [];
+    if (!recent) {return [];}
 
     const filings: EdgarFiling[] = [];
     const length = Math.min(recent.accessionNumber?.length || 0, limit);
@@ -226,7 +225,7 @@ export async function getRecentFilings(
           return typeMap[type]?.some(t => formType.includes(t));
         });
 
-        if (!matchesType) continue;
+        if (!matchesType) {continue;}
       }
 
       const accessionNumber = recent.accessionNumber[i];
@@ -278,7 +277,7 @@ export async function getFiling(
       `${SEC_EDGAR_BASE_URL}/Archives/edgar/data/${paddedCik}/${accessionFormatted}/index.json`
     );
 
-    if (!response.ok) return null;
+    if (!response.ok) {return null;}
 
     const data = await response.json();
     const directory = data.directory;
@@ -443,7 +442,7 @@ export async function searchFilings(params: SearchParams): Promise<{
       accessionNumber: hit._source.adsh,
       filingDate: hit._source.file_date,
       description: hit._source.file_description,
-      documentUrl: buildEdgarUrl(hit._source.ciks?.[0], hit._source.adsh),
+      documentUrl: buildEdgarUrl(hit._source.ciks?.[0] ?? '', hit._source.adsh ?? ''),
       highlights: hit.highlight?.content || [],
     }));
 

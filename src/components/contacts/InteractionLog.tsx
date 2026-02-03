@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   Mail,
   Phone,
@@ -15,10 +16,12 @@ import {
   ChevronUp,
   Link as LinkIcon,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatDate, formatRelativeTime } from '@/lib/utils';
+
 import type { ContactInteraction, InteractionType } from './mockContactsData';
 
 interface InteractionLogProps {
@@ -171,7 +174,7 @@ function AddInteractionForm({ onSubmit, onCancel, contactName }: AddInteractionF
       <h4 className="font-medium text-slate-900">Log Interaction with {contactName}</h4>
 
       <div>
-        <label className="block text-sm font-medium text-slate-700 mb-1.5">Type</label>
+        <span className="block text-sm font-medium text-slate-700 mb-1.5">Type</span>
         <div className="flex flex-wrap gap-2">
           {(['email', 'call', 'meeting', 'note', 'task'] as InteractionType[]).map((t) => (
             <button

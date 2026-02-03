@@ -1,7 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
+
 import Link from 'next/link';
+
 import {
   Activity,
   FileText,
@@ -17,10 +19,11 @@ import {
   MessageSquare,
   ChevronRight,
   Clock,
-  LucideIcon,
+  type LucideIcon,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatRelativeTime } from '@/lib/utils';
 
 // ============================================================================

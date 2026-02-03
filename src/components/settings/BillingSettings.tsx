@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   CreditCard,
   Check,
@@ -19,10 +20,11 @@ import {
   Clock,
   Calendar,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+
 import { Badge } from '@/components/ui/Badge';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import { Modal, ModalFooter, ModalHeader, ModalTitle } from '@/components/ui/Modal';
 import { cn } from '@/lib/utils';
 
 interface Plan {
@@ -217,13 +219,13 @@ export function BillingSettings() {
   };
 
   const getUsagePercentage = (current: number, limit: number | 'unlimited') => {
-    if (limit === 'unlimited') return 0;
+    if (limit === 'unlimited') {return 0;}
     return Math.min((current / limit) * 100, 100);
   };
 
   const getUsageColor = (percentage: number) => {
-    if (percentage >= 90) return 'bg-danger-500';
-    if (percentage >= 75) return 'bg-warning-500';
+    if (percentage >= 90) {return 'bg-danger-500';}
+    if (percentage >= 75) {return 'bg-warning-500';}
     return 'bg-primary-500';
   };
 
@@ -490,40 +492,44 @@ export function BillingSettings() {
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-2 max-w-2xl">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label htmlFor="billing-email" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Billing Email
               </label>
               <input
+                id="billing-email"
                 type="email"
                 defaultValue="billing@company.com"
                 className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label htmlFor="company-name" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Company Name
               </label>
               <input
+                id="company-name"
                 type="text"
                 defaultValue="Apex Acquisition Corp"
                 className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
               />
             </div>
             <div className="sm:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label htmlFor="billing-address" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Billing Address
               </label>
               <input
+                id="billing-address"
                 type="text"
                 defaultValue="350 Park Avenue, New York, NY 10022"
                 className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label htmlFor="tax-id" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Tax ID (Optional)
               </label>
               <input
+                id="tax-id"
                 type="text"
                 placeholder="Enter tax ID"
                 className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
@@ -567,10 +573,12 @@ export function BillingSettings() {
           setIsUpgradeModalOpen(false);
           setSelectedPlan(null);
         }}
-        title="Upgrade Your Plan"
-        description="Choose a plan that fits your needs"
         size="full"
       >
+        <ModalHeader>
+          <ModalTitle>Upgrade Your Plan</ModalTitle>
+          <p className="mt-1 text-sm text-slate-500">Choose a plan that fits your needs</p>
+        </ModalHeader>
         <div className="space-y-6">
           {/* Billing Toggle */}
           <div className="flex items-center justify-center gap-4">
@@ -690,16 +698,19 @@ export function BillingSettings() {
       <Modal
         isOpen={isAddPaymentModalOpen}
         onClose={() => setIsAddPaymentModalOpen(false)}
-        title="Add Payment Method"
-        description="Add a new credit or debit card"
         size="md"
       >
+        <ModalHeader>
+          <ModalTitle>Add Payment Method</ModalTitle>
+          <p className="mt-1 text-sm text-slate-500">Add a new credit or debit card</p>
+        </ModalHeader>
         <div className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label htmlFor="card-number" className="block text-sm font-medium text-slate-700 mb-1.5">
               Card Number
             </label>
             <input
+              id="card-number"
               type="text"
               placeholder="1234 5678 9012 3456"
               className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
@@ -707,18 +718,20 @@ export function BillingSettings() {
           </div>
           <div className="grid gap-4 grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label htmlFor="expiry-date" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Expiry Date
               </label>
               <input
+                id="expiry-date"
                 type="text"
                 placeholder="MM/YY"
                 className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">CVC</label>
+              <label htmlFor="cvc" className="block text-sm font-medium text-slate-700 mb-1.5">CVC</label>
               <input
+                id="cvc"
                 type="text"
                 placeholder="123"
                 className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"
@@ -726,10 +739,11 @@ export function BillingSettings() {
             </div>
           </div>
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-1.5">
+            <label htmlFor="name-on-card" className="block text-sm font-medium text-slate-700 mb-1.5">
               Name on Card
             </label>
             <input
+              id="name-on-card"
               type="text"
               placeholder="John Doe"
               className="w-full rounded-md border border-slate-200 bg-white px-3 py-2 text-sm"

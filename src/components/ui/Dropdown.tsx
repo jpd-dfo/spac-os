@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useRef, useEffect, useCallback, useId } from 'react';
-import { cn } from '@/lib/utils';
+import { useState, useRef, useEffect, useCallback, useId , createContext, useContext } from 'react';
+
 import { cva, type VariantProps } from 'class-variance-authority';
+
+import { cn } from '@/lib/utils';
 
 // ============================================================================
 // DROPDOWN CONTAINER
@@ -44,7 +46,7 @@ export function Dropdown({
   // Keyboard navigation
   const handleKeyDown = useCallback(
     (event: React.KeyboardEvent) => {
-      if (disabled) return;
+      if (disabled) {return;}
 
       switch (event.key) {
         case 'Enter':
@@ -138,7 +140,6 @@ export function Dropdown({
 // DROPDOWN CONTEXT
 // ============================================================================
 
-import { createContext, useContext } from 'react';
 
 interface DropdownContextValue {
   closeMenu: () => void;
@@ -190,7 +191,7 @@ export function DropdownItem({
   const { closeMenu } = useDropdownContext();
 
   const handleClick = (event: React.MouseEvent<HTMLButtonElement>) => {
-    if (disabled) return;
+    if (disabled) {return;}
     onClick?.(event);
     if (closeOnClick) {
       closeMenu();

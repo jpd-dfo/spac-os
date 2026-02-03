@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   X,
   Mail,
@@ -21,12 +22,15 @@ import {
   CheckSquare,
   Briefcase,
 } from 'lucide-react';
+
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatDate, formatRelativeTime } from '@/lib/utils';
+
 import { InteractionLog } from './InteractionLog';
+
 import type { ExtendedContact, ContactCategory } from './mockContactsData';
 
 interface ContactDetailModalProps {
@@ -55,23 +59,23 @@ function getCategoryColor(category: ContactCategory): string {
 }
 
 function getRelationshipColor(score: number): string {
-  if (score >= 80) return 'text-green-600';
-  if (score >= 60) return 'text-amber-600';
-  if (score >= 40) return 'text-orange-600';
+  if (score >= 80) {return 'text-green-600';}
+  if (score >= 60) {return 'text-amber-600';}
+  if (score >= 40) {return 'text-orange-600';}
   return 'text-red-600';
 }
 
 function getRelationshipBgColor(score: number): string {
-  if (score >= 80) return 'bg-green-500';
-  if (score >= 60) return 'bg-amber-500';
-  if (score >= 40) return 'bg-orange-500';
+  if (score >= 80) {return 'bg-green-500';}
+  if (score >= 60) {return 'bg-amber-500';}
+  if (score >= 40) {return 'bg-orange-500';}
   return 'bg-red-500';
 }
 
 function getRelationshipLabel(score: number): string {
-  if (score >= 80) return 'Strong';
-  if (score >= 60) return 'Good';
-  if (score >= 40) return 'Developing';
+  if (score >= 80) {return 'Strong';}
+  if (score >= 60) {return 'Good';}
+  if (score >= 40) {return 'Developing';}
   return 'New';
 }
 
@@ -85,7 +89,7 @@ export function ContactDetailModal({
 }: ContactDetailModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   const tabs: { id: TabType; label: string; icon: React.ReactNode }[] = [
     { id: 'overview', label: 'Overview', icon: <Users className="h-4 w-4" /> },

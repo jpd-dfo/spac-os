@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   Users,
   UserPlus,
@@ -20,12 +21,13 @@ import {
   Copy,
   RefreshCw,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
+
 import { Badge } from '@/components/ui/Badge';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Modal, ModalFooter, ModalHeader, ModalTitle } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
 import { cn } from '@/lib/utils';
 
 type UserRole = 'Admin' | 'Manager' | 'Analyst' | 'Viewer';
@@ -267,22 +269,23 @@ export function TeamManagement() {
   const handleInvite = async () => {
     const errors: Record<string, string> = {};
     if (!inviteEmail.trim()) {
-      errors.email = 'Email is required';
+      errors['email'] = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail)) {
-      errors.email = 'Invalid email format';
+      errors['email'] = 'Invalid email format';
     } else if (teamMembers.some((m) => m.email === inviteEmail)) {
-      errors.email = 'User already exists';
+      errors['email'] = 'User already exists';
     }
 
     setInviteErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {return;}
 
     setIsInviting(true);
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
+    const emailName = inviteEmail.split('@')[0] ?? inviteEmail;
     const newMember: TeamMember = {
       id: Date.now().toString(),
-      name: inviteEmail.split('@')[0].replace('.', ' '),
+      name: emailName.replace('.', ' '),
       email: inviteEmail,
       role: inviteRole,
       status: 'pending',
@@ -307,7 +310,7 @@ export function TeamManagement() {
   };
 
   const handleDeactivate = async () => {
-    if (!selectedMember) return;
+    if (!selectedMember) {return;}
 
     setTeamMembers(
       teamMembers.map((m) =>
@@ -648,10 +651,12 @@ export function TeamManagement() {
           setInviteErrors({});
           setInviteLink('');
         }}
-        title="Invite Team Member"
-        description="Send an invitation to join your team"
         size="md"
       >
+        <ModalHeader>
+          <ModalTitle>Invite Team Member</ModalTitle>
+          <p className="mt-1 text-sm text-slate-500">Send an invitation to join your team</p>
+        </ModalHeader>
         {inviteLink ? (
           <div className="space-y-4">
             <div className="rounded-lg bg-success-50 border border-success-200 p-4">
@@ -661,11 +666,12 @@ export function TeamManagement() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label htmlFor="invitation-link" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Invitation Link
               </label>
               <div className="flex gap-2">
                 <input
+                  id="invitation-link"
                   type="text"
                   value={inviteLink}
                   readOnly
@@ -703,7 +709,7 @@ export function TeamManagement() {
               placeholder="colleague@company.com"
               value={inviteEmail}
               onChange={(e) => setInviteEmail(e.target.value)}
-              error={inviteErrors.email}
+              error={inviteErrors['email']}
             />
             <Select
               label="Role"
@@ -764,10 +770,12 @@ export function TeamManagement() {
           setIsEditModalOpen(false);
           setSelectedMember(null);
         }}
-        title="Edit Team Member"
-        description={`Update role for ${selectedMember?.name}`}
         size="md"
       >
+        <ModalHeader>
+          <ModalTitle>Edit Team Member</ModalTitle>
+          <p className="mt-1 text-sm text-slate-500">Update role for {selectedMember?.name}</p>
+        </ModalHeader>
         {selectedMember && (
           <div className="space-y-4">
             <div className="flex items-center gap-4 rounded-lg bg-slate-50 p-4">
@@ -813,9 +821,11 @@ export function TeamManagement() {
           setIsDeactivateModalOpen(false);
           setSelectedMember(null);
         }}
-        title="Deactivate Team Member"
         size="md"
       >
+        <ModalHeader>
+          <ModalTitle>Deactivate Team Member</ModalTitle>
+        </ModalHeader>
         {selectedMember && (
           <div className="space-y-4">
             <div className="flex items-center gap-3 rounded-lg bg-warning-50 border border-warning-200 p-4">

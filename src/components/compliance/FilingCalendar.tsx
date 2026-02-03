@@ -1,16 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Calendar as CalendarIcon,
-  FileText,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Filter,
-} from 'lucide-react';
+
 import {
   format,
   startOfMonth,
@@ -25,13 +16,24 @@ import {
   isToday,
   parseISO,
 } from 'date-fns';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Calendar as CalendarIcon,
+  FileText,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Filter,
+} from 'lucide-react';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { FILING_DEFINITIONS } from '@/lib/compliance/complianceRules';
+import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { FilingType, FilingStatus } from '@/types';
-import { FILING_TYPE_LABELS } from '@/lib/constants';
-import { FILING_DEFINITIONS } from '@/lib/compliance/complianceRules';
 
 // ============================================================================
 // TYPES
@@ -120,8 +122,8 @@ export function FilingCalendar({
   // Filter filings
   const filteredFilings = useMemo(() => {
     return filings.filter((filing) => {
-      if (filterType !== 'all' && filing.type !== filterType) return false;
-      if (filterStatus !== 'all' && filing.status !== filterStatus) return false;
+      if (filterType !== 'all' && filing.type !== filterType) {return false;}
+      if (filterStatus !== 'all' && filing.status !== filterStatus) {return false;}
       return true;
     });
   }, [filings, filterType, filterStatus]);

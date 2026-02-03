@@ -1,7 +1,9 @@
 'use client';
 
 import { useState } from 'react';
+
 import Link from 'next/link';
+
 import {
   Bell,
   Mail,
@@ -12,8 +14,9 @@ import {
   Check,
   ArrowLeft,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
 
 interface NotificationCategory {
@@ -328,10 +331,11 @@ export default function NotificationSettingsPage() {
 
               {reminderSettings.dailyDigest && emailNotificationsEnabled && (
                 <div className="mt-4">
-                  <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                  <label htmlFor="digest-time" className="block text-sm font-medium text-slate-700 mb-1.5">
                     Digest Time
                   </label>
                   <input
+                    id="digest-time"
                     type="time"
                     value={reminderSettings.digestTime}
                     onChange={(e) =>

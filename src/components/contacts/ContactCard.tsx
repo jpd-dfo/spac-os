@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   Mail,
   Phone,
@@ -13,11 +14,13 @@ import {
   Video,
   ExternalLink,
 } from 'lucide-react';
+
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
-import { Card } from '@/components/ui/Card';
 import { Button } from '@/components/ui/Button';
+import { Card } from '@/components/ui/Card';
 import { cn, formatRelativeTime } from '@/lib/utils';
+
 import type { ExtendedContact, ContactCategory } from './mockContactsData';
 
 interface ContactCardProps {
@@ -44,16 +47,16 @@ function getCategoryColor(category: ContactCategory): string {
 }
 
 function getRelationshipColor(score: number): string {
-  if (score >= 80) return 'text-green-600';
-  if (score >= 60) return 'text-amber-600';
-  if (score >= 40) return 'text-orange-600';
+  if (score >= 80) {return 'text-green-600';}
+  if (score >= 60) {return 'text-amber-600';}
+  if (score >= 40) {return 'text-orange-600';}
   return 'text-red-600';
 }
 
 function getRelationshipBgColor(score: number): string {
-  if (score >= 80) return 'bg-green-500';
-  if (score >= 60) return 'bg-amber-500';
-  if (score >= 40) return 'bg-orange-500';
+  if (score >= 80) {return 'bg-green-500';}
+  if (score >= 60) {return 'bg-amber-500';}
+  if (score >= 40) {return 'bg-orange-500';}
   return 'bg-red-500';
 }
 

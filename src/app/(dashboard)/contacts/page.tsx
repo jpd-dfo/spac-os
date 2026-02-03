@@ -1,6 +1,7 @@
 'use client';
 
 import { Users, Network, Building, UserPlus, Mail, Phone, Clock } from 'lucide-react';
+
 import { Card, CardContent } from '@/components/ui/Card';
 
 export default function ContactsPage() {

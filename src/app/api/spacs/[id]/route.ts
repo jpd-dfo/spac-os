@@ -3,13 +3,17 @@
  * RESTful endpoints for individual SPAC management
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
+
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
+import { type z } from 'zod';
+
 import { authOptions } from '@/lib/auth';
-import { SpacUpdateSchema } from '@/schemas';
-import { z } from 'zod';
 import { logger } from '@/lib/logger';
+import { prisma } from '@/lib/prisma';
+import { SpacUpdateSchema } from '@/schemas';
+
+
 
 interface RouteParams {
   params: { id: string };
@@ -40,16 +44,15 @@ export async function GET(
         organization: {
           select: { id: true, name: true },
         },
-        createdBy: {
-          select: { id: true, name: true, email: true, image: true },
-        },
         sponsors: {
-          select: {
-            id: true,
-            name: true,
-            type: true,
-            promoterShares: true,
-            privatePlacementWarrants: true,
+          include: {
+            sponsor: {
+              select: {
+                id: true,
+                name: true,
+                tier: true,
+              },
+            },
           },
         },
         _count: {
@@ -68,7 +71,7 @@ export async function GET(
           take: 1,
         },
         milestones: {
-          where: { status: { in: ['NOT_STARTED', 'IN_PROGRESS'] } },
+          where: { isCompleted: false },
           orderBy: { targetDate: 'asc' },
           take: 5,
         },
@@ -83,6 +86,13 @@ export async function GET(
     }
 
     // Verify user has access
+    if (!spac.organizationId) {
+      return NextResponse.json(
+        { error: 'SPAC has no organization' },
+        { status: 400 }
+      );
+    }
+
     const membership = await prisma.organizationUser.findUnique({
       where: {
         organizationId_userId: {
@@ -175,6 +185,13 @@ export async function PUT(
     }
 
     // Verify user has access
+    if (!existingSpac.organizationId) {
+      return NextResponse.json(
+        { error: 'SPAC has no organization' },
+        { status: 400 }
+      );
+    }
+
     const membership = await prisma.organizationUser.findUnique({
       where: {
         organizationId_userId: {
@@ -220,10 +237,35 @@ export async function PUT(
       }
     }
 
+    // Extract only the fields that exist in Prisma schema for update
+    const prismaUpdateData = {
+      name: updateData.name,
+      ticker: updateData.ticker,
+      cik: updateData.cik,
+      status: updateData.status as any, // Cast to handle enum differences
+      phase: updateData.phase as any, // Cast to handle enum differences
+      ipoDate: updateData.ipoDate,
+      ipoSize: updateData.ipoSize,
+      trustAmount: updateData.trustSize,
+      trustBalance: updateData.trustBalance,
+      deadline: updateData.deadline,
+      deadlineDate: updateData.deadlineDate,
+      maxExtensions: updateData.maxExtensions,
+      description: updateData.description,
+      targetSectors: updateData.targetSectors,
+      targetGeographies: updateData.targetGeographies,
+      tags: updateData.tags,
+    };
+
+    // Remove undefined values
+    const cleanedData = Object.fromEntries(
+      Object.entries(prismaUpdateData).filter(([_, v]) => v !== undefined)
+    );
+
     // Update SPAC
     const updatedSpac = await prisma.spac.update({
       where: { id: spacId },
-      data: updateData,
+      data: cleanedData,
       include: {
         organization: {
           select: { id: true, name: true },
@@ -240,7 +282,7 @@ export async function PUT(
           entityId: spacId,
           userId: session.user.id,
           organizationId: existingSpac.organizationId,
-          changes,
+          metadata: changes,
         },
       });
     }
@@ -297,6 +339,13 @@ export async function DELETE(
     }
 
     // Verify user has admin/owner access
+    if (!existingSpac.organizationId) {
+      return NextResponse.json(
+        { error: 'SPAC has no organization' },
+        { status: 400 }
+      );
+    }
+
     const membership = await prisma.organizationUser.findUnique({
       where: {
         organizationId_userId: {
@@ -318,7 +367,6 @@ export async function DELETE(
       where: { id: spacId },
       data: {
         deletedAt: new Date(),
-        deletedById: session.user.id,
       },
     });
 

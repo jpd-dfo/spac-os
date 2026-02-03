@@ -1,6 +1,19 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+
+import {
+  Users,
+  Building2,
+  Briefcase,
+  TrendingUp,
+  Info,
+  Download,
+  ChevronDown,
+  ChevronRight,
+  Award,
+  AlertCircle,
+} from 'lucide-react';
 import {
   PieChart,
   Pie,
@@ -14,21 +27,10 @@ import {
   YAxis,
   CartesianGrid,
 } from 'recharts';
-import {
-  Users,
-  Building2,
-  Briefcase,
-  TrendingUp,
-  Info,
-  Download,
-  ChevronDown,
-  ChevronRight,
-  Award,
-  AlertCircle,
-} from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { Tooltip as UITooltip } from '@/components/ui/Tooltip';
 import { cn, formatLargeNumber, formatPercent } from '@/lib/utils';
 
@@ -180,9 +182,12 @@ interface ChartTooltipProps {
 }
 
 function ChartTooltip({ active, payload }: ChartTooltipProps) {
-  if (!active || !payload || !payload.length) return null;
+  if (!active || !payload || !payload.length) {return null;}
 
-  const data = payload[0].payload;
+  const firstPayload = payload[0];
+  if (!firstPayload) {return null;}
+
+  const data = firstPayload.payload;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">

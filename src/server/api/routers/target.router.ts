@@ -3,20 +3,25 @@
  * Full CRUD operations for acquisition targets
  */
 
-import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import type { Prisma } from '@prisma/client';
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  orgAuditedProcedure,
-} from '../trpc';
+import { z } from 'zod';
+
 import {
   TargetCreateSchema,
   TargetUpdateSchema,
   TargetFilterSchema,
   UuidSchema,
 } from '@/schemas';
+
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  orgAuditedProcedure,
+} from '../trpc';
+
+import { Prisma } from '@prisma/client';
+
+
 
 export const targetRouter = createTRPCRouter({
   // ============================================================================
@@ -68,7 +73,23 @@ export const targetRouter = createTRPCRouter({
         });
       }
 
-      return target;
+      // Serialize Decimal fields
+      return {
+        ...target,
+        valuation: target.valuation ? Number(target.valuation) : null,
+        enterpriseValue: target.enterpriseValue ? Number(target.enterpriseValue) : null,
+        revenue: target.revenue ? Number(target.revenue) : null,
+        ebitda: target.ebitda ? Number(target.ebitda) : null,
+        evRevenue: target.evRevenue ? Number(target.evRevenue) : null,
+        evEbitda: target.evEbitda ? Number(target.evEbitda) : null,
+        aiScore: target.aiScore ? Number(target.aiScore) : null,
+        overallScore: target.overallScore ? Number(target.overallScore) : null,
+        probability: target.probability ? Number(target.probability) : null,
+        transactions: target.transactions.map((t) => ({
+          ...t,
+          amount: t.amount ? Number(t.amount) : null,
+        })),
+      };
     }),
 
   list: protectedProcedure
@@ -95,11 +116,27 @@ export const targetRouter = createTRPCRouter({
         deletedAt: null,
       };
 
-      if (spacId) where.spacId = spacId;
-      if (status?.length) where.status = { in: status };
-      if (stage?.length) where.stage = { in: stage };
-      if (industry) where.industry = { contains: industry, mode: 'insensitive' };
-      if (sector) where.sector = { contains: sector, mode: 'insensitive' };
+      if (spacId) {where.spacId = spacId;}
+      if (status?.length) {where.status = { in: status };}
+      // Map DealStage schema values to TargetStage Prisma enum values
+      if (stage?.length) {
+        const stageMapping: Record<string, 'SOURCING' | 'SCREENING' | 'PRELIMINARY_DD' | 'FULL_DD' | 'NEGOTIATION' | 'DOCUMENTATION' | 'CLOSING'> = {
+          'ORIGINATION': 'SOURCING',
+          'PRELIMINARY_REVIEW': 'SCREENING',
+          'DEEP_DIVE': 'FULL_DD',
+          'NEGOTIATION': 'NEGOTIATION',
+          'DOCUMENTATION': 'DOCUMENTATION',
+          'CLOSING': 'CLOSING',
+        };
+        const mappedStages = stage
+          .map(s => stageMapping[s])
+          .filter((s): s is 'SOURCING' | 'SCREENING' | 'PRELIMINARY_DD' | 'FULL_DD' | 'NEGOTIATION' | 'DOCUMENTATION' | 'CLOSING' => s !== undefined);
+        if (mappedStages.length) {
+          where.stage = { in: mappedStages };
+        }
+      }
+      if (industry) {where.industry = { contains: industry, mode: 'insensitive' };}
+      if (sector) {where.sector = { contains: sector, mode: 'insensitive' };}
 
       if (search) {
         where.OR = [
@@ -123,7 +160,7 @@ export const targetRouter = createTRPCRouter({
         };
       }
 
-      const [items, total] = await Promise.all([
+      const [rawItems, total] = await Promise.all([
         ctx.db.target.findMany({
           where,
           include: {
@@ -140,6 +177,20 @@ export const targetRouter = createTRPCRouter({
         }),
         ctx.db.target.count({ where }),
       ]);
+
+      // Serialize Decimal fields
+      const items = rawItems.map((target) => ({
+        ...target,
+        valuation: target.valuation ? Number(target.valuation) : null,
+        enterpriseValue: target.enterpriseValue ? Number(target.enterpriseValue) : null,
+        revenue: target.revenue ? Number(target.revenue) : null,
+        ebitda: target.ebitda ? Number(target.ebitda) : null,
+        evRevenue: target.evRevenue ? Number(target.evRevenue) : null,
+        evEbitda: target.evEbitda ? Number(target.evEbitda) : null,
+        aiScore: target.aiScore ? Number(target.aiScore) : null,
+        overallScore: target.overallScore ? Number(target.overallScore) : null,
+        probability: target.probability ? Number(target.probability) : null,
+      }));
 
       return {
         items,
@@ -166,10 +217,51 @@ export const targetRouter = createTRPCRouter({
         }
       }
 
+      // Map stage to valid Prisma TargetStage values
+      const stageMapping: Record<string, 'SOURCING' | 'SCREENING' | 'PRELIMINARY_DD' | 'FULL_DD' | 'NEGOTIATION' | 'DOCUMENTATION' | 'CLOSING'> = {
+        'ORIGINATION': 'SOURCING',
+        'PRELIMINARY_REVIEW': 'SCREENING',
+        'DEEP_DIVE': 'FULL_DD',
+        'NEGOTIATION': 'NEGOTIATION',
+        'DOCUMENTATION': 'DOCUMENTATION',
+        'CLOSING': 'CLOSING',
+      };
+
       const target = await ctx.db.target.create({
         data: {
-          ...input,
+          name: input.name,
+          description: input.description,
+          industry: input.industry,
+          sector: input.sector,
+          status: input.status,
+          stage: input.stage ? stageMapping[input.stage] ?? null : null,
+          valuation: input.enterpriseValue,
+          enterpriseValue: input.enterpriseValue,
+          revenue: input.revenue,
+          ebitda: input.ebitda,
+          evRevenue: input.evRevenue,
+          evEbitda: input.evEbitda,
+          aiScore: input.overallScore,
+          overallScore: input.overallScore,
+          managementScore: input.managementScore,
+          marketScore: input.marketScore,
+          financialScore: input.financialScore,
+          operationalScore: input.operationalScore,
+          riskScore: input.riskScore,
+          priority: input.priority,
+          probability: input.probability,
+          dueDiligenceStatus: input.dueDiligenceStatus ? { status: input.dueDiligenceStatus } : undefined,
+          keyRisks: input.keyRisks,
+          keyOpportunities: input.keyOpportunities,
           identifiedDate: input.identifiedDate || new Date(),
+          ndaDate: input.ndaDate,
+          ndaSignedDate: input.ndaDate,
+          loiDate: input.loiDate,
+          loiSignedDate: input.loiDate,
+          daDate: input.daDate,
+          daSignedDate: input.daDate,
+          expectedCloseDate: input.expectedCloseDate,
+          ...(input.spacId && { spac: { connect: { id: input.spacId } } }),
         },
         include: {
           spac: true,
@@ -196,9 +288,72 @@ export const targetRouter = createTRPCRouter({
         });
       }
 
+      // Map stage to valid Prisma TargetStage values
+      const stageMapping: Record<string, 'SOURCING' | 'SCREENING' | 'PRELIMINARY_DD' | 'FULL_DD' | 'NEGOTIATION' | 'DOCUMENTATION' | 'CLOSING'> = {
+        'ORIGINATION': 'SOURCING',
+        'PRELIMINARY_REVIEW': 'SCREENING',
+        'DEEP_DIVE': 'FULL_DD',
+        'NEGOTIATION': 'NEGOTIATION',
+        'DOCUMENTATION': 'DOCUMENTATION',
+        'CLOSING': 'CLOSING',
+      };
+
+      // Build update data with only valid Prisma fields
+      const updateData: Parameters<typeof ctx.db.target.update>[0]['data'] = {};
+
+      if (input.data.name !== undefined) { updateData.name = input.data.name; }
+      if (input.data.description !== undefined) { updateData.description = input.data.description; }
+      if (input.data.industry !== undefined) { updateData.industry = input.data.industry; }
+      if (input.data.sector !== undefined) { updateData.sector = input.data.sector; }
+      if (input.data.status !== undefined) { updateData.status = input.data.status; }
+      if (input.data.stage !== undefined) { updateData.stage = input.data.stage ? stageMapping[input.data.stage] ?? null : null; }
+      if (input.data.enterpriseValue !== undefined) {
+        updateData.enterpriseValue = input.data.enterpriseValue;
+        updateData.valuation = input.data.enterpriseValue;
+      }
+      if (input.data.revenue !== undefined) { updateData.revenue = input.data.revenue; }
+      if (input.data.ebitda !== undefined) { updateData.ebitda = input.data.ebitda; }
+      if (input.data.evRevenue !== undefined) { updateData.evRevenue = input.data.evRevenue; }
+      if (input.data.evEbitda !== undefined) { updateData.evEbitda = input.data.evEbitda; }
+      if (input.data.overallScore !== undefined) {
+        updateData.overallScore = input.data.overallScore;
+        updateData.aiScore = input.data.overallScore;
+      }
+      if (input.data.managementScore !== undefined) { updateData.managementScore = input.data.managementScore; }
+      if (input.data.marketScore !== undefined) { updateData.marketScore = input.data.marketScore; }
+      if (input.data.financialScore !== undefined) { updateData.financialScore = input.data.financialScore; }
+      if (input.data.operationalScore !== undefined) { updateData.operationalScore = input.data.operationalScore; }
+      if (input.data.riskScore !== undefined) { updateData.riskScore = input.data.riskScore; }
+      if (input.data.priority !== undefined) { updateData.priority = input.data.priority; }
+      if (input.data.probability !== undefined) { updateData.probability = input.data.probability; }
+      if (input.data.dueDiligenceStatus !== undefined) { updateData.dueDiligenceStatus = input.data.dueDiligenceStatus ? { status: input.data.dueDiligenceStatus } : Prisma.JsonNull; }
+      if (input.data.keyRisks !== undefined) { updateData.keyRisks = input.data.keyRisks; }
+      if (input.data.keyOpportunities !== undefined) { updateData.keyOpportunities = input.data.keyOpportunities; }
+      if (input.data.identifiedDate !== undefined) { updateData.identifiedDate = input.data.identifiedDate; }
+      if (input.data.ndaDate !== undefined) {
+        updateData.ndaDate = input.data.ndaDate;
+        updateData.ndaSignedDate = input.data.ndaDate;
+      }
+      if (input.data.loiDate !== undefined) {
+        updateData.loiDate = input.data.loiDate;
+        updateData.loiSignedDate = input.data.loiDate;
+      }
+      if (input.data.daDate !== undefined) {
+        updateData.daDate = input.data.daDate;
+        updateData.daSignedDate = input.data.daDate;
+      }
+      if (input.data.expectedCloseDate !== undefined) { updateData.expectedCloseDate = input.data.expectedCloseDate; }
+      if (input.data.spacId !== undefined) {
+        if (input.data.spacId) {
+          updateData.spac = { connect: { id: input.data.spacId } };
+        } else {
+          updateData.spac = { disconnect: true };
+        }
+      }
+
       const target = await ctx.db.target.update({
         where: { id: input.id },
-        data: input.data,
+        data: updateData,
         include: {
           spac: true,
           contacts: { include: { contact: true } },
@@ -264,11 +419,27 @@ export const targetRouter = createTRPCRouter({
         orderBy: [{ priority: 'asc' }, { probability: 'desc' }],
       });
 
-      // Group by status
-      const pipeline: Record<string, typeof targets> = {};
+      // Group by status and serialize Decimals
+      const pipeline: Record<string, Array<{
+        id: string;
+        name: string;
+        status: string;
+        stage: string | null;
+        priority: number | null;
+        probability: number | null;
+        enterpriseValue: number | null;
+        industry: string | null;
+        spac: { id: string; name: string; ticker: string | null } | null;
+      }>> = {};
+
       for (const target of targets) {
-        if (!pipeline[target.status]) pipeline[target.status] = [];
-        pipeline[target.status].push(target);
+        const status = target.status;
+        if (!pipeline[status]) {pipeline[status] = [];}
+        pipeline[status]!.push({
+          ...target,
+          enterpriseValue: target.enterpriseValue ? Number(target.enterpriseValue) : null,
+          probability: target.probability ? Number(target.probability) : null,
+        });
       }
 
       return pipeline;
@@ -402,9 +573,29 @@ export const targetRouter = createTRPCRouter({
         comparables.reduce((sum, c) => sum + (Number(c.evEbitda) || 0), 0) /
         (comparables.filter((c) => c.evEbitda).length || 1);
 
+      // Serialize Decimals for target
+      const serializedTarget = {
+        ...target,
+        enterpriseValue: target.enterpriseValue ? Number(target.enterpriseValue) : null,
+        revenue: target.revenue ? Number(target.revenue) : null,
+        ebitda: target.ebitda ? Number(target.ebitda) : null,
+        evRevenue: target.evRevenue ? Number(target.evRevenue) : null,
+        evEbitda: target.evEbitda ? Number(target.evEbitda) : null,
+      };
+
+      // Serialize Decimals for comparables
+      const serializedComparables = comparables.map((c) => ({
+        ...c,
+        enterpriseValue: c.enterpriseValue ? Number(c.enterpriseValue) : null,
+        revenue: c.revenue ? Number(c.revenue) : null,
+        ebitda: c.ebitda ? Number(c.ebitda) : null,
+        evRevenue: c.evRevenue ? Number(c.evRevenue) : null,
+        evEbitda: c.evEbitda ? Number(c.evEbitda) : null,
+      }));
+
       return {
-        target,
-        comparables,
+        target: serializedTarget,
+        comparables: serializedComparables,
         industryAverages: {
           evRevenue: avgEvRevenue,
           evEbitda: avgEvEbitda,
@@ -608,6 +799,64 @@ export const targetRouter = createTRPCRouter({
       return { success: true };
     }),
 
+  /**
+   * Update target priority
+   */
+  updatePriority: orgAuditedProcedure
+    .input(z.object({
+      id: UuidSchema,
+      priority: z.number().int().min(1).max(4),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const target = await ctx.db.target.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!target) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Target not found',
+        });
+      }
+
+      const updated = await ctx.db.target.update({
+        where: { id: input.id },
+        data: { priority: input.priority },
+        include: { spac: true },
+      });
+
+      return updated;
+    }),
+
+  /**
+   * Update target stage
+   */
+  updateStage: orgAuditedProcedure
+    .input(z.object({
+      id: UuidSchema,
+      stage: z.enum(['SOURCING', 'SCREENING', 'PRELIMINARY_DD', 'FULL_DD', 'NEGOTIATION', 'DOCUMENTATION', 'CLOSING']),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const target = await ctx.db.target.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!target) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Target not found',
+        });
+      }
+
+      const updated = await ctx.db.target.update({
+        where: { id: input.id },
+        data: { stage: input.stage },
+        include: { spac: true },
+      });
+
+      return updated;
+    }),
+
   // ============================================================================
   // ANALYTICS
   // ============================================================================
@@ -669,9 +918,9 @@ export const targetRouter = createTRPCRouter({
           .filter((i) => i.industry)
           .map((i) => ({ industry: i.industry, count: i._count })),
         averages: {
-          enterpriseValue: avgValuation._avg.enterpriseValue,
-          evRevenue: avgValuation._avg.evRevenue,
-          evEbitda: avgValuation._avg.evEbitda,
+          enterpriseValue: avgValuation._avg.enterpriseValue ? Number(avgValuation._avg.enterpriseValue) : null,
+          evRevenue: avgValuation._avg.evRevenue ? Number(avgValuation._avg.evRevenue) : null,
+          evEbitda: avgValuation._avg.evEbitda ? Number(avgValuation._avg.evEbitda) : null,
         },
         conversionRate,
       };

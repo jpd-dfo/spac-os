@@ -1,7 +1,10 @@
 'use client';
 
+import { useState } from 'react';
+
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+
 import {
   LayoutDashboard,
   Building2,
@@ -14,8 +17,8 @@ import {
   ChevronLeft,
   ChevronRight,
 } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
 
 interface NavItem {
   name: string;

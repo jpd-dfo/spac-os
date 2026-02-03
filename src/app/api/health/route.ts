@@ -4,6 +4,7 @@
  */
 
 import { NextResponse } from 'next/server';
+
 import { prisma } from '@/lib/prisma';
 
 export async function GET() {
@@ -18,7 +19,7 @@ export async function GET() {
     return NextResponse.json({
       status: 'healthy',
       timestamp: new Date().toISOString(),
-      version: process.env.APP_VERSION || '1.0.0',
+      version: process.env['APP_VERSION'] || '1.0.0',
       environment: process.env.NODE_ENV,
       checks: {
         database: 'connected',
@@ -32,7 +33,7 @@ export async function GET() {
       {
         status: 'unhealthy',
         timestamp: new Date().toISOString(),
-        version: process.env.APP_VERSION || '1.0.0',
+        version: process.env['APP_VERSION'] || '1.0.0',
         environment: process.env.NODE_ENV,
         checks: {
           database: 'disconnected',

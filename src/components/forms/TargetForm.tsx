@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { TARGET_STATUS_LABELS, DEAL_STAGE_LABELS, SECTORS } from '@/lib/constants';
 import type { Target, TargetStatus, DealStage } from '@/types';
 
@@ -59,17 +60,17 @@ export function TargetForm({
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = 'Company name is required';
+      newErrors['name'] = 'Company name is required';
     }
 
     if (formData.website && !/^https?:\/\/.+/.test(formData.website)) {
-      newErrors.website = 'Please enter a valid URL';
+      newErrors['website'] = 'Please enter a valid URL';
     }
 
     if (formData.foundedYear) {
       const year = parseInt(formData.foundedYear);
       if (year < 1800 || year > new Date().getFullYear()) {
-        newErrors.foundedYear = 'Please enter a valid year';
+        newErrors['foundedYear'] = 'Please enter a valid year';
       }
     }
 
@@ -80,7 +81,7 @@ export function TargetForm({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validate()) return;
+    if (!validate()) {return;}
 
     const submitData: Partial<Target> = {
       spacId,
@@ -121,7 +122,7 @@ export function TargetForm({
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                error={errors.name}
+                error={errors['name']}
                 placeholder="e.g., TechCorp Inc."
               />
               <Input
@@ -136,7 +137,7 @@ export function TargetForm({
                 name="website"
                 value={formData.website}
                 onChange={handleChange}
-                error={errors.website}
+                error={errors['website']}
                 placeholder="https://www.example.com"
               />
               <Input
@@ -152,7 +153,7 @@ export function TargetForm({
                 type="number"
                 value={formData.foundedYear}
                 onChange={handleChange}
-                error={errors.foundedYear}
+                error={errors['foundedYear']}
                 placeholder="e.g., 2015"
               />
               <Input

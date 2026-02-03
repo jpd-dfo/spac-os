@@ -1,16 +1,18 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import { useRouter, useParams } from 'next/navigation';
-import { useForm } from 'react-hook-form';
+
 import { zodResolver } from '@hookform/resolvers/zod';
-import { z } from 'zod';
-import toast from 'react-hot-toast';
 import { ArrowLeft, Building2, Save, X, Trash2, AlertTriangle } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import { useForm } from 'react-hook-form';
+import toast from 'react-hot-toast';
+import { z } from 'zod';
+
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
 import {
   Modal,
   ModalHeader,
@@ -19,17 +21,22 @@ import {
   ModalBody,
   ModalFooter,
 } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
 import { trpc } from '@/lib/trpc/client';
+import { SpacStatusSchema } from '@/schemas';
 
 // Status options that match the router schema
 const SPAC_STATUS_OPTIONS = [
-  { value: 'PRE_IPO', label: 'Pre-IPO' },
   { value: 'SEARCHING', label: 'Searching' },
   { value: 'LOI_SIGNED', label: 'LOI Signed' },
-  { value: 'DEFINITIVE_AGREEMENT', label: 'Definitive Agreement' },
-  { value: 'VOTE_PENDING', label: 'Vote Pending' },
-  { value: 'DE_SPAC_COMPLETE', label: 'De-SPAC Complete' },
+  { value: 'DA_ANNOUNCED', label: 'DA Announced' },
+  { value: 'SEC_REVIEW', label: 'SEC Review' },
+  { value: 'SHAREHOLDER_VOTE', label: 'Shareholder Vote' },
+  { value: 'CLOSING', label: 'Closing' },
+  { value: 'COMPLETED', label: 'Completed' },
+  { value: 'LIQUIDATING', label: 'Liquidating' },
   { value: 'LIQUIDATED', label: 'Liquidated' },
+  { value: 'TERMINATED', label: 'Terminated' },
 ];
 
 // Zod schema for SPAC form validation (matching the update schema from router)
@@ -42,15 +49,7 @@ const spacFormSchema = z.object({
     .transform((val) => (val ? val.toUpperCase() : val))
     .optional()
     .nullable(),
-  status: z.enum([
-    'PRE_IPO',
-    'SEARCHING',
-    'LOI_SIGNED',
-    'DEFINITIVE_AGREEMENT',
-    'VOTE_PENDING',
-    'DE_SPAC_COMPLETE',
-    'LIQUIDATED',
-  ]),
+  status: SpacStatusSchema,
   trustAmount: z
     .string()
     .optional()
@@ -70,6 +69,7 @@ const spacFormSchema = z.object({
 });
 
 type SpacFormData = z.infer<typeof spacFormSchema>;
+type SpacFormInput = z.input<typeof spacFormSchema>;
 
 // Skeleton component for loading state
 function EditSkeleton() {
@@ -157,7 +157,7 @@ function ErrorState({ error, id }: { error: string; id: string }) {
 export default function EditSPACPage() {
   const router = useRouter();
   const params = useParams();
-  const id = params.id as string;
+  const id = params['id'] as string;
 
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
@@ -210,7 +210,7 @@ export default function EditSPACPage() {
     handleSubmit,
     formState: { errors, isDirty },
     reset,
-  } = useForm<SpacFormData>({
+  } = useForm<SpacFormInput>({
     resolver: zodResolver(spacFormSchema),
     defaultValues: {
       name: '',
@@ -233,16 +233,18 @@ export default function EditSPACPage() {
         trustAmount: spac.trustAmount ? String(spac.trustAmount) : '',
         ipoDate: spac.ipoDate ? new Date(spac.ipoDate).toISOString().split('T')[0] : '',
         deadlineDate: spac.deadlineDate ? new Date(spac.deadlineDate).toISOString().split('T')[0] : '',
-        redemptionRate: spac.redemptionRate ? String(spac.redemptionRate * 100) : '',
+        redemptionRate: spac.redemptionRate ? String(Number(spac.redemptionRate) * 100) : '',
       });
     }
   }, [spac, reset]);
 
-  const onSubmit = async (data: SpacFormData) => {
+  const onSubmit = async (inputData: SpacFormInput) => {
     setIsSubmitting(true);
     setSubmitError(null);
 
     try {
+      // Parse input data to get transformed values
+      const data = spacFormSchema.parse(inputData);
       updateMutation.mutate({
         id,
         name: data.name,

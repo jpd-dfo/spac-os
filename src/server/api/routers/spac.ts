@@ -11,18 +11,10 @@ import {
   protectedProcedure,
 } from '../trpc';
 
+import { SpacStatusSchema } from '@/schemas';
+
 // Input validation schemas
 const UuidSchema = z.string().min(1, 'ID is required');
-
-const SpacStatusSchema = z.enum([
-  'PRE_IPO',
-  'SEARCHING',
-  'LOI_SIGNED',
-  'DEFINITIVE_AGREEMENT',
-  'VOTE_PENDING',
-  'DE_SPAC_COMPLETE',
-  'LIQUIDATED',
-]);
 
 // List input schema with pagination, filtering, and sorting
 const SpacListSchema = z.object({
@@ -78,11 +70,11 @@ export const spacRouter = createTRPCRouter({
       const where: Record<string, unknown> = {};
 
       if (status) {
-        where.status = status;
+        where['status'] = status;
       }
 
       if (search) {
-        where.OR = [
+        where['OR'] = [
           { name: { contains: search, mode: 'insensitive' } },
           { ticker: { contains: search, mode: 'insensitive' } },
         ];
@@ -97,7 +89,7 @@ export const spacRouter = createTRPCRouter({
         : { updatedAt: 'desc' as const };
 
       // Execute query with pagination
-      const [items, total] = await Promise.all([
+      const [rawItems, total] = await Promise.all([
         ctx.db.spac.findMany({
           where,
           include: {
@@ -116,6 +108,16 @@ export const spacRouter = createTRPCRouter({
         }),
         ctx.db.spac.count({ where }),
       ]);
+
+      // Transform Decimal/BigInt fields to serializable types
+      const items = rawItems.map((spac) => ({
+        ...spac,
+        trustAmount: spac.trustAmount ? Number(spac.trustAmount) : null,
+        ipoSize: spac.ipoSize ? Number(spac.ipoSize) : null,
+        trustBalance: spac.trustBalance ? Number(spac.trustBalance) : null,
+        sharesOutstanding: spac.sharesOutstanding ? Number(spac.sharesOutstanding) : null,
+        redemptionRate: spac.redemptionRate ? Number(spac.redemptionRate) : null,
+      }));
 
       const totalPages = Math.ceil(total / limit);
 
@@ -146,7 +148,7 @@ export const spacRouter = createTRPCRouter({
             take: 50,
           },
           filings: {
-            orderBy: { filingDate: 'desc' },
+            orderBy: { filedDate: 'desc' },
             take: 20,
           },
           tasks: {
@@ -179,7 +181,27 @@ export const spacRouter = createTRPCRouter({
         });
       }
 
-      return spac;
+      // Transform Decimal/BigInt fields to serializable types
+      return {
+        ...spac,
+        trustAmount: spac.trustAmount ? Number(spac.trustAmount) : null,
+        ipoSize: spac.ipoSize ? Number(spac.ipoSize) : null,
+        trustBalance: spac.trustBalance ? Number(spac.trustBalance) : null,
+        sharesOutstanding: spac.sharesOutstanding ? Number(spac.sharesOutstanding) : null,
+        redemptionRate: spac.redemptionRate ? Number(spac.redemptionRate) : null,
+        targets: spac.targets.map((t) => ({
+          ...t,
+          valuation: t.valuation ? Number(t.valuation) : null,
+          enterpriseValue: t.enterpriseValue ? Number(t.enterpriseValue) : null,
+          revenue: t.revenue ? Number(t.revenue) : null,
+          ebitda: t.ebitda ? Number(t.ebitda) : null,
+          evRevenue: t.evRevenue ? Number(t.evRevenue) : null,
+          evEbitda: t.evEbitda ? Number(t.evEbitda) : null,
+          aiScore: t.aiScore ? Number(t.aiScore) : null,
+          overallScore: t.overallScore ? Number(t.overallScore) : null,
+          probability: t.probability ? Number(t.probability) : null,
+        })),
+      };
     }),
 
   /**
@@ -348,13 +370,16 @@ export const spacRouter = createTRPCRouter({
 
       // Validate status transition (optional business logic)
       const validTransitions: Record<string, string[]> = {
-        PRE_IPO: ['SEARCHING'],
-        SEARCHING: ['LOI_SIGNED', 'LIQUIDATED'],
-        LOI_SIGNED: ['DEFINITIVE_AGREEMENT', 'SEARCHING', 'LIQUIDATED'],
-        DEFINITIVE_AGREEMENT: ['VOTE_PENDING', 'SEARCHING', 'LIQUIDATED'],
-        VOTE_PENDING: ['DE_SPAC_COMPLETE', 'LIQUIDATED'],
-        DE_SPAC_COMPLETE: [], // Terminal state
+        SEARCHING: ['LOI_SIGNED', 'LIQUIDATING', 'TERMINATED'],
+        LOI_SIGNED: ['DA_ANNOUNCED', 'SEARCHING', 'TERMINATED'],
+        DA_ANNOUNCED: ['SEC_REVIEW', 'SEARCHING', 'TERMINATED'],
+        SEC_REVIEW: ['SHAREHOLDER_VOTE', 'DA_ANNOUNCED', 'TERMINATED'],
+        SHAREHOLDER_VOTE: ['CLOSING', 'TERMINATED'],
+        CLOSING: ['COMPLETED', 'TERMINATED'],
+        COMPLETED: [], // Terminal state
+        LIQUIDATING: ['LIQUIDATED'],
         LIQUIDATED: [], // Terminal state
+        TERMINATED: [], // Terminal state
       };
 
       const allowedNextStatuses = validTransitions[previousStatus] || [];
@@ -428,32 +453,43 @@ export const spacRouter = createTRPCRouter({
         totalCount,
         searchingCount,
         loiSignedCount,
-        daCount,
-        votePendingCount,
+        daAnnouncedCount,
+        secReviewCount,
+        shareholderVoteCount,
+        closingCount,
         completedCount,
+        liquidatingCount,
         liquidatedCount,
+        terminatedCount,
       ] = await Promise.all([
         ctx.db.spac.count(),
         ctx.db.spac.count({ where: { status: 'SEARCHING' } }),
         ctx.db.spac.count({ where: { status: 'LOI_SIGNED' } }),
-        ctx.db.spac.count({ where: { status: 'DEFINITIVE_AGREEMENT' } }),
-        ctx.db.spac.count({ where: { status: 'VOTE_PENDING' } }),
-        ctx.db.spac.count({ where: { status: 'DE_SPAC_COMPLETE' } }),
+        ctx.db.spac.count({ where: { status: 'DA_ANNOUNCED' } }),
+        ctx.db.spac.count({ where: { status: 'SEC_REVIEW' } }),
+        ctx.db.spac.count({ where: { status: 'SHAREHOLDER_VOTE' } }),
+        ctx.db.spac.count({ where: { status: 'CLOSING' } }),
+        ctx.db.spac.count({ where: { status: 'COMPLETED' } }),
+        ctx.db.spac.count({ where: { status: 'LIQUIDATING' } }),
         ctx.db.spac.count({ where: { status: 'LIQUIDATED' } }),
+        ctx.db.spac.count({ where: { status: 'TERMINATED' } }),
       ]);
 
       return {
         total: totalCount,
         byStatus: {
-          PRE_IPO: await ctx.db.spac.count({ where: { status: 'PRE_IPO' } }),
           SEARCHING: searchingCount,
           LOI_SIGNED: loiSignedCount,
-          DEFINITIVE_AGREEMENT: daCount,
-          VOTE_PENDING: votePendingCount,
-          DE_SPAC_COMPLETE: completedCount,
+          DA_ANNOUNCED: daAnnouncedCount,
+          SEC_REVIEW: secReviewCount,
+          SHAREHOLDER_VOTE: shareholderVoteCount,
+          CLOSING: closingCount,
+          COMPLETED: completedCount,
+          LIQUIDATING: liquidatingCount,
           LIQUIDATED: liquidatedCount,
+          TERMINATED: terminatedCount,
         },
-        active: totalCount - liquidatedCount - completedCount,
+        active: totalCount - liquidatedCount - completedCount - terminatedCount,
       };
     }),
 });

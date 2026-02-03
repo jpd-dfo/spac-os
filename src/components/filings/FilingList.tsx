@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+
+import { format, differenceInDays, startOfDay } from 'date-fns';
 import {
   Search,
   Filter,
@@ -21,15 +23,15 @@ import {
   Send,
   RefreshCw,
 } from 'lucide-react';
-import { format, differenceInDays, startOfDay } from 'date-fns';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Dropdown, DropdownItem } from '@/components/ui/Dropdown';
+import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
+import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn, formatDate } from '@/lib/utils';
 import type { FilingType, FilingStatus } from '@/types';
-import { FILING_TYPE_LABELS } from '@/lib/constants';
 
 // ============================================================================
 // TYPES
@@ -282,7 +284,7 @@ export function FilingList({
 
   // Sort indicator component
   const SortIndicator = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return null;
+    if (sortField !== field) {return null;}
     return sortDirection === 'asc' ? (
       <ChevronUp className="ml-1 inline h-3 w-3" />
     ) : (

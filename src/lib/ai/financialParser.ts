@@ -4,6 +4,7 @@
 
 import { getAIClient, type AIRequestOptions } from './client';
 import { SYSTEM_PROMPTS, USER_PROMPTS, AI_CONFIG } from './prompts';
+
 import type {
   FinancialData,
   IncomeStatement,
@@ -476,26 +477,33 @@ export function calculateFinancialRatios(data: FinancialData): FinancialMetrics 
   }
 
   // Calculate balance sheet ratios
-  if (balanceSheet.currentAssets !== null && balanceSheet.currentLiabilities !== null && balanceSheet.currentLiabilities !== 0) {
-    metrics.currentRatio = balanceSheet.currentAssets / balanceSheet.currentLiabilities;
+  const currentAssets = balanceSheet.currentAssets;
+  const currentLiabilities = balanceSheet.currentLiabilities;
+  if (currentAssets != null && currentLiabilities != null && currentLiabilities !== 0) {
+    metrics.currentRatio = currentAssets / currentLiabilities;
   }
-  if (balanceSheet.debt !== null && balanceSheet.totalEquity !== null && balanceSheet.totalEquity !== 0) {
-    metrics.debtToEquity = balanceSheet.debt / balanceSheet.totalEquity;
+  const debt = balanceSheet.debt;
+  const totalEquity = balanceSheet.totalEquity;
+  if (debt != null && totalEquity != null && totalEquity !== 0) {
+    metrics.debtToEquity = debt / totalEquity;
   }
 
   // Calculate return ratios
-  if (incomeStatement.netIncome !== null) {
-    if (balanceSheet.totalEquity !== null && balanceSheet.totalEquity !== 0) {
-      metrics.returnOnEquity = (incomeStatement.netIncome / balanceSheet.totalEquity) * 100;
+  const netIncome = incomeStatement.netIncome;
+  if (netIncome != null) {
+    if (totalEquity != null && totalEquity !== 0) {
+      metrics.returnOnEquity = (netIncome / totalEquity) * 100;
     }
-    if (balanceSheet.totalAssets !== null && balanceSheet.totalAssets !== 0) {
-      metrics.returnOnAssets = (incomeStatement.netIncome / balanceSheet.totalAssets) * 100;
+    const totalAssets = balanceSheet.totalAssets;
+    if (totalAssets != null && totalAssets !== 0) {
+      metrics.returnOnAssets = (netIncome / totalAssets) * 100;
     }
   }
 
   // Asset turnover
-  if (incomeStatement.revenue && balanceSheet.totalAssets !== null && balanceSheet.totalAssets !== 0) {
-    metrics.assetTurnover = incomeStatement.revenue / balanceSheet.totalAssets;
+  const totalAssetsForTurnover = balanceSheet.totalAssets;
+  if (incomeStatement.revenue && totalAssetsForTurnover != null && totalAssetsForTurnover !== 0) {
+    metrics.assetTurnover = incomeStatement.revenue / totalAssetsForTurnover;
   }
 
   return metrics;
@@ -578,8 +586,8 @@ function normalizeCashFlow(data: Partial<CashFlowStatement>): CashFlowStatement 
 }
 
 function normalizeNumber(value: unknown): number | null {
-  if (value === null || value === undefined) return null;
-  if (typeof value === 'number' && !isNaN(value)) return value;
+  if (value === null || value === undefined) {return null;}
+  if (typeof value === 'number' && !isNaN(value)) {return value;}
   if (typeof value === 'string') {
     // Remove currency symbols and commas
     const cleaned = value.replace(/[$,]/g, '').trim();

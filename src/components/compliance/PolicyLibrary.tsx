@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   FileText,
   Search,
@@ -22,11 +23,12 @@ import {
   AlertTriangle,
   Bell,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Input, Textarea } from '@/components/ui/Input';
+import { Modal, ModalHeader, ModalTitle, ModalFooter } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { cn, formatDate } from '@/lib/utils';
 
@@ -561,9 +563,11 @@ export function PolicyLibrary() {
       <Modal
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
-        title={selectedPolicy?.name || 'Policy Details'}
         size="lg"
       >
+        <ModalHeader>
+          <ModalTitle>{selectedPolicy?.name || 'Policy Details'}</ModalTitle>
+        </ModalHeader>
         {selectedPolicy && (
           <div className="space-y-6">
             {/* Header Info */}

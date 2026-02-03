@@ -5,9 +5,9 @@
 // ============================================================================
 
 import { useState } from 'react';
-import { cn } from '@/lib/utils';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import type {
   DocumentAnalysisResult,
   DocumentSummary,
@@ -16,6 +16,7 @@ import type {
   ContractTerms,
   FinancialData
 } from '@/lib/ai/types';
+import { cn } from '@/lib/utils';
 
 // ============================================================================
 // Types
@@ -83,7 +84,7 @@ function RiskSeverityBadge({ severity }: { severity: string }) {
   return (
     <span className={cn(
       'inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-medium',
-      colors[severity] || colors.medium
+      colors[severity] || colors['medium']
     )}>
       {severity.charAt(0).toUpperCase() + severity.slice(1)}
     </span>
@@ -554,8 +555,9 @@ export function DocumentAnalysisResults({
   }
 
   // Set default tab if current tab is not available
-  if (!tabs.find(t => t.id === activeTab) && tabs.length > 0) {
-    setActiveTab(tabs[0].id);
+  const firstTab = tabs[0];
+  if (!tabs.find(t => t.id === activeTab) && firstTab) {
+    setActiveTab(firstTab.id);
   }
 
   return (

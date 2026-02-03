@@ -3,22 +3,25 @@
  * Webhook management and delivery
  */
 
-import { z } from 'zod';
-import { TRPCError } from '@trpc/server';
-import { Prisma } from '@prisma/client';
 import crypto from 'crypto';
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  orgAuditedProcedure,
-  adminProcedure,
-} from '../trpc';
+
+import { type Prisma } from '@prisma/client';
+import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
+
+
 import {
   WebhookCreateSchema,
   UuidSchema,
   PaginationSchema,
   WebhookEventTypeSchema,
 } from '@/schemas';
+
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  orgAuditedProcedure,
+} from '../trpc';
 
 /** Webhook payload structure */
 interface WebhookPayload {
@@ -42,7 +45,7 @@ export const webhookRouter = createTRPCRouter({
       const { organizationId, isActive, page, pageSize } = input;
 
       const where: Prisma.WebhookWhereInput = { organizationId };
-      if (isActive !== undefined) where.isActive = isActive;
+      if (isActive !== undefined) {where.isActive = isActive;}
 
       const [items, total] = await Promise.all([
         ctx.db.webhook.findMany({
@@ -113,7 +116,7 @@ export const webhookRouter = createTRPCRouter({
       }
 
       const webhook = await ctx.db.webhook.create({
-        data: input,
+        data: input as any,
         select: {
           id: true,
           name: true,
@@ -153,7 +156,7 @@ export const webhookRouter = createTRPCRouter({
 
       const webhook = await ctx.db.webhook.update({
         where: { id: input.id },
-        data: input.data,
+        data: input.data as any,
         select: {
           id: true,
           name: true,
@@ -230,7 +233,7 @@ export const webhookRouter = createTRPCRouter({
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Webhook not found' });
       }
 
-      const eventType = input.eventType || webhook.events[0];
+      const eventType = input.eventType || webhook.events[0] || 'TEST';
       const payload = {
         event: eventType,
         timestamp: new Date().toISOString(),
@@ -267,7 +270,7 @@ export const webhookRouter = createTRPCRouter({
           data: {
             webhookId: webhook.id,
             eventType,
-            payload,
+            payload: payload as any,
             statusCode: response.status,
             response: responseText.slice(0, 1000),
             deliveredAt: new Date(),
@@ -291,7 +294,7 @@ export const webhookRouter = createTRPCRouter({
           data: {
             webhookId: webhook.id,
             eventType,
-            payload,
+            payload: payload as any,
             duration,
             success: false,
             error: errorMessage,
@@ -319,7 +322,7 @@ export const webhookRouter = createTRPCRouter({
       const { webhookId, success, page, pageSize } = input;
 
       const where: Prisma.WebhookDeliveryWhereInput = { webhookId };
-      if (success !== undefined) where.success = success;
+      if (success !== undefined) {where.success = success;}
 
       const [items, total] = await Promise.all([
         ctx.db.webhookDelivery.findMany({
@@ -356,7 +359,7 @@ export const webhookRouter = createTRPCRouter({
         });
       }
 
-      const payload = delivery.payload as WebhookPayload;
+      const payload = delivery.payload as unknown as WebhookPayload;
       const signature = crypto
         .createHmac('sha256', delivery.webhook.secret)
         .update(JSON.stringify(payload))

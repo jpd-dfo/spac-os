@@ -1,7 +1,11 @@
-import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
+
 import { ClerkProvider } from '@clerk/nextjs';
 import { Toaster } from 'react-hot-toast';
+
+import { TRPCProvider } from '@/lib/trpc/provider';
+
+import type { Metadata } from 'next';
 import '@/styles/globals.css';
 
 const inter = Inter({
@@ -27,7 +31,9 @@ export default function RootLayout({
     <ClerkProvider>
       <html lang="en" className={inter.variable}>
         <body className="min-h-screen bg-gray-50 font-sans antialiased">
-          {children}
+          <TRPCProvider>
+            {children}
+          </TRPCProvider>
           <Toaster
             position="top-right"
             toastOptions={{

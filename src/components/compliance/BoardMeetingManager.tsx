@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   Calendar,
   Clock,
@@ -16,11 +17,12 @@ import {
   MapPin,
   Download,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Input, Textarea } from '@/components/ui/Input';
+import { Modal, ModalHeader, ModalTitle, ModalFooter } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
 
@@ -473,9 +475,11 @@ export function BoardMeetingManager() {
       <Modal
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
-        title={selectedMeeting?.title || 'Meeting Details'}
         size="full"
       >
+        <ModalHeader>
+          <ModalTitle>{selectedMeeting?.title || 'Meeting Details'}</ModalTitle>
+        </ModalHeader>
         {selectedMeeting && (
           <div>
             {/* Meeting Info */}

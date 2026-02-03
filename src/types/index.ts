@@ -10,15 +10,16 @@
 // ============================================================================
 
 export type SPACStatus =
-  | 'PRE_IPO'
   | 'SEARCHING'
   | 'LOI_SIGNED'
   | 'DA_ANNOUNCED'
-  | 'PROXY_FILED'
-  | 'VOTE_SCHEDULED'
+  | 'SEC_REVIEW'
+  | 'SHAREHOLDER_VOTE'
   | 'CLOSING'
   | 'COMPLETED'
-  | 'LIQUIDATED';
+  | 'LIQUIDATING'
+  | 'LIQUIDATED'
+  | 'TERMINATED';
 
 export type SPACPhase =
   | 'FORMATION'

@@ -1,6 +1,9 @@
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
+
 import Link from 'next/link';
+
 import {
   Building2,
   MoreHorizontal,
@@ -10,13 +13,14 @@ import {
   Pencil,
   Trash2,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
-import { SpacStatusBadge } from './SpacStatusBadge';
-import { formatLargeNumber, formatDate, daysUntil, cn } from '@/lib/utils';
+import { Card, CardContent } from '@/components/ui/Card';
 import { SPAC_PHASE_LABELS } from '@/lib/constants';
+import { formatLargeNumber, formatDate, daysUntil, cn } from '@/lib/utils';
 import type { SPACStatus, SPACPhase } from '@/types';
-import { useState, useRef, useEffect } from 'react';
+
+import { SpacStatusBadge } from './SpacStatusBadge';
 
 interface SpacCardProps {
   spac: {

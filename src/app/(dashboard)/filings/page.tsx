@@ -1,6 +1,7 @@
 'use client';
 
 import { FileText, Calendar, AlertTriangle, Clock, MessageSquare, TrendingUp } from 'lucide-react';
+
 import { Card, CardContent } from '@/components/ui/Card';
 
 export default function FilingsPage() {

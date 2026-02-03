@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+
+import { format, differenceInDays, differenceInBusinessDays } from 'date-fns';
 import {
   FileText,
   Calendar,
@@ -19,15 +21,15 @@ import {
   Send,
   X,
 } from 'lucide-react';
-import { format, differenceInDays, differenceInBusinessDays } from 'date-fns';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { Textarea } from '@/components/ui/Input';
+import { FILING_DEFINITIONS, type ChecklistItem, type ChecklistItemStatus } from '@/lib/compliance/complianceRules';
+import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
 import type { FilingType, FilingStatus } from '@/types';
-import { FILING_TYPE_LABELS } from '@/lib/constants';
-import { FILING_DEFINITIONS, type ChecklistItem, type ChecklistItemStatus } from '@/lib/compliance/complianceRules';
 
 // ============================================================================
 // TYPES

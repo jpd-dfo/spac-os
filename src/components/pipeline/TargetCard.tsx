@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   MoreHorizontal,
   TrendingUp,
@@ -14,10 +15,11 @@ import {
   Star,
   AlertTriangle,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/Badge';
+
 import { Avatar } from '@/components/ui/Avatar';
-import { Tooltip } from '@/components/ui/Tooltip';
+import { Badge } from '@/components/ui/Badge';
 import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel } from '@/components/ui/Dropdown';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { cn, formatLargeNumber } from '@/lib/utils';
 
 // ============================================================================
@@ -46,10 +48,15 @@ export interface Target {
   description?: string;
   headquarters?: string;
   revenue?: number;
+  revenueGrowth?: number;
   ebitda?: number;
+  ebitdaMargin?: number;
+  grossMargin?: number;
   employeeCount?: number;
   source?: 'inbound' | 'referral' | 'research' | 'banker';
   tags?: string[];
+  investmentHighlights?: string[];
+  keyRisks?: string[];
   lastActivityDate?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -69,8 +76,11 @@ interface TargetCardProps {
   target: Target;
   isDragging?: boolean;
   isOverlay?: boolean;
+  isSelected?: boolean;
+  showCheckbox?: boolean;
   onClick?: (target: Target) => void;
   onQuickAction?: (target: Target, action: QuickAction) => void;
+  onSelectionChange?: (target: Target, selected: boolean) => void;
 }
 
 // ============================================================================
@@ -79,16 +89,16 @@ interface TargetCardProps {
 
 function ScoreIndicator({ score }: { score: number }) {
   const getColor = (value: number) => {
-    if (value >= 80) return 'bg-success-500';
-    if (value >= 60) return 'bg-primary-500';
-    if (value >= 40) return 'bg-warning-500';
+    if (value >= 80) {return 'bg-success-500';}
+    if (value >= 60) {return 'bg-primary-500';}
+    if (value >= 40) {return 'bg-warning-500';}
     return 'bg-danger-500';
   };
 
   const getLabel = (value: number) => {
-    if (value >= 80) return 'Excellent';
-    if (value >= 60) return 'Good';
-    if (value >= 40) return 'Fair';
+    if (value >= 80) {return 'Excellent';}
+    if (value >= 60) {return 'Good';}
+    if (value >= 40) {return 'Fair';}
     return 'Poor';
   };
 
@@ -108,7 +118,7 @@ function ScoreIndicator({ score }: { score: number }) {
 }
 
 function PriorityIndicator({ priority }: { priority: Target['priority'] }) {
-  if (!priority || priority === 'medium') return null;
+  if (!priority || priority === 'medium') {return null;}
 
   const config = {
     low: { color: 'text-slate-400', icon: null, label: 'Low Priority' },
@@ -118,7 +128,7 @@ function PriorityIndicator({ priority }: { priority: Target['priority'] }) {
 
   const { color, icon: Icon, label } = config[priority] || {};
 
-  if (!Icon) return null;
+  if (!Icon) {return null;}
 
   return (
     <Tooltip content={label}>
@@ -129,9 +139,9 @@ function PriorityIndicator({ priority }: { priority: Target['priority'] }) {
 
 function DaysInStageBadge({ days }: { days: number }) {
   const getVariant = (d: number) => {
-    if (d <= 7) return 'success';
-    if (d <= 21) return 'secondary';
-    if (d <= 45) return 'warning';
+    if (d <= 7) {return 'success';}
+    if (d <= 21) {return 'secondary';}
+    if (d <= 45) {return 'warning';}
     return 'danger';
   };
 
@@ -175,8 +185,11 @@ export function TargetCard({
   target,
   isDragging = false,
   isOverlay = false,
+  isSelected = false,
+  showCheckbox = false,
   onClick,
   onQuickAction,
+  onSelectionChange,
 }: TargetCardProps) {
   const [isHovered, setIsHovered] = useState(false);
 
@@ -187,6 +200,15 @@ export function TargetCard({
     onClick?.(target);
   };
 
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    onSelectionChange?.(target, e.target.checked);
+  };
+
+  const handleCheckboxClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+  };
+
   const handleQuickAction = (action: QuickAction) => {
     onQuickAction?.(target, action);
   };
@@ -194,10 +216,12 @@ export function TargetCard({
   return (
     <div
       className={cn(
-        'group rounded-lg border bg-white shadow-sm transition-all duration-200',
+        'group relative rounded-lg border bg-white shadow-sm transition-all duration-200',
         isDragging
           ? 'border-primary-300 shadow-lg ring-2 ring-primary-200'
-          : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
+          : isSelected
+            ? 'border-primary-400 bg-primary-50/50 ring-1 ring-primary-200'
+            : 'border-slate-200 hover:border-slate-300 hover:shadow-md',
         isOverlay && 'rotate-2 scale-105',
         onClick && 'cursor-pointer'
       )}
@@ -205,8 +229,27 @@ export function TargetCard({
       onMouseEnter={() => setIsHovered(true)}
       onMouseLeave={() => setIsHovered(false)}
     >
+      {/* Selection Checkbox */}
+      {showCheckbox && (
+        <div
+          data-no-click
+          className={cn(
+            'absolute left-2 top-2 z-10 transition-opacity duration-200',
+            isHovered || isSelected ? 'opacity-100' : 'opacity-0'
+          )}
+          onClick={handleCheckboxClick}
+        >
+          <input
+            type="checkbox"
+            checked={isSelected}
+            onChange={handleCheckboxChange}
+            className="h-4 w-4 cursor-pointer rounded border-slate-300 text-primary-600 focus:ring-primary-500 focus:ring-offset-0"
+          />
+        </div>
+      )}
+
       {/* Card Header */}
-      <div className="p-4">
+      <div className={cn('p-4', showCheckbox && 'pl-8')}>
         <div className="mb-3 flex items-start justify-between gap-2">
           {/* Company Info */}
           <div className="flex items-start gap-3 min-w-0 flex-1">
@@ -273,7 +316,7 @@ export function TargetCard({
               <DropdownItem
                 icon={<Archive className="h-4 w-4" />}
                 onClick={() => handleQuickAction('archive')}
-                danger
+                variant="danger"
               >
                 Archive
               </DropdownItem>
@@ -391,6 +434,8 @@ interface TargetCardCompactProps {
   onClick?: (target: Target) => void;
   onQuickAction?: (target: Target, action: QuickAction) => void;
   selected?: boolean;
+  showCheckbox?: boolean;
+  onSelectionChange?: (target: Target, selected: boolean) => void;
 }
 
 export function TargetCardCompact({
@@ -398,7 +443,14 @@ export function TargetCardCompact({
   onClick,
   onQuickAction,
   selected = false,
+  showCheckbox = false,
+  onSelectionChange,
 }: TargetCardCompactProps) {
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    e.stopPropagation();
+    onSelectionChange?.(target, e.target.checked);
+  };
+
   return (
     <div
       className={cn(
@@ -410,6 +462,17 @@ export function TargetCardCompact({
       )}
       onClick={() => onClick?.(target)}
     >
+      {/* Selection Checkbox */}
+      {showCheckbox && (
+        <div onClick={(e) => e.stopPropagation()}>
+          <input
+            type="checkbox"
+            checked={selected}
+            onChange={handleCheckboxChange}
+            className="h-4 w-4 cursor-pointer rounded border-slate-300 text-primary-600 focus:ring-primary-500 focus:ring-offset-0"
+          />
+        </div>
+      )}
       {/* Logo */}
       <div className={cn(
         'flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-lg',

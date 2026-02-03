@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect } from 'react';
+
 import {
   Search,
   X,
@@ -14,9 +15,11 @@ import {
   Folder,
   SlidersHorizontal,
 } from 'lucide-react';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { cn, formatRelativeTime } from '@/lib/utils';
+
 import type { DocumentData } from './DocumentCard';
 
 interface SearchFilters {
@@ -184,7 +187,7 @@ export function DocumentSearch({
     (selectedDateRange ? 1 : 0);
 
   const highlightMatch = (text: string, query: string) => {
-    if (!query) return text;
+    if (!query) {return text;}
     const regex = new RegExp(`(${query})`, 'gi');
     const parts = text.split(regex);
     return parts.map((part, i) =>
@@ -338,9 +341,9 @@ export function DocumentSearch({
           <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
             {/* File Type */}
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 File Type
-              </label>
+              </span>
               <div className="mt-2 flex flex-wrap gap-2">
                 {fileTypes.map((type) => (
                   <button
@@ -359,9 +362,9 @@ export function DocumentSearch({
 
             {/* Status */}
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Status
-              </label>
+              </span>
               <div className="mt-2 flex flex-wrap gap-2">
                 {statuses.map((status) => (
                   <button
@@ -382,11 +385,12 @@ export function DocumentSearch({
 
             {/* Date Range */}
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <label htmlFor="date-range-filter" className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Date Modified
               </label>
               <div className="mt-2">
                 <select
+                  id="date-range-filter"
                   value={selectedDateRange}
                   onChange={(e) => setSelectedDateRange(e.target.value)}
                   className="w-full rounded-md border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700"
@@ -403,11 +407,12 @@ export function DocumentSearch({
 
             {/* Owner */}
             <div>
-              <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+              <label htmlFor="owner-filter" className="text-xs font-semibold uppercase tracking-wider text-slate-400">
                 Owner
               </label>
               <div className="mt-2">
                 <select
+                  id="owner-filter"
                   value={filters.owners[0] || ''}
                   onChange={(e) =>
                     setFilters((prev) => ({
@@ -430,9 +435,9 @@ export function DocumentSearch({
 
           {/* Category Filter */}
           <div className="mt-4">
-            <label className="text-xs font-semibold uppercase tracking-wider text-slate-400">
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-400">
               Category
-            </label>
+            </span>
             <div className="mt-2 flex flex-wrap gap-2">
               {categories.map((category) => (
                 <button

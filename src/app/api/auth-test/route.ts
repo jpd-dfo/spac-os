@@ -1,5 +1,6 @@
-import { auth, currentUser } from '@clerk/nextjs/server';
 import { NextResponse } from 'next/server';
+
+import { auth, currentUser } from '@clerk/nextjs/server';
 
 export async function GET() {
   const { userId, sessionId } = await auth();

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   CheckCircle2,
   Clock,
@@ -13,9 +14,10 @@ import {
   Calendar,
   Search,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { cn, formatDate } from '@/lib/utils';
@@ -451,7 +453,7 @@ export function ComplianceChecklist() {
         <div className="space-y-4">
           {(['SEC', 'Exchange', 'Corporate', 'Tax'] as ChecklistCategory[]).map((category) => {
             const items = groupedItems[category] || [];
-            if (items.length === 0) return null;
+            if (items.length === 0) {return null;}
 
             const categoryComplete = items.filter((i) => i.status === 'Complete').length;
             const isExpanded = expandedCategories.has(category);

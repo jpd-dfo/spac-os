@@ -709,7 +709,7 @@ export const TransactionUpdateSchema = TransactionCreateSchema.partial().omit({ 
 // TASK SCHEMAS
 // ============================================================================
 
-export const TaskCreateSchema = z.object({
+const TaskBaseSchema = z.object({
   spacId: UuidSchema.optional().nullable(),
   targetId: UuidSchema.optional().nullable(),
   filingId: UuidSchema.optional().nullable(),
@@ -730,12 +730,14 @@ export const TaskCreateSchema = z.object({
   recurrenceRule: z.string().max(255).optional().nullable(), // iCal RRULE format
   blockedBy: z.array(UuidSchema).default([]),
   metadata: z.record(z.unknown()).optional().default({}),
-}).refine(
+});
+
+export const TaskCreateSchema = TaskBaseSchema.refine(
   (data) => !data.startDate || !data.dueDate || data.startDate <= data.dueDate,
   { message: 'Start date must be before or equal to due date' }
 );
 
-export const TaskUpdateSchema = TaskCreateSchema.partial().omit({ createdById: true });
+export const TaskUpdateSchema = TaskBaseSchema.partial().omit({ createdById: true });
 
 // ============================================================================
 // MILESTONE SCHEMAS

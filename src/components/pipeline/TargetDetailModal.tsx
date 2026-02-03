@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   X,
   Building2,
@@ -27,12 +28,14 @@ import {
   BarChart3,
   Activity,
 } from 'lucide-react';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+
 import { Avatar } from '@/components/ui/Avatar';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Modal, ModalFooter } from '@/components/ui/Modal';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn, formatLargeNumber, formatDate, formatRelativeTime } from '@/lib/utils';
+
 import type { Target, PipelineStage, TargetAssignee } from './TargetCard';
 
 // ============================================================================
@@ -149,9 +152,9 @@ function MetricCard({ label, value, subValue, trend }: { label: string; value: s
 function ScoreBar({ label, score, maxScore = 100 }: { label: string; score: number; maxScore?: number }) {
   const percentage = (score / maxScore) * 100;
   const getColor = (p: number) => {
-    if (p >= 80) return 'bg-success-500';
-    if (p >= 60) return 'bg-primary-500';
-    if (p >= 40) return 'bg-warning-500';
+    if (p >= 80) {return 'bg-success-500';}
+    if (p >= 60) {return 'bg-primary-500';}
+    if (p >= 40) {return 'bg-warning-500';}
     return 'bg-danger-500';
   };
 
@@ -286,7 +289,7 @@ export function TargetDetailModal({
 }: TargetDetailModalProps) {
   const [activeTab, setActiveTab] = useState<TabId>('overview');
 
-  if (!target) return null;
+  if (!target) {return null;}
 
   const stageLabels: Record<PipelineStage, string> = {
     sourcing: 'Sourcing',

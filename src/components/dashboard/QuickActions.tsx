@@ -1,7 +1,9 @@
 'use client';
 
 import { ReactNode } from 'react';
+
 import Link from 'next/link';
+
 import {
   Plus,
   Target,
@@ -12,12 +14,13 @@ import {
   Users,
   Settings,
   ChevronRight,
-  LucideIcon,
+  type LucideIcon,
   BarChart3,
   ClipboardList,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
 
 // ============================================================================

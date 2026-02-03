@@ -6,9 +6,11 @@
 'use client';
 
 import { useState } from 'react';
+
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { httpBatchLink, loggerLink } from '@trpc/client';
 import superjson from 'superjson';
+
 import { trpc } from './client';
 
 /**
@@ -21,12 +23,12 @@ function getBaseUrl() {
   }
 
   // SSR should use absolute URL
-  if (process.env.VERCEL_URL) {
-    return `https://${process.env.VERCEL_URL}`;
+  if (process.env['VERCEL_URL']) {
+    return `https://${process.env['VERCEL_URL']}`;
   }
 
   // Fallback to localhost
-  return `http://localhost:${process.env.PORT ?? 3000}`;
+  return `http://localhost:${process.env['PORT'] ?? 3000}`;
 }
 
 /**
@@ -47,8 +49,9 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
       })
   );
 
-  const [trpcClient] = useState(() =>
-    trpc.createClient({
+  const [trpcClient] = useState(() => {
+    return trpc.createClient({
+      transformer: superjson,
       links: [
         loggerLink({
           enabled: (opts) =>
@@ -57,7 +60,6 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
         }),
         httpBatchLink({
           url: `${getBaseUrl()}/api/trpc`,
-          transformer: superjson,
           headers() {
             return {
               'x-trpc-source': 'react',
@@ -65,8 +67,8 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
           },
         }),
       ],
-    })
-  );
+    });
+  });
 
   return (
     <trpc.Provider client={trpcClient} queryClient={queryClient}>

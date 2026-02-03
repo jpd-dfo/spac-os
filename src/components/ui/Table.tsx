@@ -1,8 +1,10 @@
 'use client';
 
 import { useState, useCallback, createContext, useContext, useId } from 'react';
-import { cn } from '@/lib/utils';
+
 import { ChevronUp, ChevronDown, ChevronsUpDown } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
 
 // ============================================================================
 // TABLE CONTEXT (FOR ROW SELECTION)

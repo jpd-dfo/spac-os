@@ -1,7 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import { useParams, useRouter } from 'next/navigation';
+
 import {
   ArrowLeft,
   Mail,
@@ -12,7 +14,6 @@ import {
   Calendar,
   Star,
   Edit,
-  Trash2,
   ExternalLink,
   MoreHorizontal,
   Clock,
@@ -24,11 +25,7 @@ import {
   TrendingUp,
   Share2,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { Avatar } from '@/components/ui/Avatar';
-import { cn, formatDate, formatRelativeTime } from '@/lib/utils';
+
 import {
   InteractionLog,
   RelationshipGraph,
@@ -37,6 +34,11 @@ import {
   type ExtendedContact,
   type ContactCategory,
 } from '@/components/contacts';
+import { Avatar } from '@/components/ui/Avatar';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { cn, formatDate, formatRelativeTime } from '@/lib/utils';
 
 function getCategoryColor(category: ContactCategory): string {
   const colors: Record<ContactCategory, string> = {
@@ -53,23 +55,23 @@ function getCategoryColor(category: ContactCategory): string {
 }
 
 function getRelationshipColor(score: number): string {
-  if (score >= 80) return 'text-green-600';
-  if (score >= 60) return 'text-amber-600';
-  if (score >= 40) return 'text-orange-600';
+  if (score >= 80) {return 'text-green-600';}
+  if (score >= 60) {return 'text-amber-600';}
+  if (score >= 40) {return 'text-orange-600';}
   return 'text-red-600';
 }
 
 function getRelationshipBgColor(score: number): string {
-  if (score >= 80) return 'bg-green-500';
-  if (score >= 60) return 'bg-amber-500';
-  if (score >= 40) return 'bg-orange-500';
+  if (score >= 80) {return 'bg-green-500';}
+  if (score >= 60) {return 'bg-amber-500';}
+  if (score >= 40) {return 'bg-orange-500';}
   return 'bg-red-500';
 }
 
 function getRelationshipLabel(score: number): string {
-  if (score >= 80) return 'Strong';
-  if (score >= 60) return 'Good';
-  if (score >= 40) return 'Developing';
+  if (score >= 80) {return 'Strong';}
+  if (score >= 60) {return 'Good';}
+  if (score >= 40) {return 'Developing';}
   return 'New';
 }
 
@@ -81,13 +83,13 @@ export default function ContactDetailPage() {
   const [activeSection, setActiveSection] = useState<'activity' | 'deals' | 'documents' | 'notes' | 'network'>('activity');
 
   useEffect(() => {
-    const id = params.id as string;
+    const id = params['id'] as string;
     const foundContact = getContactById(id);
     if (foundContact) {
       setContact(foundContact);
       setIsStarred(foundContact.isStarred || false);
     }
-  }, [params.id]);
+  }, [params['id']]);
 
   if (!contact) {
     return (

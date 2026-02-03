@@ -4,6 +4,7 @@
 
 import { getAIClient, type AIRequestOptions } from './client';
 import { SYSTEM_PROMPTS, USER_PROMPTS, AI_CONFIG } from './prompts';
+
 import type {
   RiskAnalysis,
   RiskItem,
@@ -602,11 +603,11 @@ function calculateRisksBySeverity(risks: RiskItem[]): Record<RiskSeverity, numbe
 }
 
 function determineOverallRiskLevel(risks: RiskItem[]): RiskSeverity {
-  if (risks.some((r) => r.severity === 'critical')) return 'critical';
-  if (risks.filter((r) => r.severity === 'high').length >= 3) return 'critical';
-  if (risks.some((r) => r.severity === 'high')) return 'high';
-  if (risks.filter((r) => r.severity === 'medium').length >= 5) return 'high';
-  if (risks.some((r) => r.severity === 'medium')) return 'medium';
+  if (risks.some((r) => r.severity === 'critical')) {return 'critical';}
+  if (risks.filter((r) => r.severity === 'high').length >= 3) {return 'critical';}
+  if (risks.some((r) => r.severity === 'high')) {return 'high';}
+  if (risks.filter((r) => r.severity === 'medium').length >= 5) {return 'high';}
+  if (risks.some((r) => r.severity === 'medium')) {return 'medium';}
   return 'low';
 }
 
@@ -623,10 +624,10 @@ function generateRiskSummary(risks: RiskItem[]): string {
   const parts: string[] = [];
   parts.push(`Identified ${risks.length} total risk${risks.length === 1 ? '' : 's'}.`);
 
-  if (critical > 0) parts.push(`${critical} critical`);
-  if (high > 0) parts.push(`${high} high`);
-  if (medium > 0) parts.push(`${medium} medium`);
-  if (low > 0) parts.push(`${low} low`);
+  if (critical > 0) {parts.push(`${critical} critical`);}
+  if (high > 0) {parts.push(`${high} high`);}
+  if (medium > 0) {parts.push(`${medium} medium`);}
+  if (low > 0) {parts.push(`${low} low`);}
 
   return parts.join(', ') + ' severity.';
 }

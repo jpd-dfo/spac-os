@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+
 import {
   Target,
   ArrowRight,
@@ -13,8 +14,9 @@ import {
   Handshake,
   FileSignature,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatLargeNumber } from '@/lib/utils';
 
 // ============================================================================
@@ -399,7 +401,9 @@ export function DealPipelineWidget({
         {/* Conversion Rates */}
         <div className="flex items-center justify-between rounded-lg bg-slate-50 p-3">
           {stages.slice(0, -1).map((stage, index) => {
-            const conversionKey = `${stage.toLowerCase()}To${stages[index + 1].charAt(0) + stages[index + 1].slice(1).toLowerCase()}` as keyof typeof data.conversionRates;
+            const nextStage = stages[index + 1];
+            if (!nextStage) { return null; }
+            const conversionKey = `${stage.toLowerCase()}To${nextStage.charAt(0) + nextStage.slice(1).toLowerCase()}` as keyof typeof data.conversionRates;
             const rate = data.conversionRates[conversionKey];
             const config = stageConfig[stage];
 

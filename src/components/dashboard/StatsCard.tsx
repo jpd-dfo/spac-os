@@ -1,7 +1,9 @@
 'use client';
 
-import { ReactNode } from 'react';
-import { ArrowUpRight, ArrowDownRight, Minus, LucideIcon } from 'lucide-react';
+import { type ReactNode } from 'react';
+
+import { ArrowUpRight, ArrowDownRight, Minus, type LucideIcon } from 'lucide-react';
+
 import { Card, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
 

@@ -1,10 +1,11 @@
 'use client';
 
 import { useState } from 'react';
+
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { Input, Textarea } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { SPAC_STATUS_LABELS, SPAC_PHASE_LABELS, SECTORS, GEOGRAPHIES } from '@/lib/constants';
 import type { SPAC, SPACStatus, SPACPhase } from '@/types';
 
@@ -19,7 +20,7 @@ export function SPACForm({ initialData, onSubmit, onCancel, isLoading }: SPACFor
   const [formData, setFormData] = useState({
     name: initialData?.name || '',
     ticker: initialData?.ticker || '',
-    status: initialData?.status || 'PRE_IPO',
+    status: initialData?.status || 'SEARCHING',
     phase: initialData?.phase || 'FORMATION',
     description: initialData?.description || '',
     investmentThesis: initialData?.investmentThesis || '',
@@ -56,13 +57,13 @@ export function SPACForm({ initialData, onSubmit, onCancel, isLoading }: SPACFor
     const newErrors: Record<string, string> = {};
 
     if (!formData.name.trim()) {
-      newErrors.name = 'Name is required';
+      newErrors['name'] = 'Name is required';
     }
 
     if (!formData.ticker.trim()) {
-      newErrors.ticker = 'Ticker is required';
+      newErrors['ticker'] = 'Ticker is required';
     } else if (!/^[A-Z]{3,5}$/i.test(formData.ticker)) {
-      newErrors.ticker = 'Ticker must be 3-5 letters';
+      newErrors['ticker'] = 'Ticker must be 3-5 letters';
     }
 
     setErrors(newErrors);
@@ -72,7 +73,7 @@ export function SPACForm({ initialData, onSubmit, onCancel, isLoading }: SPACFor
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validate()) return;
+    if (!validate()) {return;}
 
     const submitData: Partial<SPAC> = {
       name: formData.name,
@@ -107,7 +108,7 @@ export function SPACForm({ initialData, onSubmit, onCancel, isLoading }: SPACFor
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                error={errors.name}
+                error={errors['name']}
                 placeholder="e.g., Alpha Acquisition Corp"
               />
               <Input
@@ -115,7 +116,7 @@ export function SPACForm({ initialData, onSubmit, onCancel, isLoading }: SPACFor
                 name="ticker"
                 value={formData.ticker}
                 onChange={handleChange}
-                error={errors.ticker}
+                error={errors['ticker']}
                 placeholder="e.g., ALPH"
                 className="uppercase"
               />
@@ -213,9 +214,9 @@ export function SPACForm({ initialData, onSubmit, onCancel, isLoading }: SPACFor
               />
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <span className="mb-2 block text-sm font-medium text-slate-700">
                   Target Sectors
-                </label>
+                </span>
                 <div className="flex flex-wrap gap-2">
                   {SECTORS.map((sector) => (
                     <button
@@ -235,9 +236,9 @@ export function SPACForm({ initialData, onSubmit, onCancel, isLoading }: SPACFor
               </div>
 
               <div>
-                <label className="mb-2 block text-sm font-medium text-slate-700">
+                <span className="mb-2 block text-sm font-medium text-slate-700">
                   Target Geographies
-                </label>
+                </span>
                 <div className="flex flex-wrap gap-2">
                   {GEOGRAPHIES.map((geo) => (
                     <button

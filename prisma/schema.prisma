@@ -388,6 +388,7 @@ model Spac {
   insiderWindows   InsiderTradingWindow[]
   secComments      SecComment[]
   webhooks         Webhook[]
+  notes            Note[]
 
   @@index([organizationId])
   @@index([status])
@@ -455,6 +456,7 @@ model Target {
   tasks        Task[]
   contacts     TargetContact[]
   transactions Transaction[]
+  notes        Note[]
 
   @@index([spacId])
   @@index([status])
@@ -515,6 +517,13 @@ model Document {
   aiSummary       String?        @db.Text
   aiExtractedData Json?
 
+  // Versioning
+  version         Int            @default(1)
+  parentId        String?
+  parent          Document?      @relation("DocumentVersions", fields: [parentId], references: [id])
+  versions        Document[]     @relation("DocumentVersions")
+  isLatest        Boolean        @default(true)
+
   // Soft delete
   deletedAt       DateTime?
 
@@ -531,6 +540,9 @@ model Document {
   @@index([spacId])
   @@index([targetId])
   @@index([type])
+  @@index([parentId])
+  @@index([name, spacId])
+  @@index([name, targetId])
   @@map("documents")
 }
 
@@ -1143,4 +1155,24 @@ model AuditLog {
   @@index([action])
   @@index([createdAt])
   @@map("audit_logs")
+}
+
+/// Note - Notes attached to targets or SPACs
+model Note {
+  id        String   @id @default(uuid())
+  content   String   @db.Text
+  targetId  String?
+  spacId    String?
+  createdBy String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  target    Target?  @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  spac      Spac?    @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  @@index([targetId])
+  @@index([spacId])
+  @@index([createdAt])
+  @@map("notes")
 }

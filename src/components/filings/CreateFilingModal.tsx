@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+
+import { format, addDays, addBusinessDays } from 'date-fns';
 import {
   X,
   FileText,
@@ -15,13 +17,13 @@ import {
   Upload,
   Info,
 } from 'lucide-react';
-import { format, addDays, addBusinessDays } from 'date-fns';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { FILING_DEFINITIONS } from '@/lib/compliance/complianceRules';
+import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { FilingType } from '@/types';
-import { FILING_TYPE_LABELS } from '@/lib/constants';
-import { FILING_DEFINITIONS } from '@/lib/compliance/complianceRules';
 
 // ============================================================================
 // TYPES
@@ -128,7 +130,7 @@ export function CreateFilingModal({
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   const selectedFilingDef = formData.type ? FILING_DEFINITIONS[formData.type] : null;
 
@@ -136,13 +138,13 @@ export function CreateFilingModal({
     const newErrors: Record<string, string> = {};
 
     if (stepNum === 1) {
-      if (!formData.type) newErrors.type = 'Please select a filing type';
-      if (!formData.spacId) newErrors.spacId = 'Please select a SPAC';
+      if (!formData.type) {newErrors['type'] = 'Please select a filing type';}
+      if (!formData.spacId) {newErrors['spacId'] = 'Please select a SPAC';}
     }
 
     if (stepNum === 2) {
-      if (!formData.title?.trim()) newErrors.title = 'Title is required';
-      if (!formData.dueDate) newErrors.dueDate = 'Due date is required';
+      if (!formData.title?.trim()) {newErrors['title'] = 'Title is required';}
+      if (!formData.dueDate) {newErrors['dueDate'] = 'Due date is required';}
     }
 
     setErrors(newErrors);
@@ -210,7 +212,10 @@ export function CreateFilingModal({
 
   const toggleReminder = (index: number) => {
     const reminders = [...(formData.reminders || DEFAULT_REMINDERS)];
-    reminders[index] = { ...reminders[index], enabled: !reminders[index].enabled };
+    const current = reminders[index];
+    if (current) {
+      reminders[index] = { days: current.days, enabled: !current.enabled };
+    }
     setFormData({ ...formData, reminders });
   };
 
@@ -250,15 +255,16 @@ export function CreateFilingModal({
           {step === 1 && (
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="spac-select" className="block text-sm font-medium text-slate-700 mb-2">
                   Select SPAC <span className="text-danger-500">*</span>
                 </label>
                 <select
+                  id="spac-select"
                   value={formData.spacId}
                   onChange={(e) => setFormData({ ...formData, spacId: e.target.value })}
                   className={cn(
                     'w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500',
-                    errors.spacId ? 'border-danger-300' : 'border-slate-200'
+                    errors['spacId'] ? 'border-danger-300' : 'border-slate-200'
                   )}
                 >
                   <option value="">Select a SPAC...</option>
@@ -268,17 +274,17 @@ export function CreateFilingModal({
                     </option>
                   ))}
                 </select>
-                {errors.spacId && (
-                  <p className="mt-1 text-sm text-danger-500">{errors.spacId}</p>
+                {errors['spacId'] && (
+                  <p className="mt-1 text-sm text-danger-500">{errors['spacId']}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <span className="block text-sm font-medium text-slate-700 mb-2">
                   Filing Type <span className="text-danger-500">*</span>
-                </label>
-                {errors.type && (
-                  <p className="mb-2 text-sm text-danger-500">{errors.type}</p>
+                </span>
+                {errors['type'] && (
+                  <p className="mb-2 text-sm text-danger-500">{errors['type']}</p>
                 )}
                 <div className="grid gap-2 sm:grid-cols-2">
                   {FILING_TYPES.map((type) => {
@@ -359,29 +365,31 @@ export function CreateFilingModal({
           {step === 2 && (
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="filing-title" className="block text-sm font-medium text-slate-700 mb-2">
                   Filing Title <span className="text-danger-500">*</span>
                 </label>
                 <input
+                  id="filing-title"
                   type="text"
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                   placeholder="Enter filing title..."
                   className={cn(
                     'w-full rounded-md border px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500',
-                    errors.title ? 'border-danger-300' : 'border-slate-200'
+                    errors['title'] ? 'border-danger-300' : 'border-slate-200'
                   )}
                 />
-                {errors.title && (
-                  <p className="mt-1 text-sm text-danger-500">{errors.title}</p>
+                {errors['title'] && (
+                  <p className="mt-1 text-sm text-danger-500">{errors['title']}</p>
                 )}
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="filing-description" className="block text-sm font-medium text-slate-700 mb-2">
                   Description
                 </label>
                 <textarea
+                  id="filing-description"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Add a description..."
@@ -392,31 +400,33 @@ export function CreateFilingModal({
 
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label htmlFor="filing-due-date" className="block text-sm font-medium text-slate-700 mb-2">
                     Due Date <span className="text-danger-500">*</span>
                   </label>
                   <div className="relative">
                     <Calendar className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                     <input
+                      id="filing-due-date"
                       type="date"
                       value={formData.dueDate ? format(formData.dueDate, 'yyyy-MM-dd') : ''}
                       onChange={(e) => setFormData({ ...formData, dueDate: new Date(e.target.value) })}
                       className={cn(
                         'w-full rounded-md border pl-10 pr-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500',
-                        errors.dueDate ? 'border-danger-300' : 'border-slate-200'
+                        errors['dueDate'] ? 'border-danger-300' : 'border-slate-200'
                       )}
                     />
                   </div>
-                  {errors.dueDate && (
-                    <p className="mt-1 text-sm text-danger-500">{errors.dueDate}</p>
+                  {errors['dueDate'] && (
+                    <p className="mt-1 text-sm text-danger-500">{errors['dueDate']}</p>
                   )}
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-slate-700 mb-2">
+                  <label htmlFor="filing-priority" className="block text-sm font-medium text-slate-700 mb-2">
                     Priority
                   </label>
                   <select
+                    id="filing-priority"
                     value={formData.priority}
                     onChange={(e) =>
                       setFormData({
@@ -437,9 +447,9 @@ export function CreateFilingModal({
 
               {/* Attachments */}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <span className="block text-sm font-medium text-slate-700 mb-2">
                   Attachments
-                </label>
+                </span>
                 <div className="rounded-lg border-2 border-dashed border-slate-200 p-4">
                   <div className="text-center">
                     <Upload className="mx-auto h-8 w-8 text-slate-400" />
@@ -486,11 +496,12 @@ export function CreateFilingModal({
           {step === 3 && (
             <div className="space-y-6">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <label htmlFor="filing-assignee" className="block text-sm font-medium text-slate-700 mb-2">
                   <User className="inline h-4 w-4 mr-1" />
                   Assign Responsible Party
                 </label>
                 <select
+                  id="filing-assignee"
                   value={formData.assigneeId}
                   onChange={(e) => setFormData({ ...formData, assigneeId: e.target.value })}
                   className="w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
@@ -505,10 +516,10 @@ export function CreateFilingModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <span className="block text-sm font-medium text-slate-700 mb-2">
                   <Users className="inline h-4 w-4 mr-1" />
                   Add Reviewers
-                </label>
+                </span>
                 <div className="grid gap-2 sm:grid-cols-2">
                   {teamMembers.map((member) => {
                     const isSelected = formData.reviewerIds?.includes(member.id);
@@ -550,10 +561,10 @@ export function CreateFilingModal({
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-2">
+                <span className="block text-sm font-medium text-slate-700 mb-2">
                   <Bell className="inline h-4 w-4 mr-1" />
                   Set Reminders
-                </label>
+                </span>
                 <div className="space-y-2">
                   {(formData.reminders || DEFAULT_REMINDERS).map((reminder, index) => (
                     <label

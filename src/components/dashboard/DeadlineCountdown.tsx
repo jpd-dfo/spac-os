@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo, useCallback } from 'react';
+
 import {
   Clock,
   AlertTriangle,
@@ -10,9 +11,10 @@ import {
   CheckCircle2,
   XCircle,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatDate, daysUntil, isPastDate } from '@/lib/utils';
 
 // ============================================================================
@@ -96,14 +98,14 @@ function getDeadlineStatus(
   warningDays: number = 30,
   criticalDays: number = 14
 ): DeadlineStatus {
-  if (isCompleted) return 'completed';
+  if (isCompleted) {return 'completed';}
 
   const days = daysUntil(deadlineDate);
-  if (days === null) return 'upcoming';
+  if (days === null) {return 'upcoming';}
 
-  if (days < 0) return 'overdue';
-  if (days <= criticalDays) return 'critical';
-  if (days <= warningDays) return 'warning';
+  if (days < 0) {return 'overdue';}
+  if (days <= criticalDays) {return 'critical';}
+  if (days <= warningDays) {return 'warning';}
   return 'upcoming';
 }
 

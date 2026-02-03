@@ -1,20 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
-import {
-  AreaChart,
-  Area,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  BarChart,
-  Bar,
-  Cell,
-} from 'recharts';
+
 import {
   Building2,
   TrendingUp,
@@ -31,9 +18,24 @@ import {
   ArrowDownRight,
   Info,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+import {
+  AreaChart,
+  Area,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  LineChart,
+  Line,
+  BarChart,
+  Bar,
+  Cell,
+} from 'recharts';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { Tooltip as UITooltip } from '@/components/ui/Tooltip';
 import { cn, formatCurrency, formatLargeNumber, formatDate, formatPercent } from '@/lib/utils';
 
@@ -190,7 +192,7 @@ interface ChartTooltipProps {
 }
 
 function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
-  if (!active || !payload || !payload.length) return null;
+  if (!active || !payload || !payload.length) {return null;}
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   Folder,
   FolderOpen,
@@ -21,6 +22,7 @@ import {
   ScrollText,
   ClipboardList,
 } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 
 export interface FolderItem {
@@ -278,7 +280,7 @@ export function FolderTree({
 
   // Filter folders based on search query
   const filterFolders = (folders: FolderItem[], query: string): FolderItem[] => {
-    if (!query) return folders;
+    if (!query) {return folders;}
 
     return folders.reduce<FolderItem[]>((acc, folder) => {
       const matchesQuery = folder.name.toLowerCase().includes(query.toLowerCase());

@@ -4,6 +4,7 @@
 
 import { getClaudeClient } from './claude';
 import { SYSTEM_PROMPTS, USER_PROMPTS, AI_CONFIG } from './prompts';
+
 import type { AIResponse, AIResponseMetadata, AIError } from './types';
 
 // ============================================================================
@@ -277,7 +278,8 @@ export async function analyzeCommentLetter(
     }>(response.content);
 
     // Extract letter date and calculate response deadline
-    const letterDate = extractDateFromText(commentLetterText) || new Date().toISOString().split('T')[0];
+    const currentDateStr = new Date().toISOString().split('T')[0] ?? new Date().toISOString().substring(0, 10);
+    const letterDate = extractDateFromText(commentLetterText) || currentDateStr;
     const responseDeadline = new Date(letterDate);
     responseDeadline.setDate(responseDeadline.getDate() + 10); // Standard 10-day response
 
@@ -766,14 +768,14 @@ Return as JSON:
 function formatSpacInfo(info: Record<string, any>): string {
   const lines: string[] = [];
 
-  if (info.name) lines.push(`SPAC Name: ${info.name}`);
-  if (info.ticker) lines.push(`Ticker: ${info.ticker}`);
-  if (info.status) lines.push(`Status: ${info.status}`);
-  if (info.fiscalYearEnd) lines.push(`Fiscal Year End: ${info.fiscalYearEnd}`);
-  if (info.ipoDate) lines.push(`IPO Date: ${formatDate(info.ipoDate)}`);
-  if (info.daAnnouncedDate) lines.push(`DA Announced: ${formatDate(info.daAnnouncedDate)}`);
-  if (info.proxyFiledDate) lines.push(`Proxy Filed: ${formatDate(info.proxyFiledDate)}`);
-  if (info.targetCloseDate) lines.push(`Target Close: ${formatDate(info.targetCloseDate)}`);
+  if (info['name']) {lines.push(`SPAC Name: ${info['name']}`);}
+  if (info['ticker']) {lines.push(`Ticker: ${info['ticker']}`);}
+  if (info['status']) {lines.push(`Status: ${info['status']}`);}
+  if (info['fiscalYearEnd']) {lines.push(`Fiscal Year End: ${info['fiscalYearEnd']}`);}
+  if (info['ipoDate']) {lines.push(`IPO Date: ${formatDate(info['ipoDate'])}`);}
+  if (info['daAnnouncedDate']) {lines.push(`DA Announced: ${formatDate(info['daAnnouncedDate'])}`);}
+  if (info['proxyFiledDate']) {lines.push(`Proxy Filed: ${formatDate(info['proxyFiledDate'])}`);}
+  if (info['targetCloseDate']) {lines.push(`Target Close: ${formatDate(info['targetCloseDate'])}`);}
 
   return lines.join('\n');
 }
@@ -782,8 +784,9 @@ function formatSpacInfo(info: Record<string, any>): string {
  * Format date
  */
 function formatDate(date: Date | string): string {
-  if (typeof date === 'string') return date;
-  return date.toISOString().split('T')[0];
+  if (typeof date === 'string') {return date;}
+  const isoString = date.toISOString();
+  return isoString.split('T')[0] ?? isoString.substring(0, 10);
 }
 
 /**
@@ -798,10 +801,11 @@ function extractDateFromText(text: string): string | null {
 
   for (const pattern of datePatterns) {
     const match = text.match(pattern);
-    if (match) {
+    if (match && match[0]) {
       const date = new Date(match[0]);
       if (!isNaN(date.getTime())) {
-        return date.toISOString().split('T')[0];
+        const isoString = date.toISOString();
+        return isoString.split('T')[0] ?? isoString.substring(0, 10);
       }
     }
   }
@@ -832,8 +836,8 @@ function normalizeFilingDeadlines(
     );
 
     let status: FilingDeadline['status'] = 'upcoming';
-    if (daysRemaining < 0) status = 'overdue';
-    else if (daysRemaining <= 7) status = 'due_soon';
+    if (daysRemaining < 0) {status = 'overdue';}
+    else if (daysRemaining <= 7) {status = 'due_soon';}
 
     return {
       id: d.id || `dl-${index + 1}`,
@@ -854,10 +858,10 @@ function normalizeFilingDeadlines(
  * Determine priority based on days remaining
  */
 function determinePriority(daysRemaining: number): 'low' | 'medium' | 'high' | 'critical' {
-  if (daysRemaining < 0) return 'critical';
-  if (daysRemaining <= 3) return 'critical';
-  if (daysRemaining <= 7) return 'high';
-  if (daysRemaining <= 30) return 'medium';
+  if (daysRemaining < 0) {return 'critical';}
+  if (daysRemaining <= 3) {return 'critical';}
+  if (daysRemaining <= 7) {return 'high';}
+  if (daysRemaining <= 30) {return 'medium';}
   return 'low';
 }
 
@@ -922,13 +926,14 @@ function normalizeDisclosureStatus(
  * Normalize violations
  */
 function normalizeViolations(violations: Partial<PolicyViolation>[]): PolicyViolation[] {
+  const defaultDate = new Date().toISOString().substring(0, 10);
   return violations.map((v, index) => ({
     id: v.id || `v-${index + 1}`,
     policy: v.policy || '',
     violation: v.violation || '',
     severity: normalizeViolationSeverity(v.severity),
-    date: v.date || new Date().toISOString().split('T')[0],
-    involvedParties: v.involvedParties,
+    date: v.date || defaultDate,
+    involvedParties: v.involvedParties || [],
     remediation: v.remediation || '',
     status: v.status || 'open',
   }));

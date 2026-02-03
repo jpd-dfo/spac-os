@@ -2,7 +2,8 @@
 // SPAC OS AI Chat API Endpoint
 // ============================================================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
+
 import { getClaudeClient, type ClaudeMessage } from '@/lib/ai/claude';
 import { SYSTEM_PROMPTS, AI_CONFIG } from '@/lib/ai/prompts';
 import { logger } from '@/lib/logger';
@@ -50,10 +51,10 @@ Guidelines:
 
   if (context) {
     prompt += '\nCurrent Context:\n';
-    if (context.page) prompt += `- User is on: ${context.page}\n`;
-    if (context.spacId) prompt += `- Working with SPAC ID: ${context.spacId}\n`;
-    if (context.targetId) prompt += `- Viewing Target ID: ${context.targetId}\n`;
-    if (context.documentId) prompt += `- Analyzing Document ID: ${context.documentId}\n`;
+    if (context.page) {prompt += `- User is on: ${context.page}\n`;}
+    if (context.spacId) {prompt += `- Working with SPAC ID: ${context.spacId}\n`;}
+    if (context.targetId) {prompt += `- Viewing Target ID: ${context.targetId}\n`;}
+    if (context.documentId) {prompt += `- Analyzing Document ID: ${context.documentId}\n`;}
   }
 
   return prompt;

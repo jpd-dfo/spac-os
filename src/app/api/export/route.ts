@@ -3,12 +3,14 @@
  * Handles data export in various formats (CSV, Excel, JSON)
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
+
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
-import { authOptions } from '@/lib/auth';
 import { z } from 'zod';
+
+import { authOptions } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { prisma } from '@/lib/prisma';
 
 const ExportRequestSchema = z.object({
   organizationId: z.string().uuid(),
@@ -85,7 +87,7 @@ export async function POST(request: NextRequest) {
           where: {
             organizationId: params.organizationId,
             deletedAt: null,
-            ...(filters.status && { status: filters.status }),
+            ...(filters.status && { status: filters.status as any }),
             ...(filters.startDate && { createdAt: { gte: filters.startDate } }),
             ...(filters.endDate && { createdAt: { lte: filters.endDate } }),
           },
@@ -101,7 +103,7 @@ export async function POST(request: NextRequest) {
             spac: { organizationId: params.organizationId },
             deletedAt: null,
             ...(filters.spacId && { spacId: filters.spacId }),
-            ...(filters.status && { status: filters.status }),
+            ...(filters.status && { status: filters.status as any }),
           },
           include: {
             spac: { select: { name: true, ticker: true } },
@@ -115,7 +117,7 @@ export async function POST(request: NextRequest) {
             spac: { organizationId: params.organizationId },
             deletedAt: null,
             ...(filters.spacId && { spacId: filters.spacId }),
-            ...(filters.status && { status: filters.status }),
+            ...(filters.status && { status: filters.status as any }),
           },
           include: {
             spac: { select: { name: true, ticker: true } },
@@ -133,7 +135,6 @@ export async function POST(request: NextRequest) {
           },
           include: {
             spac: { select: { name: true, ticker: true } },
-            uploadedBy: { select: { name: true, email: true } },
           },
         });
         break;
@@ -143,7 +144,7 @@ export async function POST(request: NextRequest) {
           where: {
             spac: { organizationId: params.organizationId },
             ...(filters.spacId && { spacId: filters.spacId }),
-            ...(filters.status && { status: filters.status }),
+            ...(filters.status && { status: filters.status as any }),
           },
           include: {
             spac: { select: { name: true, ticker: true } },
@@ -156,7 +157,7 @@ export async function POST(request: NextRequest) {
           where: {
             spac: { organizationId: params.organizationId },
             ...(filters.spacId && { spacId: filters.spacId }),
-            ...(filters.status && { status: filters.status }),
+            ...(filters.status && { status: filters.status as any }),
           },
           include: {
             spac: { select: { name: true, ticker: true } },
@@ -167,13 +168,12 @@ export async function POST(request: NextRequest) {
       case 'transactions':
         data = await prisma.transaction.findMany({
           where: {
-            spac: { organizationId: params.organizationId },
-            ...(filters.spacId && { spacId: filters.spacId }),
+            target: { spac: { organizationId: params.organizationId } },
             ...(filters.startDate && { date: { gte: filters.startDate } }),
             ...(filters.endDate && { date: { lte: filters.endDate } }),
           },
           include: {
-            spac: { select: { name: true, ticker: true } },
+            target: { select: { name: true, spac: { select: { name: true, ticker: true } } } },
           },
         });
         break;
@@ -225,6 +225,7 @@ export async function POST(request: NextRequest) {
       data: {
         action: 'EXPORT',
         entityType: params.entityType,
+        entityId: params.organizationId, // Use organizationId as entity reference for bulk exports
         userId: session.user.id,
         organizationId: params.organizationId,
         metadata: {

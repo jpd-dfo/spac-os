@@ -1,7 +1,9 @@
 'use client';
 
 import { useMemo } from 'react';
+
 import Link from 'next/link';
+
 import {
   Calendar,
   Clock,
@@ -12,10 +14,11 @@ import {
   Target,
   Users,
   DollarSign,
-  LucideIcon,
+  type LucideIcon,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatDate, daysUntil } from '@/lib/utils';
 
 // ============================================================================
@@ -211,21 +214,21 @@ export const mockUpcomingDeadlines: DeadlineItem[] = [
 // ============================================================================
 
 function getStatusBadgeVariant(status: DeadlineStatus, daysRemaining: number | null): 'success' | 'warning' | 'danger' | 'secondary' {
-  if (status === 'COMPLETED') return 'success';
-  if (status === 'OVERDUE' || (daysRemaining !== null && daysRemaining < 0)) return 'danger';
-  if (status === 'DUE_SOON' || (daysRemaining !== null && daysRemaining <= 14)) return 'warning';
+  if (status === 'COMPLETED') {return 'success';}
+  if (status === 'OVERDUE' || (daysRemaining !== null && daysRemaining < 0)) {return 'danger';}
+  if (status === 'DUE_SOON' || (daysRemaining !== null && daysRemaining <= 14)) {return 'warning';}
   return 'secondary';
 }
 
 function getStatusLabel(status: DeadlineStatus, daysRemaining: number | null): string {
-  if (status === 'COMPLETED') return 'Completed';
+  if (status === 'COMPLETED') {return 'Completed';}
   if (status === 'OVERDUE' || (daysRemaining !== null && daysRemaining < 0)) {
     return `Overdue by ${Math.abs(daysRemaining || 0)} days`;
   }
-  if (daysRemaining === 0) return 'Due Today';
-  if (daysRemaining === 1) return 'Due Tomorrow';
-  if (daysRemaining !== null && daysRemaining <= 7) return `${daysRemaining} days left`;
-  if (daysRemaining !== null && daysRemaining <= 30) return `${daysRemaining} days`;
+  if (daysRemaining === 0) {return 'Due Today';}
+  if (daysRemaining === 1) {return 'Due Tomorrow';}
+  if (daysRemaining !== null && daysRemaining <= 7) {return `${daysRemaining} days left`;}
+  if (daysRemaining !== null && daysRemaining <= 30) {return `${daysRemaining} days`;}
   return formatDate(new Date(Date.now() + (daysRemaining || 0) * 24 * 60 * 60 * 1000));
 }
 

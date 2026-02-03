@@ -1,18 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import {
-  PieChart,
-  Pie,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  BarChart,
-  Bar,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-} from 'recharts';
+
 import {
   Users,
   DollarSign,
@@ -29,9 +18,22 @@ import {
   Plus,
   Filter,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+import {
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+} from 'recharts';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { Tooltip as UITooltip } from '@/components/ui/Tooltip';
 import { cn, formatLargeNumber, formatPercent, formatDate, formatCurrency } from '@/lib/utils';
 
@@ -209,9 +211,12 @@ interface ChartTooltipProps {
 }
 
 function ChartTooltip({ active, payload }: ChartTooltipProps) {
-  if (!active || !payload || !payload.length) return null;
+  if (!active || !payload || !payload.length) {return null;}
 
-  const data = payload[0].payload;
+  const firstPayload = payload[0];
+  if (!firstPayload) {return null;}
+
+  const data = firstPayload.payload;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
@@ -423,7 +428,7 @@ export function PIPETracker({
 
   // Filtered investors
   const filteredInvestors = useMemo(() => {
-    if (statusFilter === 'all') return investors;
+    if (statusFilter === 'all') {return investors;}
     return investors.filter((i) => i.subscriptionStatus === statusFilter);
   }, [investors, statusFilter]);
 

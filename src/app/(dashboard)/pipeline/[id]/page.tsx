@@ -1,19 +1,18 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, useCallback, useMemo } from 'react';
+
+import Image from 'next/image';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import {
   ArrowLeft,
   Building2,
-  TrendingUp,
   Users,
   MapPin,
   Calendar,
-  DollarSign,
   FileText,
   MessageSquare,
-  Clock,
   CheckCircle2,
   AlertCircle,
   ChevronRight,
@@ -25,17 +24,34 @@ import {
   Globe,
   BarChart3,
   Activity,
-  Plus,
   MoreHorizontal,
   LinkIcon,
+  Loader2,
+  Plus,
+  Flag,
+  Search,
+  FileSignature,
+  Sparkles,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+import toast from 'react-hot-toast';
+
+import { UploadModal } from '@/components/documents/UploadModal';
+import { TargetForm } from '@/components/forms/TargetForm';
+import { AIResearchPanel } from '@/components/pipeline/AIResearchPanel';
+import { AIScoreCard } from '@/components/pipeline/AIScoreCard';
+import { InvestmentMemo } from '@/components/pipeline/InvestmentMemo';
 import { Avatar } from '@/components/ui/Avatar';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
+import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel } from '@/components/ui/Dropdown';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Textarea } from '@/components/ui/Input';
+import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '@/components/ui/Modal';
 import { Tooltip } from '@/components/ui/Tooltip';
-import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
-import { cn, formatLargeNumber, formatDate, formatRelativeTime } from '@/lib/utils';
+import { trpc } from '@/lib/trpc/client';
+import { cn, formatLargeNumber, formatDate, formatRelativeTime, formatFileSize } from '@/lib/utils';
+import type { Target, TargetStatus } from '@/types';
 
 // ============================================================================
 // Types
@@ -139,10 +155,142 @@ interface TargetDetails {
 }
 
 // ============================================================================
-// Mock Data
+// Data Transformation Utilities
 // ============================================================================
 
-const MOCK_TARGET: TargetDetails = {
+// Map database status to UI pipeline stage
+function mapStatusToStage(status: string): PipelineStage {
+  const statusToStageMap: Record<string, PipelineStage> = {
+    'IDENTIFIED': 'sourcing',
+    'PRELIMINARY': 'sourcing',
+    'RESEARCHING': 'sourcing',
+    'OUTREACH': 'initial_screening',
+    'NDA_SIGNED': 'initial_screening',
+    'DUE_DILIGENCE': 'deep_evaluation',
+    'TERM_SHEET': 'deep_evaluation',
+    'LOI_SIGNED': 'deep_evaluation',
+    'LOI': 'negotiation',
+    'DEFINITIVE': 'execution',
+    'DA_SIGNED': 'execution',
+    'CLOSING': 'execution',
+    'CLOSED': 'closed_passed',
+    'COMPLETED': 'closed_passed',
+    'PASSED': 'closed_passed',
+    'TERMINATED': 'closed_passed',
+  };
+  return statusToStageMap[status] || 'sourcing';
+}
+
+// Schema TargetStatus type for mutations
+type SchemaTargetStatus = 'IDENTIFIED' | 'PRELIMINARY' | 'NDA_SIGNED' | 'DUE_DILIGENCE' | 'TERM_SHEET' | 'LOI' | 'DEFINITIVE' | 'CLOSED' | 'PASSED' | 'TERMINATED';
+
+// Map UI stage to database status for mutations
+function mapStageToStatus(stage: PipelineStage): SchemaTargetStatus {
+  const stageToStatusMap: Record<PipelineStage, SchemaTargetStatus> = {
+    'sourcing': 'IDENTIFIED',
+    'initial_screening': 'NDA_SIGNED',
+    'deep_evaluation': 'DUE_DILIGENCE',
+    'negotiation': 'LOI',
+    'execution': 'DEFINITIVE',
+    'closed_passed': 'PASSED',
+  };
+  return stageToStatusMap[stage] || 'IDENTIFIED';
+}
+
+// Map priority number to string
+function mapPriorityToString(priority: number | null): 'low' | 'medium' | 'high' | 'critical' | undefined {
+  if (priority === null) {
+    return undefined;
+  }
+  if (priority <= 1) {
+    return 'critical';
+  }
+  if (priority <= 2) {
+    return 'high';
+  }
+  if (priority <= 3) {
+    return 'medium';
+  }
+  return 'low';
+}
+
+// Calculate days in stage from dates
+function calculateDaysInStage(updatedAt: Date | string | null): number {
+  if (!updatedAt) {
+    return 0;
+  }
+  const date = new Date(updatedAt);
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - date.getTime());
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+// Transform database target to UI TargetDetails format
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformDbTargetToDetails(dbTarget: any): TargetDetails {
+  return {
+    id: dbTarget.id,
+    name: dbTarget.name,
+    industry: dbTarget.industry || 'Unknown',
+    subIndustry: dbTarget.sector || undefined,
+    description: dbTarget.description || undefined,
+    headquarters: dbTarget.headquarters || undefined,
+    website: dbTarget.website || undefined,
+    foundedYear: dbTarget.foundedYear || undefined,
+    employeeCount: dbTarget.employeeCount || undefined,
+    stage: mapStatusToStage(dbTarget.status),
+    priority: mapPriorityToString(dbTarget.priority),
+    source: 'research', // Default - not in DB
+    enterpriseValue: dbTarget.enterpriseValue || 0,
+    equityValue: dbTarget.equityValue || undefined,
+    revenue: dbTarget.revenue || undefined,
+    revenueGrowth: undefined, // Not directly in DB
+    ebitda: dbTarget.ebitda || undefined,
+    ebitdaMargin: dbTarget.ebitda && dbTarget.revenue
+      ? Math.round((dbTarget.ebitda / dbTarget.revenue) * 100)
+      : undefined,
+    evaluationScore: dbTarget.overallScore ? Math.round(dbTarget.overallScore * 10) : 50,
+    managementScore: dbTarget.managementScore ? dbTarget.managementScore * 10 : undefined,
+    marketScore: dbTarget.marketScore ? dbTarget.marketScore * 10 : undefined,
+    financialScore: dbTarget.financialScore ? dbTarget.financialScore * 10 : undefined,
+    operationalScore: dbTarget.operationalScore ? dbTarget.operationalScore * 10 : undefined,
+    riskScore: dbTarget.riskScore ? dbTarget.riskScore * 10 : undefined,
+    daysInStage: calculateDaysInStage(dbTarget.updatedAt),
+    assignee: undefined, // Would need user assignment system
+    associatedSpac: dbTarget.spac ? {
+      id: dbTarget.spac.id,
+      name: dbTarget.spac.name,
+      ticker: dbTarget.spac.ticker || '',
+    } : undefined,
+    tags: dbTarget.tags || [],
+    investmentHighlights: dbTarget.keyOpportunities || [],
+    keyRisks: dbTarget.keyRisks || [],
+    keyContacts: dbTarget.contacts?.map((c: { contact: { id: string; name: string; title?: string; email?: string; phone?: string } }) => ({
+      id: c.contact.id,
+      name: c.contact.name,
+      title: c.contact.title || '',
+      email: c.contact.email,
+      phone: c.contact.phone,
+    })) || [],
+    documents: dbTarget.documents?.map((d: { id: string; name: string; type?: string; fileSize?: number; createdAt: string }) => ({
+      id: d.id,
+      name: d.name,
+      type: d.type || 'Unknown',
+      size: d.fileSize ? `${Math.round(d.fileSize / 1024)} KB` : 'Unknown',
+      uploadedAt: new Date(d.createdAt),
+      uploadedBy: 'System',
+    })) || [],
+    activities: [], // Would need activity log system
+    createdAt: new Date(dbTarget.createdAt),
+    updatedAt: new Date(dbTarget.updatedAt),
+  };
+}
+
+// ============================================================================
+// Legacy Mock Data (kept for reference - to be deleted)
+// ============================================================================
+
+const _MOCK_TARGET_DEPRECATED: TargetDetails = {
   id: '7',
   name: 'OrthoInnovate',
   industry: 'Medical Devices',
@@ -236,9 +384,9 @@ const MOCK_TARGET: TargetDetails = {
 function ScoreBar({ label, score, maxScore = 100 }: { label: string; score: number; maxScore?: number }) {
   const percentage = (score / maxScore) * 100;
   const getColor = (p: number) => {
-    if (p >= 80) return 'bg-success-500';
-    if (p >= 60) return 'bg-primary-500';
-    if (p >= 40) return 'bg-warning-500';
+    if (p >= 80) {return 'bg-success-500';}
+    if (p >= 60) {return 'bg-primary-500';}
+    if (p >= 40) {return 'bg-warning-500';}
     return 'bg-danger-500';
   };
 
@@ -256,6 +404,42 @@ function ScoreBar({ label, score, maxScore = 100 }: { label: string; score: numb
   );
 }
 
+function getTrendColorClass(trend?: 'up' | 'down' | 'neutral'): string {
+  if (trend === 'up') {
+    return 'text-success-600';
+  }
+  if (trend === 'down') {
+    return 'text-danger-600';
+  }
+  return 'text-slate-500';
+}
+
+function getStatusBadgeVariant(status: string): 'success' | 'primary' | 'danger' | 'secondary' {
+  if (status === 'completed') {
+    return 'success';
+  }
+  if (status === 'in_progress') {
+    return 'primary';
+  }
+  if (status === 'flagged') {
+    return 'danger';
+  }
+  return 'secondary';
+}
+
+function mapPriorityStringToNumber(priority?: 'low' | 'medium' | 'high' | 'critical'): number {
+  if (priority === 'critical') {
+    return 1;
+  }
+  if (priority === 'high') {
+    return 2;
+  }
+  if (priority === 'medium') {
+    return 3;
+  }
+  return 4;
+}
+
 function MetricCard({ label, value, subValue, trend }: { label: string; value: string; subValue?: string; trend?: 'up' | 'down' | 'neutral' }) {
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4">
@@ -264,7 +448,7 @@ function MetricCard({ label, value, subValue, trend }: { label: string; value: s
       {subValue && (
         <p className={cn(
           'mt-0.5 text-sm',
-          trend === 'up' ? 'text-success-600' : trend === 'down' ? 'text-danger-600' : 'text-slate-500'
+          getTrendColorClass(trend)
         )}>
           {trend === 'up' && '+'}
           {subValue}
@@ -328,6 +512,14 @@ const STAGE_CONFIG: Record<PipelineStage, { label: string; color: string }> = {
   closed_passed: { label: 'Closed/Passed', color: 'bg-emerald-500' },
 };
 
+// Priority configuration
+const PRIORITY_OPTIONS = [
+  { value: 1, label: 'Critical', color: 'text-red-600' },
+  { value: 2, label: 'High', color: 'text-orange-600' },
+  { value: 3, label: 'Medium', color: 'text-yellow-600' },
+  { value: 4, label: 'Low', color: 'text-green-600' },
+] as const;
+
 // ============================================================================
 // Main Component
 // ============================================================================
@@ -338,25 +530,103 @@ interface PageProps {
 
 export default function TargetDetailPage({ params }: PageProps) {
   const router = useRouter();
-  const [target, setTarget] = useState<TargetDetails | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'financials' | 'diligence' | 'documents' | 'activity'>('overview');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isResearchPanelOpen, setIsResearchPanelOpen] = useState(false);
+  const [isInvestmentMemoOpen, setIsInvestmentMemoOpen] = useState(false);
 
-  // Load target data
-  useEffect(() => {
-    // Simulate API call - in real app, fetch from API using params.id
-    const loadTarget = async () => {
-      setIsLoading(true);
-      // Simulated delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setTarget(MOCK_TARGET);
-      setIsLoading(false);
-    };
-    loadTarget();
-  }, [params.id]);
+  // tRPC Query
+  const {
+    data: dbTarget,
+    isLoading,
+    error,
+  } = trpc.target.getById.useQuery(
+    { id: params.id },
+    { enabled: !!params.id }
+  );
+
+  // Notes Query
+  const { data: notesData, refetch: refetchNotes } = trpc.note.getByTarget.useQuery(
+    { targetId: params.id },
+    { enabled: !!params.id }
+  );
+
+  // Documents Query - fetch real documents for this target
+  const { data: documentsData, refetch: refetchDocuments } = trpc.document.list.useQuery(
+    { targetId: params.id, page: 1, pageSize: 50 },
+    { enabled: !!params.id }
+  );
+
+  // tRPC Mutations
+  const utils = trpc.useUtils();
+
+  const updateStatusMutation = trpc.target.updateStatus.useMutation({
+    onSuccess: () => {
+      utils.target.getById.invalidate({ id: params.id });
+    },
+  });
+
+  const deleteTargetMutation = trpc.target.delete.useMutation({
+    onSuccess: () => {
+      router.push('/pipeline');
+    },
+  });
+
+  const updateTargetMutation = trpc.target.update.useMutation({
+    onSuccess: () => {
+      utils.target.getById.invalidate({ id: params.id });
+      setIsEditModalOpen(false);
+    },
+  });
+
+  const updatePriorityMutation = trpc.target.updatePriority.useMutation({
+    onSuccess: () => {
+      utils.target.getById.invalidate({ id: params.id });
+      toast.success('Priority updated successfully');
+    },
+    onError: (err) => {
+      toast.error(`Failed to update priority: ${err.message}`);
+    },
+  });
+
+  const createNoteMutation = trpc.note.create.useMutation({
+    onSuccess: () => {
+      setIsAddNoteModalOpen(false);
+      setNewNoteContent('');
+      refetchNotes();
+      toast.success('Note added successfully');
+    },
+    onError: (err) => {
+      toast.error(`Failed to add note: ${err.message}`);
+    },
+  });
+
+  const uploadDocumentMutation = trpc.document.uploadNewVersion.useMutation({
+    onSuccess: () => {
+      refetchDocuments();
+      setIsUploadModalOpen(false);
+      toast.success('Document uploaded successfully');
+    },
+    onError: (err) => {
+      toast.error(`Failed to upload document: ${err.message}`);
+    },
+  });
+
+  // Transform database target to UI format
+  const target = useMemo(() => {
+    if (!dbTarget) {
+      return null;
+    }
+    return transformDbTargetToDetails(dbTarget);
+  }, [dbTarget]);
 
   const handleAdvanceStage = useCallback(() => {
-    if (!target) return;
+    if (!target) {
+      return;
+    }
     const stageOrder: PipelineStage[] = [
       'sourcing',
       'initial_screening',
@@ -366,20 +636,121 @@ export default function TargetDetailPage({ params }: PageProps) {
       'closed_passed',
     ];
     const currentIndex = stageOrder.indexOf(target.stage);
-    if (currentIndex < stageOrder.length - 1) {
-      setTarget({ ...target, stage: stageOrder[currentIndex + 1], daysInStage: 0 });
+    const nextStage = stageOrder[currentIndex + 1];
+    if (currentIndex < stageOrder.length - 1 && nextStage) {
+      const newStatus = mapStageToStatus(nextStage);
+      updateStatusMutation.mutate({
+        id: target.id,
+        status: newStatus as 'IDENTIFIED' | 'PRELIMINARY' | 'NDA_SIGNED' | 'DUE_DILIGENCE' | 'TERM_SHEET' | 'LOI' | 'DEFINITIVE' | 'CLOSED' | 'PASSED' | 'TERMINATED',
+      });
     }
-  }, [target]);
+  }, [target, updateStatusMutation]);
 
   const handleReject = useCallback(() => {
-    if (!target) return;
-    setTarget({ ...target, stage: 'closed_passed', daysInStage: 0 });
-  }, [target]);
+    if (!target) {
+      return;
+    }
+    updateStatusMutation.mutate({
+      id: target.id,
+      status: 'PASSED',
+    });
+  }, [target, updateStatusMutation]);
+
+  const handleArchive = useCallback(() => {
+    if (!target) {
+      return;
+    }
+    deleteTargetMutation.mutate({ id: target.id });
+  }, [target, deleteTargetMutation]);
+
+  const handleEdit = useCallback(() => {
+    setIsEditModalOpen(true);
+  }, []);
+
+  const handleAddNote = useCallback(() => {
+    setIsAddNoteModalOpen(true);
+  }, []);
+
+  const handleSubmitNote = useCallback(() => {
+    if (!target || !newNoteContent.trim()) {
+      return;
+    }
+    createNoteMutation.mutate({
+      content: newNoteContent.trim(),
+      targetId: target.id,
+    });
+  }, [target, newNoteContent, createNoteMutation]);
+
+  const handleChangePriority = useCallback((priority: number) => {
+    if (!target) {
+      return;
+    }
+    updatePriorityMutation.mutate({
+      id: target.id,
+      priority,
+    });
+  }, [target, updatePriorityMutation]);
+
+  const handleEditSubmit = useCallback(async (data: Partial<Target>) => {
+    if (!target) {
+      return;
+    }
+    updateTargetMutation.mutate({
+      id: target.id,
+      data: {
+        name: data.name,
+        description: data.description,
+        industry: data.industry,
+        sector: data.sector,
+        enterpriseValue: data.enterpriseValue,
+        revenue: data.ltmRevenue,
+        ebitda: data.ltmEbitda,
+        priority: data.priority,
+        probability: data.probability,
+        status: data.status as SchemaTargetStatus | undefined,
+        stage: data.stage,
+      },
+    });
+    setIsEditModalOpen(false);
+  }, [target, updateTargetMutation]);
+
+  const handleUpload = useCallback(async (files: File[], metadata: { category: string; tags: string[] }) => {
+    if (!target) {
+      return;
+    }
+    // For each file, create a document entry
+    for (const file of files) {
+      uploadDocumentMutation.mutate({
+        name: file.name,
+        targetId: target.id,
+        category: metadata.category,
+        fileSize: file.size,
+        mimeType: file.type,
+        // In a real implementation, the file would be uploaded to storage first
+        // and the fileUrl would be set to the storage URL
+      });
+    }
+  }, [target, uploadDocumentMutation]);
 
   if (isLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+        <div className="flex items-center gap-3 text-slate-500">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span>Loading target details...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-96 flex-col items-center justify-center">
+        <AlertCircle className="h-12 w-12 text-red-400" />
+        <p className="mt-4 text-red-600">Error loading target: {error.message}</p>
+        <Button variant="secondary" className="mt-4" onClick={() => router.push('/pipeline')}>
+          Back to Pipeline
+        </Button>
       </div>
     );
   }
@@ -430,9 +801,11 @@ export default function TargetDetailPage({ params }: PageProps) {
             'bg-gradient-to-br from-primary-50 to-primary-100 text-primary-600'
           )}>
             {target.logoUrl ? (
-              <img
+              <Image
                 src={target.logoUrl}
                 alt={target.name}
+                width={64}
+                height={64}
                 className="h-full w-full rounded-xl object-cover"
               />
             ) : (
@@ -497,7 +870,50 @@ export default function TargetDetailPage({ params }: PageProps) {
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="secondary">
+          {/* AI Actions */}
+          <Dropdown
+            trigger={
+              <Button variant="secondary">
+                <Sparkles className="mr-2 h-4 w-4" />
+                AI Tools
+              </Button>
+            }
+            align="right"
+          >
+            <DropdownLabel>AI Analysis</DropdownLabel>
+            <DropdownItem onClick={() => setIsResearchPanelOpen(true)}>
+              <Search className="mr-2 h-4 w-4" />
+              Research Company
+            </DropdownItem>
+            <DropdownItem onClick={() => setIsInvestmentMemoOpen(true)}>
+              <FileSignature className="mr-2 h-4 w-4" />
+              Generate Investment Memo
+            </DropdownItem>
+          </Dropdown>
+          <Button variant="secondary" onClick={handleAddNote}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Note
+          </Button>
+          <Dropdown
+            trigger={
+              <Button variant="secondary">
+                <Flag className="mr-2 h-4 w-4" />
+                Priority
+              </Button>
+            }
+            align="right"
+          >
+            <DropdownLabel>Change Priority</DropdownLabel>
+            {PRIORITY_OPTIONS.map((option) => (
+              <DropdownItem
+                key={option.value}
+                onClick={() => handleChangePriority(option.value)}
+              >
+                <span className={cn('font-medium', option.color)}>{option.label}</span>
+              </DropdownItem>
+            ))}
+          </Dropdown>
+          <Button variant="secondary" onClick={handleEdit}>
             <Edit className="mr-2 h-4 w-4" />
             Edit
           </Button>
@@ -512,7 +928,7 @@ export default function TargetDetailPage({ params }: PageProps) {
             <DropdownItem>Export to PDF</DropdownItem>
             <DropdownItem>Share</DropdownItem>
             <DropdownDivider />
-            <DropdownItem danger>Archive</DropdownItem>
+            <DropdownItem variant="danger" onClick={handleArchive}>Archive</DropdownItem>
           </Dropdown>
           {canReject && (
             <Button variant="danger" onClick={handleReject}>
@@ -576,9 +992,9 @@ export default function TargetDetailPage({ params }: PageProps) {
                   {ddProgress.completed}/{ddProgress.total}
                 </Badge>
               )}
-              {tab === 'documents' && target.documents && (
+              {tab === 'documents' && documentsData && (
                 <Badge variant="secondary" size="sm">
-                  {target.documents.length}
+                  {documentsData.total}
                 </Badge>
               )}
             </button>
@@ -650,6 +1066,21 @@ export default function TargetDetailPage({ params }: PageProps) {
                   </CardContent>
                 </Card>
               )}
+
+              {/* AI Score Card */}
+              <AIScoreCard
+                targetId={target.id}
+                targetName={target.name}
+                targetData={{
+                  name: target.name,
+                  sector: target.subIndustry || target.industry,
+                  description: target.description,
+                  valuation: target.enterpriseValue,
+                  revenue: target.revenue,
+                  ebitda: target.ebitda,
+                }}
+                existingScore={target.evaluationScore}
+              />
 
               {/* Evaluation Scores */}
               <Card>
@@ -739,11 +1170,7 @@ export default function TargetDetailPage({ params }: PageProps) {
                           <td className="px-4 py-3 text-sm text-slate-500">{item.category}</td>
                           <td className="px-4 py-3">
                             <Badge
-                              variant={
-                                item.status === 'completed' ? 'success' :
-                                item.status === 'in_progress' ? 'primary' :
-                                item.status === 'flagged' ? 'danger' : 'secondary'
-                              }
+                              variant={getStatusBadgeVariant(item.status)}
                               size="sm"
                             >
                               {item.status.replace('_', ' ')}
@@ -759,34 +1186,51 @@ export default function TargetDetailPage({ params }: PageProps) {
             </>
           )}
 
-          {activeTab === 'documents' && target.documents && (
+          {activeTab === 'documents' && (
             <Card>
               <CardHeader className="flex flex-row items-center justify-between">
-                <CardTitle>Documents ({target.documents.length})</CardTitle>
-                <Button variant="secondary" size="sm">
+                <CardTitle>Documents ({documentsData?.total || 0})</CardTitle>
+                <Button variant="secondary" size="sm" onClick={() => setIsUploadModalOpen(true)}>
                   <Paperclip className="mr-2 h-4 w-4" />
                   Upload
                 </Button>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="divide-y divide-slate-200">
-                  {target.documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-                          <FileText className="h-5 w-5 text-slate-500" />
+                {documentsData?.items && documentsData.items.length > 0 ? (
+                  <div className="divide-y divide-slate-200">
+                    {documentsData.items.map((doc) => (
+                      <div key={doc.id} className="flex items-center justify-between px-6 py-4 hover:bg-slate-50">
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+                            <FileText className="h-5 w-5 text-slate-500" />
+                          </div>
+                          <div>
+                            <p className="text-sm font-medium text-slate-900">{doc.name}</p>
+                            <p className="text-xs text-slate-500">
+                              {doc.fileSize ? formatFileSize(doc.fileSize) : 'Unknown size'} - {formatDate(new Date(doc.createdAt))}
+                              {doc.version && doc.version > 1 && (
+                                <span className="ml-2 text-primary-600">v{doc.version}</span>
+                              )}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm font-medium text-slate-900">{doc.name}</p>
-                          <p className="text-xs text-slate-500">{doc.size} - Uploaded by {doc.uploadedBy} on {formatDate(doc.uploadedAt)}</p>
-                        </div>
+                        <Button variant="ghost" size="sm">
+                          <ExternalLink className="h-4 w-4" />
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="sm">
-                        <ExternalLink className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  ))}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <EmptyState
+                    icon={<FileText className="h-12 w-12" />}
+                    title="No documents yet"
+                    description="Upload documents related to this target for easy access and collaboration."
+                    action={{
+                      label: 'Upload Document',
+                      onClick: () => setIsUploadModalOpen(true),
+                    }}
+                  />
+                )}
               </CardContent>
             </Card>
           )}
@@ -917,6 +1361,104 @@ export default function TargetDetailPage({ params }: PageProps) {
           )}
         </div>
       </div>
+
+      {/* Edit Target Modal */}
+      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} size="xl">
+        <ModalHeader>
+          <ModalTitle>Edit Target</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          <TargetForm
+            spacId={target.associatedSpac?.id || ''}
+            initialData={{
+              name: target.name,
+              description: target.description,
+              industry: target.industry,
+              sector: target.subIndustry,
+              status: mapStageToStatus(target.stage) as TargetStatus,
+              enterpriseValue: target.enterpriseValue,
+              ltmRevenue: target.revenue,
+              ltmEbitda: target.ebitda,
+              priority: mapPriorityStringToNumber(target.priority),
+            }}
+            onSubmit={handleEditSubmit}
+            onCancel={() => setIsEditModalOpen(false)}
+            isLoading={updateTargetMutation.isPending}
+          />
+        </ModalBody>
+      </Modal>
+
+      {/* Add Note Modal */}
+      <Modal isOpen={isAddNoteModalOpen} onClose={() => setIsAddNoteModalOpen(false)} size="md">
+        <ModalHeader>
+          <ModalTitle>Add Note</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          <Textarea
+            label="Note"
+            placeholder="Enter your note about this target..."
+            value={newNoteContent}
+            onChange={(e) => setNewNoteContent(e.target.value)}
+            rows={5}
+          />
+          {notesData && notesData.length > 0 && (
+            <div className="mt-4">
+              <h4 className="text-sm font-medium text-slate-700 mb-2">Recent Notes ({notesData.length})</h4>
+              <div className="space-y-2 max-h-48 overflow-y-auto">
+                {notesData.slice(0, 5).map((note) => (
+                  <div key={note.id} className="p-2 bg-slate-50 rounded-md text-sm">
+                    <p className="text-slate-700">{note.content}</p>
+                    <p className="text-xs text-slate-400 mt-1">{formatRelativeTime(new Date(note.createdAt))}</p>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setIsAddNoteModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={handleSubmitNote}
+            disabled={!newNoteContent.trim() || createNoteMutation.isPending}
+          >
+            {createNoteMutation.isPending ? 'Adding...' : 'Add Note'}
+          </Button>
+        </ModalFooter>
+      </Modal>
+
+      {/* Upload Modal */}
+      <UploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUpload={handleUpload}
+      />
+
+      {/* AI Research Panel */}
+      <AIResearchPanel
+        targetId={target.id}
+        targetName={target.name}
+        targetSector={target.subIndustry || target.industry}
+        isOpen={isResearchPanelOpen}
+        onClose={() => setIsResearchPanelOpen(false)}
+      />
+
+      {/* Investment Memo Modal */}
+      <InvestmentMemo
+        isOpen={isInvestmentMemoOpen}
+        onClose={() => setIsInvestmentMemoOpen(false)}
+        target={{
+          id: target.id,
+          name: target.name,
+          sector: target.subIndustry || target.industry,
+          description: target.description,
+          valuation: target.enterpriseValue,
+          revenue: target.revenue,
+          ebitda: target.ebitda,
+        }}
+      />
     </div>
   );
 }
