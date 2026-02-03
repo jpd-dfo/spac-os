@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 
 import {
   Brain,
@@ -17,13 +17,29 @@ import {
   ChevronDown,
   ChevronUp,
   Sparkles,
+  History,
 } from 'lucide-react';
 
+import { ProgressIndicator } from '@/components/shared';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn } from '@/lib/utils';
+
+// Score calculation steps for progress tracking
+const SCORE_STEPS = [
+  'Analyzing target',
+  'Calculating scores',
+  'Generating thesis',
+];
+import {
+  ScoreHistory,
+  TrendBadge,
+  type ScoreHistoryEntry,
+  type ScoreTrendData,
+  type ScoreTrend,
+} from './ScoreHistory';
 
 // ============================================================================
 // Types
@@ -278,9 +294,136 @@ export function AIScoreCard({
   );
   const [isExpanded, setIsExpanded] = useState(true);
 
+  // Progress tracking state
+  const [currentStep, setCurrentStep] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [estimatedTime, setEstimatedTime] = useState<number | undefined>(undefined);
+
+  // AbortController for cancellation
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const handleCancel = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    setIsLoading(false);
+    setCurrentStep(0);
+    setProgress(0);
+    setStatusMessage('');
+    setEstimatedTime(undefined);
+  }, []);
+
+  // Score history state
+  const [scoreHistory, setScoreHistory] = useState<ScoreHistoryEntry[]>([]);
+  const [scoreTrend, setScoreTrend] = useState<ScoreTrendData>({
+    trend: 'new',
+    changePercent: 0,
+    previousScore: null,
+    currentScore: existingScore || 0,
+    scoreCount: 0,
+    averageScore: 0,
+  });
+  const [isHistoryLoading, setIsHistoryLoading] = useState(false);
+  const [showFullHistory, setShowFullHistory] = useState(false);
+
+  // Fetch score history on mount
+  const fetchScoreHistory = useCallback(async () => {
+    setIsHistoryLoading(true);
+    try {
+      const response = await fetch(`/api/score-history?targetId=${targetId}&limit=10`);
+      if (response.ok) {
+        const data = await response.json();
+        setScoreHistory(data.history || []);
+        setScoreTrend(data.trend || {
+          trend: 'new',
+          changePercent: 0,
+          previousScore: null,
+          currentScore: existingScore || 0,
+          scoreCount: 0,
+          averageScore: 0,
+        });
+      }
+    } catch (err) {
+      // Silently fail - history is optional
+      console.warn('Failed to fetch score history:', err);
+    } finally {
+      setIsHistoryLoading(false);
+    }
+  }, [targetId, existingScore]);
+
+  useEffect(() => {
+    if (targetId) {
+      fetchScoreHistory();
+    }
+  }, [targetId, fetchScoreHistory]);
+
+  // Save score to history
+  const saveScoreToHistory = useCallback(async (scoreResponse: AIScoreResponse) => {
+    try {
+      await fetch('/api/score-history', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          targetId,
+          scoreData: {
+            overallScore: scoreResponse.overallScore,
+            managementScore: scoreResponse.categories.management,
+            marketScore: scoreResponse.categories.market,
+            financialScore: scoreResponse.categories.financial,
+            operationalScore: scoreResponse.categories.operational,
+            transactionScore: scoreResponse.categories.transaction,
+            thesis: scoreResponse.thesis,
+          },
+        }),
+      });
+      // Refresh history after saving
+      fetchScoreHistory();
+    } catch (err) {
+      // Silently fail - history saving is optional
+      console.warn('Failed to save score to history:', err);
+    }
+  }, [targetId, fetchScoreHistory]);
+
   const calculateScore = useCallback(async () => {
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+
+    // Create new AbortController
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     setIsLoading(true);
     setError(null);
+
+    // Initialize progress tracking
+    setCurrentStep(0);
+    setProgress(0);
+    setStatusMessage(SCORE_STEPS[0] ?? 'Analyzing target');
+    setEstimatedTime(20); // Initial estimate: 20 seconds
+
+    // Start progress simulation
+    let stepIndex = 0;
+    progressIntervalRef.current = setInterval(() => {
+      stepIndex = Math.min(stepIndex + 1, SCORE_STEPS.length - 1);
+      setCurrentStep(stepIndex);
+      setStatusMessage(SCORE_STEPS[stepIndex] ?? 'Processing');
+      setProgress((prev) => Math.min(prev + 30, 90)); // Max out at 90% until complete
+      setEstimatedTime((prev) => (prev !== undefined && prev > 5 ? prev - 5 : undefined));
+    }, 4000);
 
     try {
       const response = await fetch('/api/ai/score', {
@@ -296,13 +439,26 @@ export function AIScoreCard({
           },
           operation: 'score',
         }),
+        signal,
       });
+
+      // Clear progress interval
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
 
       if (!response.ok) {
         throw new Error('Failed to calculate AI score');
       }
 
       const data = await response.json();
+
+      // Complete progress
+      setCurrentStep(SCORE_STEPS.length - 1);
+      setProgress(100);
+      setStatusMessage('Score complete');
+      setEstimatedTime(undefined);
 
       // Map API response to our expected format
       const scoreResponse: AIScoreResponse = {
@@ -323,12 +479,28 @@ export function AIScoreCard({
 
       setScoreData(scoreResponse);
       onScoreUpdate?.(scoreResponse.overallScore);
+
+      // Save score to history
+      await saveScoreToHistory(scoreResponse);
     } catch (err) {
+      // Clear progress interval on error
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+
+      // Don't show error if cancelled
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('Score calculation cancelled by user');
+        return;
+      }
+
       setError(err instanceof Error ? err.message : 'An error occurred');
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
-  }, [targetData, onScoreUpdate]);
+  }, [targetData, onScoreUpdate, saveScoreToHistory]);
 
   const categoryScores: CategoryScore[] = scoreData
     ? [
@@ -378,6 +550,15 @@ export function AIScoreCard({
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* Trend Badge (compact) */}
+          {scoreHistory.length > 0 && (
+            <TrendBadge
+              trend={scoreTrend.trend}
+              changePercent={scoreTrend.changePercent}
+              size="sm"
+              showPercent={true}
+            />
+          )}
           <Button
             variant="secondary"
             size="sm"
@@ -421,13 +602,24 @@ export function AIScoreCard({
         )}
 
         {isLoading && (
-          <div className="flex flex-col items-center justify-center py-12">
-            <div className="relative">
-              <div className="h-16 w-16 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
-              <Brain className="absolute left-1/2 top-1/2 h-6 w-6 -translate-x-1/2 -translate-y-1/2 text-primary-600" />
+          <div className="flex flex-col items-center justify-center py-8">
+            <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary-100 mb-4">
+              <Brain className="h-7 w-7 text-primary-600" />
             </div>
-            <p className="mt-4 text-sm text-slate-600">Analyzing {targetName}...</p>
-            <p className="mt-1 text-xs text-slate-400">This may take a few moments</p>
+            <h4 className="text-sm font-medium text-slate-900 mb-1">Calculating AI Score</h4>
+            <p className="text-xs text-slate-500 mb-4 text-center">
+              Analyzing {targetName}
+            </p>
+            <div className="w-full max-w-xs">
+              <ProgressIndicator
+                progress={progress}
+                status={statusMessage}
+                steps={SCORE_STEPS}
+                currentStep={currentStep}
+                onCancel={handleCancel}
+                estimatedTimeRemaining={estimatedTime}
+              />
+            </div>
           </div>
         )}
 
@@ -467,6 +659,51 @@ export function AIScoreCard({
                 </p>
               </div>
             </div>
+
+            {/* Score History Section */}
+            {scoreHistory.length > 0 && (
+              <div className="rounded-lg border border-slate-200 p-4">
+                <div className="mb-3 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <History className="h-4 w-4 text-slate-500" />
+                    <h4 className="text-sm font-semibold text-slate-900">Score History</h4>
+                    <span className="text-xs text-slate-500">
+                      ({scoreHistory.length} {scoreHistory.length === 1 ? 'entry' : 'entries'})
+                    </span>
+                  </div>
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowFullHistory(!showFullHistory)}
+                  >
+                    {showFullHistory ? 'Hide History' : 'View Full History'}
+                  </Button>
+                </div>
+
+                {showFullHistory ? (
+                  <ScoreHistory
+                    targetId={targetId}
+                    history={scoreHistory}
+                    trend={scoreTrend}
+                    currentScore={scoreData.overallScore}
+                    onRefresh={fetchScoreHistory}
+                    isLoading={isHistoryLoading}
+                    maxVisible={10}
+                    showChart={true}
+                  />
+                ) : (
+                  <ScoreHistory
+                    targetId={targetId}
+                    history={scoreHistory.slice(0, 5)}
+                    trend={scoreTrend}
+                    currentScore={scoreData.overallScore}
+                    maxVisible={5}
+                    showChart={true}
+                    compact={false}
+                  />
+                )}
+              </div>
+            )}
 
             {/* Category Breakdown */}
             <div>
@@ -534,9 +771,17 @@ export function AIScoreCard({
                   <Badge className={getGradeColor(scoreData.letterGrade)}>
                     Grade {scoreData.letterGrade}
                   </Badge>
+                  {scoreHistory.length > 1 && (
+                    <TrendBadge
+                      trend={scoreTrend.trend}
+                      changePercent={scoreTrend.changePercent}
+                      size="sm"
+                    />
+                  )}
                 </div>
                 <p className="mt-1 text-xs text-slate-500">
                   {scoreData.risks.length} risks, {scoreData.opportunities.length} opportunities identified
+                  {scoreHistory.length > 0 && ` | ${scoreHistory.length} scores recorded`}
                 </p>
               </div>
             </div>

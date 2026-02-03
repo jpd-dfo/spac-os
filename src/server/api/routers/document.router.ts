@@ -561,4 +561,53 @@ export const documentRouter = createTRPCRouter({
         mimeType: document.mimeType,
       };
     }),
+
+  // ============================================================================
+  // ANALYSIS CACHE
+  // ============================================================================
+
+  /**
+   * Get cached analysis risk levels for multiple documents
+   * Used to display risk badges on document cards
+   */
+  getCachedAnalysisRiskLevels: protectedProcedure
+    .input(z.object({
+      documentIds: z.array(UuidSchema),
+    }))
+    .query(async ({ ctx, input }) => {
+      if (input.documentIds.length === 0) {
+        return {};
+      }
+
+      try {
+        // Get the most recent analysis for each document
+        const analyses = await ctx.db.documentAnalysis.findMany({
+          where: {
+            documentId: { in: input.documentIds },
+          },
+          select: {
+            documentId: true,
+            riskLevel: true,
+            createdAt: true,
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+        });
+
+        // Create a map of document IDs to risk levels (only keep the most recent for each doc)
+        const riskLevelMap: Record<string, string> = {};
+        for (const analysis of analyses) {
+          // Only add if not already in map (since we ordered by desc, first is most recent)
+          if (!riskLevelMap[analysis.documentId] && analysis.riskLevel) {
+            riskLevelMap[analysis.documentId] = analysis.riskLevel;
+          }
+        }
+
+        return riskLevelMap;
+      } catch {
+        // If DocumentAnalysis table doesn't exist, return empty map
+        return {};
+      }
+    }),
 });

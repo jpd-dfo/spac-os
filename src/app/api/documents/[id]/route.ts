@@ -10,6 +10,7 @@ import { type NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 
 import { authOptions } from '@/lib/auth';
+import { invalidateAnalysis } from '@/lib/cache/analysisCache';
 import { logger } from '@/lib/logger';
 import { prisma } from '@/lib/prisma';
 
@@ -196,6 +197,11 @@ export async function PATCH(
       },
     });
 
+    // Invalidate cached AI analysis when document is updated
+    // This ensures fresh analysis is generated on next request
+    await invalidateAnalysis(documentId);
+    logger.info(`Invalidated analysis cache for document: ${documentId}`);
+
     // Create audit log
     await prisma.auditLog.create({
       data: {
@@ -283,6 +289,10 @@ export async function DELETE(
         deletedAt: new Date(),
       },
     });
+
+    // Invalidate cached AI analysis when document is deleted
+    await invalidateAnalysis(documentId);
+    logger.info(`Invalidated analysis cache for deleted document: ${documentId}`);
 
     // Create audit log
     await prisma.auditLog.create({

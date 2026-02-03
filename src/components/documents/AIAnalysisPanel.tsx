@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 import {
   X,
@@ -19,11 +19,16 @@ import {
   Clock,
   BookOpen,
   AlertCircle,
+  Database,
 } from 'lucide-react';
+
+import { ProgressIndicator } from '@/components/shared';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { cn, formatDate } from '@/lib/utils';
+
+import type { AnalysisData, CachedAnalysis } from '@/lib/cache/analysisCache';
 
 import type { DocumentData } from './DocumentCard';
 
@@ -252,6 +257,18 @@ function transformAPIResponse(apiData: APIData): AIAnalysis {
 }
 
 // ============================================================================
+// Analysis Steps for Progress Tracking
+// ============================================================================
+
+const ANALYSIS_STEPS = [
+  'Initializing',
+  'Analyzing content',
+  'Extracting terms',
+  'Identifying risks',
+  'Generating summary',
+];
+
+// ============================================================================
 // Component
 // ============================================================================
 
@@ -262,67 +279,259 @@ export function AIAnalysisPanel({ document, documentContent, isOpen, onClose }: 
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
     new Set(['summary', 'risks', 'actions'])
   );
+  const [isCached, setIsCached] = useState(false);
+  const [cacheTimestamp, setCacheTimestamp] = useState<Date | null>(null);
 
-  const fetchAnalysis = useCallback(async () => {
+  // Progress tracking state
+  const [currentStep, setCurrentStep] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [estimatedTime, setEstimatedTime] = useState<number | undefined>(undefined);
+
+  // Track if initial load has been done to avoid double-fetch on mount
+  const initialLoadDone = useRef(false);
+
+  // AbortController for cancellation
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  /**
+   * Fetches cached analysis from the API endpoint
+   */
+  const fetchCachedAnalysis = useCallback(async (): Promise<CachedAnalysis | null> => {
+    try {
+      const response = await fetch(`/api/ai/analysis-cache?documentId=${document.id}`);
+      if (!response.ok) {
+        return null;
+      }
+      const result = await response.json();
+      if (result.success && result.data && result.isFresh) {
+        return result.data as CachedAnalysis;
+      }
+      return null;
+    } catch {
+      // Cache fetch failed, proceed without cache
+      return null;
+    }
+  }, [document.id]);
+
+  /**
+   * Saves analysis to cache via API endpoint
+   */
+  const saveToCache = useCallback(async (analysisData: AIAnalysis): Promise<void> => {
+    try {
+      await fetch('/api/ai/analysis-cache', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          documentId: document.id,
+          analysis: analysisData,
+        }),
+      });
+    } catch {
+      // Cache save failed, non-critical
+      console.warn('Failed to save analysis to cache');
+    }
+  }, [document.id]);
+
+  /**
+   * Converts cached analysis to the AIAnalysis format used by the UI
+   */
+  const cachedToUIFormat = useCallback((cached: CachedAnalysis): AIAnalysis => {
+    return {
+      summary: cached.summary || '',
+      keyTerms: (cached.keyTerms as AIAnalysis['keyTerms']) || [],
+      riskFlags: (cached.riskFlags as AIAnalysis['riskFlags']) || [],
+      relatedDocuments: [],
+      actionItems: (cached.actionItems as AIAnalysis['actionItems']) || [],
+      insights: (cached.insights as AIAnalysis['insights']) || [],
+      financialHighlights: (cached.financialHighlights as AIAnalysis['financialHighlights']) || undefined,
+    };
+  }, []);
+
+  /**
+   * Handles cancellation of ongoing analysis
+   */
+  const handleCancel = useCallback(() => {
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+      abortControllerRef.current = null;
+    }
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+    setIsLoading(false);
+    setCurrentStep(0);
+    setProgress(0);
+    setStatusMessage('');
+    setEstimatedTime(undefined);
+  }, []);
+
+  /**
+   * Fetches fresh analysis from the AI API
+   */
+  const fetchFreshAnalysis = useCallback(async (signal?: AbortSignal): Promise<AIAnalysis | null> => {
+    if (!documentContent) {
+      throw new Error('Document content is required for AI analysis.');
+    }
+
+    const response = await fetch('/api/ai/analyze', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        content: documentContent,
+        metadata: {
+          id: document.id,
+          name: document.name,
+          type: document.fileType,
+        },
+        operation: 'full',
+        options: {
+          includeRisks: true,
+          generateActionItems: true,
+          includeFinancials: true,
+        },
+      }),
+      signal,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || errorData.message || `Analysis failed with status ${response.status}`);
+    }
+
+    const result = await response.json();
+
+    if (!result.success) {
+      throw new Error(result.error || 'Analysis failed');
+    }
+
+    return transformAPIResponse(result.data);
+  }, [document.id, document.name, document.fileType, documentContent]);
+
+  /**
+   * Main analysis fetching function - checks cache first, then fetches fresh if needed
+   */
+  const fetchAnalysis = useCallback(async (forceRefresh: boolean = false) => {
     if (!documentContent) {
       setError('Document content is required for AI analysis.');
       return;
     }
 
+    // Cancel any existing request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+    }
+
+    // Create new AbortController
+    abortControllerRef.current = new AbortController();
+    const signal = abortControllerRef.current.signal;
+
     setIsLoading(true);
     setError(null);
+    setIsCached(false);
+    setCacheTimestamp(null);
+
+    // Initialize progress tracking
+    setCurrentStep(0);
+    setProgress(0);
+    setStatusMessage(ANALYSIS_STEPS[0] ?? 'Initializing');
+    setEstimatedTime(30); // Initial estimate: 30 seconds
 
     try {
-      const response = await fetch('/api/ai/analyze', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: documentContent,
-          metadata: {
-            id: document.id,
-            name: document.name,
-            type: document.fileType,
-          },
-          operation: 'full',
-          options: {
-            includeRisks: true,
-            generateActionItems: true,
-            includeFinancials: true,
-          },
-        }),
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || errorData.message || `Analysis failed with status ${response.status}`);
+      // Check cache first unless forcing refresh
+      if (!forceRefresh) {
+        const cachedAnalysis = await fetchCachedAnalysis();
+        if (cachedAnalysis) {
+          const analysisData = cachedToUIFormat(cachedAnalysis);
+          setAnalysis(analysisData);
+          setIsCached(true);
+          setCacheTimestamp(cachedAnalysis.createdAt);
+          setIsLoading(false);
+          setCurrentStep(ANALYSIS_STEPS.length - 1);
+          setProgress(100);
+          setStatusMessage('Loaded from cache');
+          setEstimatedTime(undefined);
+          return;
+        }
       }
 
-      const result = await response.json();
+      // Start progress simulation for fresh analysis
+      let stepIndex = 0;
+      progressIntervalRef.current = setInterval(() => {
+        stepIndex = Math.min(stepIndex + 1, ANALYSIS_STEPS.length - 1);
+        setCurrentStep(stepIndex);
+        setStatusMessage(ANALYSIS_STEPS[stepIndex] ?? 'Analyzing...');
+        setProgress((prev) => Math.min(prev + 20, 90)); // Max out at 90% until complete
+        setEstimatedTime((prev) => (prev !== undefined && prev > 5 ? prev - 5 : undefined));
+      }, 3000);
 
-      if (!result.success) {
-        throw new Error(result.error || 'Analysis failed');
+      // Fetch fresh analysis from AI
+      const freshAnalysis = await fetchFreshAnalysis(signal);
+
+      // Clear progress interval
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
       }
 
-      const transformedData = transformAPIResponse(result.data);
-      setAnalysis(transformedData);
+      if (freshAnalysis) {
+        setAnalysis(freshAnalysis);
+        setIsCached(false);
+        setCacheTimestamp(null);
+
+        // Complete progress
+        setCurrentStep(ANALYSIS_STEPS.length - 1);
+        setProgress(100);
+        setStatusMessage('Analysis complete');
+        setEstimatedTime(undefined);
+
+        // Save to cache in background
+        saveToCache(freshAnalysis);
+      }
     } catch (err) {
+      // Clear progress interval on error
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+
+      // Don't show error if cancelled
+      if (err instanceof Error && err.name === 'AbortError') {
+        console.log('Analysis cancelled by user');
+        return;
+      }
+
       console.error('AI Analysis error:', err);
       setError(err instanceof Error ? err.message : 'An unexpected error occurred');
     } finally {
       setIsLoading(false);
+      abortControllerRef.current = null;
     }
-  }, [document.id, document.name, document.fileType, documentContent]);
+  }, [documentContent, fetchCachedAnalysis, cachedToUIFormat, fetchFreshAnalysis, saveToCache]);
 
   useEffect(() => {
-    if (isOpen && documentContent) {
-      fetchAnalysis();
+    if (isOpen && documentContent && !initialLoadDone.current) {
+      initialLoadDone.current = true;
+      fetchAnalysis(false);
     } else if (isOpen && !documentContent) {
       setError('Document content is required for AI analysis.');
       setIsLoading(false);
     }
   }, [isOpen, documentContent, fetchAnalysis]);
+
+  // Reset initial load tracking when panel closes
+  useEffect(() => {
+    if (!isOpen) {
+      initialLoadDone.current = false;
+    }
+  }, [isOpen]);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
@@ -343,7 +552,11 @@ export function AIAnalysisPanel({ document, documentContent, isOpen, onClose }: 
   };
 
   const handleRegenerate = () => {
-    fetchAnalysis();
+    fetchAnalysis(true); // Force refresh, bypass cache
+  };
+
+  const handleRefreshAnalysis = () => {
+    fetchAnalysis(true); // Force refresh, bypass cache
   };
 
   const severityColors = {
@@ -379,13 +592,51 @@ export function AIAnalysisPanel({ document, documentContent, isOpen, onClose }: 
             <p className="text-sm text-slate-500">{document.name}</p>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-        >
-          <X className="h-5 w-5" />
-        </button>
+        <div className="flex items-center gap-2">
+          {/* Refresh Analysis button */}
+          {analysis && !isLoading && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleRefreshAnalysis}
+              title="Refresh Analysis"
+              className="text-slate-400 hover:text-slate-600"
+            >
+              <RefreshCw className="h-4 w-4" />
+            </Button>
+          )}
+          <button
+            onClick={onClose}
+            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
       </div>
+
+      {/* Cached Analysis Indicator */}
+      {isCached && analysis && !isLoading && (
+        <div className="flex items-center justify-between border-b border-slate-200 bg-blue-50 px-6 py-2">
+          <div className="flex items-center gap-2 text-sm text-blue-700">
+            <Database className="h-4 w-4" />
+            <span>Using cached analysis</span>
+            {cacheTimestamp && (
+              <span className="text-blue-500">
+                (from {formatDate(cacheTimestamp)})
+              </span>
+            )}
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleRefreshAnalysis}
+            className="text-blue-700 hover:text-blue-800 hover:bg-blue-100"
+          >
+            <RefreshCw className="mr-1 h-3 w-3" />
+            Refresh
+          </Button>
+        </div>
+      )}
 
       {/* Content */}
       <div className="h-[calc(100%-73px)] overflow-y-auto">
@@ -411,17 +662,26 @@ export function AIAnalysisPanel({ document, documentContent, isOpen, onClose }: 
           </div>
         )}
 
-        {/* Loading State */}
+        {/* Loading State with Progress Indicator */}
         {isLoading && (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="relative">
-              <div className="h-16 w-16 rounded-full border-4 border-slate-200" />
-              <div className="absolute inset-0 h-16 w-16 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+          <div className="flex flex-col items-center justify-center py-12 px-6">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 mb-6">
+              <Sparkles className="h-8 w-8 text-primary-600" />
             </div>
-            <p className="mt-4 font-medium text-slate-900">Analyzing document...</p>
-            <p className="mt-1 text-sm text-slate-500">
-              Extracting key information and insights
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Analyzing Document</h3>
+            <p className="text-sm text-slate-500 mb-6 text-center">
+              AI is processing your document to extract insights
             </p>
+            <div className="w-full max-w-sm">
+              <ProgressIndicator
+                progress={progress}
+                status={statusMessage}
+                steps={ANALYSIS_STEPS}
+                currentStep={currentStep}
+                onCancel={handleCancel}
+                estimatedTimeRemaining={estimatedTime}
+              />
+            </div>
           </div>
         )}
 
@@ -746,17 +1006,22 @@ export function AIAnalysisPanel({ document, documentContent, isOpen, onClose }: 
               </div>
             )}
 
-            {/* Regenerate */}
-            <div className="flex justify-center py-4">
+            {/* Refresh Analysis */}
+            <div className="flex flex-col items-center gap-2 py-4">
               <Button
                 variant="ghost"
                 size="sm"
-                onClick={handleRegenerate}
+                onClick={handleRefreshAnalysis}
                 disabled={isLoading}
               >
                 <RefreshCw className={cn("mr-2 h-4 w-4", isLoading && "animate-spin")} />
-                Regenerate Analysis
+                {isCached ? 'Refresh Analysis' : 'Regenerate Analysis'}
               </Button>
+              {isCached && cacheTimestamp && (
+                <p className="text-xs text-slate-400">
+                  Last analyzed: {formatDate(cacheTimestamp)}
+                </p>
+              )}
             </div>
           </div>
         )}

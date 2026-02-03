@@ -3,6 +3,7 @@
  * Exports all routers for use in the root router
  */
 
+export { alertRouter } from './alert.router';
 export { spacRouter } from './spac.router';
 export { targetRouter } from './target.router';
 export { filingRouter } from './filing.router';

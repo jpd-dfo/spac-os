@@ -7,16 +7,54 @@ import {
   Search,
   Bell,
   Menu,
+  AlertTriangle,
+  Clock,
+  AlertCircle,
+  FileText,
+  ShieldAlert,
 } from 'lucide-react';
+import Link from 'next/link';
 
+import { trpc } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
-interface Notification {
-  id: string;
-  title: string;
-  message: string;
-  time: string;
-  unread: boolean;
+// Map alert types to icons
+const alertTypeIcons: Record<string, React.ElementType> = {
+  DEADLINE_APPROACHING: Clock,
+  DEADLINE_CRITICAL: AlertTriangle,
+  DEADLINE_MISSED: AlertCircle,
+  FILING_REQUIRED: FileText,
+  COMPLIANCE_WARNING: ShieldAlert,
+};
+
+// Map severity to colors
+const severityColors: Record<string, string> = {
+  high: 'text-danger-600',
+  medium: 'text-warning-600',
+  low: 'text-primary-600',
+};
+
+// Format relative time
+function formatRelativeTime(date: Date): string {
+  const now = new Date();
+  const diffMs = now.getTime() - new Date(date).getTime();
+  const diffMins = Math.floor(diffMs / 60000);
+  const diffHours = Math.floor(diffMins / 60);
+  const diffDays = Math.floor(diffHours / 24);
+
+  if (diffMins < 1) {
+    return 'Just now';
+  }
+  if (diffMins < 60) {
+    return `${diffMins} min ago`;
+  }
+  if (diffHours < 24) {
+    return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
+  }
+  if (diffDays < 7) {
+    return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
+  }
+  return new Date(date).toLocaleDateString();
 }
 
 export function Header() {
@@ -24,31 +62,29 @@ export function Header() {
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
-  const notifications: Notification[] = [
-    {
-      id: '1',
-      title: 'New target identified',
-      message: 'TechCorp has been added to the pipeline',
-      time: '5 min ago',
-      unread: true,
-    },
-    {
-      id: '2',
-      title: 'Filing deadline approaching',
-      message: 'DEF14A due in 3 days',
-      time: '1 hour ago',
-      unread: true,
-    },
-    {
-      id: '3',
-      title: 'Task completed',
-      message: 'Due diligence checklist completed',
-      time: '2 hours ago',
-      unread: false,
-    },
-  ];
+  // Fetch unread count
+  const { data: unreadData } = trpc.alert.getUnreadCount.useQuery(undefined, {
+    refetchInterval: 30000, // Refetch every 30 seconds
+  });
 
-  const unreadCount = notifications.filter((n) => n.unread).length;
+  // Fetch recent alerts for dropdown
+  const { data: recentAlerts } = trpc.alert.getRecent.useQuery(
+    { limit: 5 },
+    { enabled: isNotificationsOpen }
+  );
+
+  // Mark as read mutation
+  const markAsReadMutation = trpc.alert.markAsRead.useMutation({
+    onSuccess: () => {
+      // Refetch to update counts
+      void trpcUtils.alert.getUnreadCount.invalidate();
+      void trpcUtils.alert.getRecent.invalidate();
+    },
+  });
+
+  const trpcUtils = trpc.useUtils();
+
+  const unreadCount = unreadData?.count ?? 0;
 
   return (
     <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-6">
@@ -99,45 +135,77 @@ export function Header() {
                 className="fixed inset-0 z-40"
                 onClick={() => setIsNotificationsOpen(false)}
               />
-              <div className="absolute right-0 top-full z-50 mt-2 w-80 rounded-xl border border-slate-200 bg-white shadow-lg animate-in">
+              <div className="absolute right-0 top-full z-50 mt-2 w-96 rounded-xl border border-slate-200 bg-white shadow-lg animate-in">
                 <div className="border-b border-slate-200 px-4 py-3">
                   <div className="flex items-center justify-between">
-                    <h3 className="font-semibold text-slate-900">Notifications</h3>
+                    <h3 className="font-semibold text-slate-900">Compliance Alerts</h3>
                     {unreadCount > 0 && (
-                      <span className="rounded-full bg-primary-100 px-2 py-0.5 text-xs font-medium text-primary-700">
-                        {unreadCount} new
+                      <span className="rounded-full bg-danger-100 px-2 py-0.5 text-xs font-medium text-danger-700">
+                        {unreadCount} unread
                       </span>
                     )}
                   </div>
                 </div>
-                <div className="max-h-80 overflow-y-auto">
-                  {notifications.map((notification) => (
-                    <div
-                      key={notification.id}
-                      className={cn(
-                        'border-b border-slate-100 px-4 py-3 hover:bg-slate-50 cursor-pointer transition-colors',
-                        notification.unread && 'bg-primary-50/50'
-                      )}
-                    >
-                      <div className="flex items-start gap-3">
-                        {notification.unread && (
-                          <div className="mt-1.5 h-2 w-2 flex-shrink-0 rounded-full bg-primary-500" />
-                        )}
-                        <div className={cn(!notification.unread && 'pl-5')}>
-                          <p className="text-sm font-medium text-slate-900">
-                            {notification.title}
-                          </p>
-                          <p className="text-sm text-slate-500">{notification.message}</p>
-                          <p className="mt-1 text-xs text-slate-400">{notification.time}</p>
+                <div className="max-h-96 overflow-y-auto">
+                  {recentAlerts && recentAlerts.length > 0 ? (
+                    recentAlerts.map((alert) => {
+                      const Icon = alertTypeIcons[alert.type] || AlertCircle;
+                      const severityColor = severityColors[alert.severity] || 'text-slate-600';
+                      return (
+                        <div
+                          key={alert.id}
+                          className={cn(
+                            'border-b border-slate-100 px-4 py-3 hover:bg-slate-50 cursor-pointer transition-colors',
+                            !alert.isRead && 'bg-primary-50/50'
+                          )}
+                          onClick={() => {
+                            if (!alert.isRead) {
+                              markAsReadMutation.mutate({ id: alert.id });
+                            }
+                          }}
+                        >
+                          <div className="flex items-start gap-3">
+                            <div className={cn('mt-0.5 flex-shrink-0', severityColor)}>
+                              <Icon className="h-5 w-5" />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center gap-2">
+                                <p className="text-sm font-medium text-slate-900 truncate">
+                                  {alert.title}
+                                </p>
+                                {!alert.isRead && (
+                                  <div className="h-2 w-2 flex-shrink-0 rounded-full bg-primary-500" />
+                                )}
+                              </div>
+                              <p className="text-sm text-slate-500 line-clamp-2">{alert.description}</p>
+                              <div className="mt-1 flex items-center gap-2 text-xs text-slate-400">
+                                <span>{formatRelativeTime(alert.createdAt)}</span>
+                                {alert.spac && (
+                                  <>
+                                    <span>-</span>
+                                    <span className="font-medium">{alert.spac.ticker || alert.spac.name}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
                         </div>
-                      </div>
+                      );
+                    })
+                  ) : (
+                    <div className="px-4 py-8 text-center text-sm text-slate-500">
+                      No active alerts
                     </div>
-                  ))}
+                  )}
                 </div>
                 <div className="border-t border-slate-200 px-4 py-3">
-                  <button className="w-full text-center text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors">
-                    View all notifications
-                  </button>
+                  <Link
+                    href="/compliance?tab=alerts"
+                    className="block w-full text-center text-sm font-medium text-primary-600 hover:text-primary-700 transition-colors"
+                    onClick={() => setIsNotificationsOpen(false)}
+                  >
+                    View all alerts
+                  </Link>
                 </div>
               </div>
             </>

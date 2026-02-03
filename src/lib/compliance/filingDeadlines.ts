@@ -20,6 +20,9 @@ import type { FilingType } from '@/types';
 
 import { FILING_DEFINITIONS, type FilerStatus, FILER_STATUS_DEFINITIONS } from './complianceRules';
 
+// Re-export FilerStatus for use by other modules
+export type { FilerStatus };
+
 // ============================================================================
 // FEDERAL HOLIDAYS (US)
 // ============================================================================
@@ -603,6 +606,28 @@ export function formatDeadlineWithTime(date: Date): string {
   return format(date, 'MMM d, yyyy h:mm a');
 }
 
+/**
+ * Enhanced format deadline with days remaining
+ */
+export function formatDeadlineWithDaysRemaining(deadline: Date): string {
+  const today = startOfDay(new Date());
+  const deadlineDay = startOfDay(deadline);
+  const daysRemaining = differenceInDays(deadlineDay, today);
+
+  const formattedDate = format(deadline, 'MMM d, yyyy');
+
+  if (daysRemaining < 0) {
+    return `${formattedDate} (${Math.abs(daysRemaining)} days overdue)`;
+  }
+  if (daysRemaining === 0) {
+    return `${formattedDate} (Due today)`;
+  }
+  if (daysRemaining === 1) {
+    return `${formattedDate} (1 day remaining)`;
+  }
+  return `${formattedDate} (${daysRemaining} days remaining)`;
+}
+
 export function getDeadlineStatus(
   deadline: Date
 ): 'OVERDUE' | 'DUE_TODAY' | 'DUE_SOON' | 'UPCOMING' | 'FUTURE' {
@@ -614,4 +639,422 @@ export function getDeadlineStatus(
   if (differenceInDays(deadlineDay, today) <= 7) {return 'DUE_SOON';}
   if (differenceInDays(deadlineDay, today) <= 30) {return 'UPCOMING';}
   return 'FUTURE';
+}
+
+// ============================================================================
+// URGENCY LEVEL CALCULATION
+// ============================================================================
+
+export type UrgencyLevel = 'critical' | 'warning' | 'normal';
+
+/**
+ * Get urgency level based on days until deadline
+ * - critical: < 7 days
+ * - warning: < 30 days
+ * - normal: >= 30 days
+ */
+export function getUrgencyLevel(deadline: Date): UrgencyLevel {
+  const today = startOfDay(new Date());
+  const deadlineDay = startOfDay(deadline);
+  const daysRemaining = differenceInDays(deadlineDay, today);
+
+  if (daysRemaining < 0) {
+    return 'critical'; // Overdue is critical
+  }
+  if (daysRemaining < 7) {
+    return 'critical';
+  }
+  if (daysRemaining < 30) {
+    return 'warning';
+  }
+  return 'normal';
+}
+
+// ============================================================================
+// SPAC DATA TYPE FOR DEADLINE CALCULATIONS
+// ============================================================================
+
+export interface SpacData {
+  id: string;
+  name: string;
+  ticker: string;
+  status: 'SEARCHING' | 'LOI_SIGNED' | 'DA_ANNOUNCED' | 'SEC_REVIEW' | 'SHAREHOLDER_VOTE' | 'CLOSING' | 'COMPLETED' | 'LIQUIDATING' | 'LIQUIDATED' | 'TERMINATED';
+  ipoDate: Date | null;
+  deadline: Date | null; // Business combination deadline
+  daAnnouncedDate: Date | null;
+  proxyFiledDate: Date | null;
+  voteDate: Date | null;
+  closingDate: Date | null;
+  extensionCount: number;
+  fiscalYearEndMonth?: number; // 0-11, defaults to 11 (December)
+  filerStatus?: FilerStatus;
+  // SEC review tracking
+  secCommentDate?: Date | null;
+  secResponseDueDate?: Date | null;
+}
+
+// ============================================================================
+// FILING DEADLINE ITEM
+// ============================================================================
+
+export interface FilingDeadlineItem {
+  id: string;
+  spacId: string;
+  spacName: string;
+  spacTicker: string;
+  filingType: FilingType;
+  filingName: string;
+  filingShortName: string;
+  deadline: Date;
+  daysRemaining: number;
+  businessDaysRemaining: number;
+  urgency: UrgencyLevel;
+  status: 'OVERDUE' | 'DUE_TODAY' | 'DUE_SOON' | 'UPCOMING' | 'FUTURE';
+  description: string;
+  category: 'PERIODIC' | 'CURRENT' | 'REGISTRATION' | 'PROXY' | 'BENEFICIAL' | 'INSIDER' | 'BUSINESS_COMBINATION' | 'SEC_RESPONSE' | 'OTHER';
+  eventDate?: Date;
+  href?: string;
+}
+
+// ============================================================================
+// CALCULATE ALL FILING DEADLINES FOR A SPAC
+// ============================================================================
+
+/**
+ * Calculate all upcoming filing deadlines for a SPAC based on its lifecycle stage
+ *
+ * Lifecycle stage determines which deadlines are relevant:
+ * - SEARCHING: Focus on periodic reports (10-K, 10-Q), business combination deadline
+ * - LOI_SIGNED to DA_ANNOUNCED: 8-K requirements for material events
+ * - SEC_REVIEW: Response deadlines for SEC comments
+ * - SHAREHOLDER_VOTE: Proxy deadlines (PREM14A/DEFM14A)
+ */
+export function calculateFilingDeadlines(spac: SpacData): FilingDeadlineItem[] {
+  const deadlines: FilingDeadlineItem[] = [];
+  const today = startOfDay(new Date());
+  const fiscalYearEndMonth = spac.fiscalYearEndMonth ?? 11; // Default December
+  const filerStatus = spac.filerStatus ?? 'NON_ACCELERATED';
+
+  // Helper function to create a deadline item
+  const createDeadlineItem = (
+    filingType: FilingType,
+    deadline: Date,
+    description: string,
+    category: FilingDeadlineItem['category'],
+    eventDate?: Date
+  ): FilingDeadlineItem => {
+    const definition = FILING_DEFINITIONS[filingType];
+    const daysRemaining = differenceInDays(startOfDay(deadline), today);
+
+    return {
+      id: `${spac.id}-${filingType}-${deadline.getTime()}`,
+      spacId: spac.id,
+      spacName: spac.name,
+      spacTicker: spac.ticker,
+      filingType,
+      filingName: definition?.name ?? filingType,
+      filingShortName: definition?.shortName ?? filingType,
+      deadline,
+      daysRemaining,
+      businessDaysRemaining: countBusinessDays(today, deadline),
+      urgency: getUrgencyLevel(deadline),
+      status: getDeadlineStatus(deadline),
+      description,
+      category,
+      eventDate,
+      href: `/compliance/filings/${spac.id}/${filingType.toLowerCase()}`,
+    };
+  };
+
+  // ========================================================================
+  // 1. BUSINESS COMBINATION DEADLINE (All stages until completed)
+  // ========================================================================
+  if (spac.deadline && !['COMPLETED', 'LIQUIDATED', 'TERMINATED'].includes(spac.status)) {
+    deadlines.push(createDeadlineItem(
+      'OTHER',
+      spac.deadline,
+      'Business combination must be completed by this date or SPAC will liquidate',
+      'BUSINESS_COMBINATION'
+    ));
+  }
+
+  // ========================================================================
+  // 2. PERIODIC REPORTS (10-K, 10-Q) - All stages while public
+  // ========================================================================
+  if (spac.ipoDate && !['LIQUIDATED', 'TERMINATED'].includes(spac.status)) {
+    const periodicSchedule = generatePeriodicFilingSchedule(
+      fiscalYearEndMonth,
+      filerStatus,
+      1 // Look 1 year ahead
+    );
+
+    // Filter to upcoming deadlines only
+    for (const filing of periodicSchedule) {
+      if (filing.filingDeadline > today) {
+        const description = filing.filingType === 'FORM_10K'
+          ? `Annual report for fiscal year ${filing.period.year}`
+          : `Quarterly report for Q${filing.period.quarter} ${filing.period.year}`;
+
+        deadlines.push(createDeadlineItem(
+          filing.filingType,
+          filing.filingDeadline,
+          description,
+          'PERIODIC',
+          filing.periodEndDate
+        ));
+      }
+    }
+  }
+
+  // ========================================================================
+  // 3. STAGE-SPECIFIC DEADLINES
+  // ========================================================================
+
+  switch (spac.status) {
+    case 'SEARCHING':
+      // Focus is on periodic reports (already added above)
+      // May need to file 8-K for any material events
+      break;
+
+    case 'LOI_SIGNED':
+      // 8-K required within 4 business days of signing LOI
+      if (spac.daAnnouncedDate) {
+        // LOI would have been before DA, estimate it
+        const loiEstimatedDate = subDays(spac.daAnnouncedDate, 30);
+        const loiDeadline = addBusinessDaysCustom(loiEstimatedDate, 4);
+        if (loiDeadline > today) {
+          deadlines.push(createDeadlineItem(
+            'FORM_8K',
+            loiDeadline,
+            'Report LOI signing with target company',
+            'CURRENT',
+            loiEstimatedDate
+          ));
+        }
+      }
+      break;
+
+    case 'DA_ANNOUNCED':
+      // 8-K for DA announcement (within 4 business days)
+      if (spac.daAnnouncedDate) {
+        const daDeadline = addBusinessDaysCustom(spac.daAnnouncedDate, 4);
+        if (daDeadline > today) {
+          deadlines.push(createDeadlineItem(
+            'FORM_8K',
+            daDeadline,
+            'Report definitive agreement with target company',
+            'CURRENT',
+            spac.daAnnouncedDate
+          ));
+        }
+      }
+
+      // S-4/PREM14A preparation reminder (typically 2-3 months after DA)
+      if (spac.daAnnouncedDate) {
+        const s4TargetDate = addMonths(spac.daAnnouncedDate, 2);
+        if (s4TargetDate > today) {
+          deadlines.push(createDeadlineItem(
+            'S4',
+            s4TargetDate,
+            'Target date for S-4 registration statement filing',
+            'REGISTRATION',
+            spac.daAnnouncedDate
+          ));
+        }
+      }
+      break;
+
+    case 'SEC_REVIEW':
+      // SEC comment response deadlines
+      if (spac.secCommentDate) {
+        const responseDeadline = spac.secResponseDueDate
+          ?? addBusinessDaysCustom(spac.secCommentDate, 10);
+
+        if (responseDeadline > today || differenceInDays(today, startOfDay(responseDeadline)) <= 5) {
+          deadlines.push(createDeadlineItem(
+            'OTHER',
+            responseDeadline,
+            'Response to SEC comment letter required',
+            'SEC_RESPONSE',
+            spac.secCommentDate
+          ));
+        }
+      }
+
+      // Preliminary proxy filing reminder
+      if (spac.voteDate && !spac.proxyFiledDate) {
+        const proxyDeadline = subBusinessDaysCustom(spac.voteDate, 20);
+        if (proxyDeadline > today) {
+          deadlines.push(createDeadlineItem(
+            'PREM14A',
+            proxyDeadline,
+            'Preliminary proxy must be filed at least 20 business days before vote',
+            'PROXY'
+          ));
+        }
+      }
+      break;
+
+    case 'SHAREHOLDER_VOTE':
+      // Definitive proxy deadline (if not yet filed)
+      if (spac.voteDate) {
+        // DEF14A should be mailed at least 20 days before vote
+        const defProxyDeadline = subDays(spac.voteDate, 20);
+        if (defProxyDeadline > today && !spac.proxyFiledDate) {
+          deadlines.push(createDeadlineItem(
+            'DEF14A',
+            defProxyDeadline,
+            'Definitive proxy must be mailed to shareholders before vote',
+            'PROXY'
+          ));
+        }
+
+        // Additional soliciting materials (DEFA14A)
+        deadlines.push(createDeadlineItem(
+          'DEFA14A',
+          spac.voteDate,
+          'Additional proxy soliciting materials may be filed until vote date',
+          'PROXY'
+        ));
+
+        // Redemption deadline (typically 2 business days before vote)
+        const redemptionDeadline = subBusinessDaysCustom(spac.voteDate, 2);
+        if (redemptionDeadline > today) {
+          deadlines.push(createDeadlineItem(
+            'OTHER',
+            redemptionDeadline,
+            'Shareholder redemption deadline',
+            'OTHER'
+          ));
+        }
+      }
+      break;
+
+    case 'CLOSING':
+      // Super 8-K deadline (4 business days after closing)
+      if (spac.closingDate) {
+        const super8KDeadline = addBusinessDaysCustom(spac.closingDate, 4);
+        deadlines.push(createDeadlineItem(
+          'SUPER_8K',
+          super8KDeadline,
+          'Super 8-K with shell company disclosures due after transaction closing',
+          'CURRENT',
+          spac.closingDate
+        ));
+      }
+      break;
+
+    case 'COMPLETED':
+      // Post-merger, continue periodic filings (already handled above)
+      break;
+
+    case 'LIQUIDATING':
+      // Liquidation 8-K
+      if (spac.deadline) {
+        const liquidation8KDeadline = addBusinessDaysCustom(spac.deadline, 4);
+        deadlines.push(createDeadlineItem(
+          'FORM_8K',
+          liquidation8KDeadline,
+          'Report liquidation decision and shareholder distribution',
+          'CURRENT',
+          spac.deadline
+        ));
+      }
+      break;
+  }
+
+  // ========================================================================
+  // 4. SORT BY URGENCY AND DEADLINE
+  // ========================================================================
+  const urgencyOrder: Record<UrgencyLevel, number> = {
+    critical: 0,
+    warning: 1,
+    normal: 2,
+  };
+
+  return deadlines.sort((a, b) => {
+    // First sort by urgency
+    const urgencyDiff = urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+    if (urgencyDiff !== 0) {return urgencyDiff;}
+    // Then by deadline date
+    return a.deadline.getTime() - b.deadline.getTime();
+  });
+}
+
+// ============================================================================
+// CALCULATE DEADLINES FOR MULTIPLE SPACS
+// ============================================================================
+
+/**
+ * Calculate filing deadlines for multiple SPACs and merge them
+ */
+export function calculateAllFilingDeadlines(spacs: SpacData[]): FilingDeadlineItem[] {
+  const allDeadlines: FilingDeadlineItem[] = [];
+
+  for (const spac of spacs) {
+    const spacDeadlines = calculateFilingDeadlines(spac);
+    allDeadlines.push(...spacDeadlines);
+  }
+
+  // Sort all deadlines by urgency and date
+  const urgencyOrder: Record<UrgencyLevel, number> = {
+    critical: 0,
+    warning: 1,
+    normal: 2,
+  };
+
+  return allDeadlines.sort((a, b) => {
+    const urgencyDiff = urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+    if (urgencyDiff !== 0) {return urgencyDiff;}
+    return a.deadline.getTime() - b.deadline.getTime();
+  });
+}
+
+// ============================================================================
+// FILTER DEADLINES BY TYPE
+// ============================================================================
+
+export type DeadlineFilterType =
+  | 'all'
+  | 'periodic' // 10-K, 10-Q
+  | 'current' // 8-K
+  | 'proxy' // PREM14A, DEF14A, DEFA14A
+  | 'business_combination'
+  | 'sec_response';
+
+/**
+ * Filter deadlines by category type
+ */
+export function filterDeadlinesByType(
+  deadlines: FilingDeadlineItem[],
+  filterType: DeadlineFilterType
+): FilingDeadlineItem[] {
+  if (filterType === 'all') {
+    return deadlines;
+  }
+
+  const categoryMap: Record<DeadlineFilterType, FilingDeadlineItem['category'][]> = {
+    all: [],
+    periodic: ['PERIODIC'],
+    current: ['CURRENT'],
+    proxy: ['PROXY'],
+    business_combination: ['BUSINESS_COMBINATION'],
+    sec_response: ['SEC_RESPONSE'],
+  };
+
+  const categories = categoryMap[filterType];
+  return deadlines.filter(d => categories.includes(d.category));
+}
+
+/**
+ * Filter deadlines by SPAC ID
+ */
+export function filterDeadlinesBySpac(
+  deadlines: FilingDeadlineItem[],
+  spacId: string | null
+): FilingDeadlineItem[] {
+  if (!spacId) {
+    return deadlines;
+  }
+  return deadlines.filter(d => d.spacId === spacId);
 }

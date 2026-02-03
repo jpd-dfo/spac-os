@@ -3,10 +3,16 @@
  * SEC filing management and tracking
  */
 
-import { type Prisma } from '@prisma/client';
+import { type Prisma, type FilingType as PrismaFilingType } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
 import { z } from 'zod';
 
+import {
+  fetchCompanyFilings,
+  mapFilingTypeToInternal,
+  type EdgarFiling,
+} from '@/lib/compliance/secEdgarClient';
+import { logger } from '@/lib/logger';
 import {
   FilingCreateSchema,
   FilingUpdateSchema,
@@ -586,5 +592,241 @@ export const filingRouter = createTRPCRouter({
         byStatus: Object.fromEntries(byStatus.map((s) => [s.status, s._count])),
         averageReviewDays: avgReviewTime,
       };
+    }),
+
+  // ============================================================================
+  // SEC EDGAR INTEGRATION
+  // ============================================================================
+
+  /**
+   * Get filings from SEC EDGAR API
+   * Fetches filings directly from SEC EDGAR without syncing to database
+   */
+  getEdgarFilings: protectedProcedure
+    .input(z.object({
+      cik: z.string().min(1, 'CIK is required'),
+      page: z.number().int().min(1).default(1),
+      pageSize: z.number().int().min(1).max(100).default(20),
+      formTypes: z.array(z.string()).optional(),
+    }))
+    .query(async ({ input }) => {
+      const { cik, page, pageSize, formTypes } = input;
+
+      try {
+        const result = await fetchCompanyFilings(cik, {
+          page,
+          pageSize,
+          formTypes,
+        });
+
+        return {
+          filings: result.filings,
+          totalFilings: result.totalFilings,
+          page: result.page,
+          pageSize: result.pageSize,
+          totalPages: Math.ceil(result.totalFilings / result.pageSize),
+          companyInfo: result.companyInfo,
+        };
+      } catch (error) {
+        logger.error('Error fetching EDGAR filings:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch filings from SEC EDGAR',
+          cause: error,
+        });
+      }
+    }),
+
+  /**
+   * Sync filings from SEC EDGAR to database
+   * Fetches filings from SEC and creates/updates them in the database
+   */
+  syncFilingsFromEdgar: orgAuditedProcedure
+    .input(z.object({
+      spacId: UuidSchema,
+      formTypes: z.array(z.string()).optional(),
+      limit: z.number().int().min(1).max(100).default(50),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { spacId, formTypes, limit } = input;
+
+      // Get SPAC with CIK
+      const spac = await ctx.db.spac.findUnique({
+        where: { id: spacId },
+        select: { id: true, cik: true, name: true, ticker: true },
+      });
+
+      if (!spac) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'SPAC not found',
+        });
+      }
+
+      if (!spac.cik) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'SPAC does not have a CIK number. Please add the CIK to sync filings from SEC EDGAR.',
+        });
+      }
+
+      try {
+        // Fetch filings from SEC EDGAR
+        const result = await fetchCompanyFilings(spac.cik, {
+          pageSize: limit,
+          formTypes,
+        });
+
+        if (result.filings.length === 0) {
+          return {
+            synced: 0,
+            created: 0,
+            updated: 0,
+            skipped: 0,
+            filings: [],
+          };
+        }
+
+        // Get existing filings by accession number
+        const existingFilings = await ctx.db.filing.findMany({
+          where: {
+            spacId,
+            accessionNumber: {
+              in: result.filings.map(f => f.accessionNumber),
+            },
+          },
+          select: { id: true, accessionNumber: true },
+        });
+
+        const existingAccessionNumbers = new Set(
+          existingFilings.map(f => f.accessionNumber).filter(Boolean)
+        );
+
+        // Process filings
+        const created: string[] = [];
+        const updated: string[] = [];
+        const skipped: string[] = [];
+
+        for (const edgarFiling of result.filings) {
+          const accessionNumber = edgarFiling.accessionNumber;
+
+          if (existingAccessionNumbers.has(accessionNumber)) {
+            // Update existing filing
+            const existing = existingFilings.find(f => f.accessionNumber === accessionNumber);
+            if (existing) {
+              await ctx.db.filing.update({
+                where: { id: existing.id },
+                data: {
+                  filedDate: new Date(edgarFiling.filingDate),
+                  edgarUrl: edgarFiling.documentUrls[0]?.documentUrl || null,
+                  fileNumber: edgarFiling.fileNumber || null,
+                },
+              });
+              updated.push(accessionNumber);
+            }
+          } else {
+            // Create new filing
+            const filingType = mapFilingTypeToInternal(edgarFiling.filingType);
+
+            // Check if the filing type is valid for the Prisma schema
+            const validFilingTypes: PrismaFilingType[] = [
+              'S1', 'S4', 'F1', 'F4', 'DEFA14A', 'DEFM14A', 'PRER14A', 'PREM14A',
+              'SC_TO', 'FORM_8K', 'FORM_10K', 'FORM_10Q', 'FORM_425', 'SUPER_8K',
+              'REGISTRATION', 'PROXY', 'PROSPECTUS', 'OTHER'
+            ];
+
+            const prismaFilingType = validFilingTypes.includes(filingType as PrismaFilingType)
+              ? (filingType as PrismaFilingType)
+              : 'OTHER';
+
+            try {
+              await ctx.db.filing.create({
+                data: {
+                  spacId,
+                  type: prismaFilingType,
+                  status: 'FILED',
+                  title: `${edgarFiling.filingType} - ${edgarFiling.primaryDocDescription || 'SEC Filing'}`,
+                  description: edgarFiling.primaryDocDescription || null,
+                  cik: spac.cik,
+                  accessionNumber,
+                  fileNumber: edgarFiling.fileNumber || null,
+                  edgarUrl: edgarFiling.documentUrls[0]?.documentUrl || null,
+                  filedDate: new Date(edgarFiling.filingDate),
+                },
+              });
+              created.push(accessionNumber);
+            } catch (createError) {
+              logger.error(`Failed to create filing ${accessionNumber}:`, createError);
+              skipped.push(accessionNumber);
+            }
+          }
+        }
+
+        // Get the synced filings
+        const syncedFilings = await ctx.db.filing.findMany({
+          where: {
+            spacId,
+            accessionNumber: {
+              in: [...created, ...updated],
+            },
+          },
+          include: {
+            spac: { select: { id: true, name: true, ticker: true } },
+          },
+          orderBy: { filedDate: 'desc' },
+        });
+
+        return {
+          synced: created.length + updated.length,
+          created: created.length,
+          updated: updated.length,
+          skipped: skipped.length,
+          filings: syncedFilings,
+        };
+      } catch (error) {
+        logger.error('Error syncing EDGAR filings:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to sync filings from SEC EDGAR',
+          cause: error,
+        });
+      }
+    }),
+
+  /**
+   * Get EDGAR filing details
+   * Fetches detailed information about a specific filing from SEC EDGAR
+   */
+  getEdgarFilingDetails: protectedProcedure
+    .input(z.object({
+      cik: z.string().min(1, 'CIK is required'),
+      accessionNumber: z.string().min(1, 'Accession number is required'),
+    }))
+    .query(async ({ input }) => {
+      const { cik, accessionNumber } = input;
+
+      try {
+        const { fetchFilingDetails } = await import('@/lib/compliance/secEdgarClient');
+        const filing = await fetchFilingDetails(cik, accessionNumber);
+
+        if (!filing) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Filing not found in SEC EDGAR',
+          });
+        }
+
+        return filing;
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+        logger.error('Error fetching EDGAR filing details:', error);
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch filing details from SEC EDGAR',
+          cause: error,
+        });
+      }
     }),
 });

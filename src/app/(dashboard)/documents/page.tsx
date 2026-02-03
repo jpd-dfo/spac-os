@@ -21,7 +21,7 @@ import {
   X,
 } from 'lucide-react';
 
-import { DocumentCard, type DocumentData } from '@/components/documents/DocumentCard';
+import { DocumentCard, type DocumentData, type RiskLevel } from '@/components/documents/DocumentCard';
 import { UploadModal } from '@/components/documents/UploadModal';
 
 // Dynamic import of DocumentViewer to avoid SSR issues with react-pdf
@@ -202,6 +202,17 @@ export default function DocumentsPage() {
     }
     return documentListData.items.map(transformDocumentToUI);
   }, [documentListData]);
+
+  // Get document IDs for fetching risk levels
+  const documentIds = useMemo(() => {
+    return documents.map((doc) => doc.id);
+  }, [documents]);
+
+  // Fetch cached analysis risk levels for all documents
+  const { data: riskLevelsMap } = trpc.document.getCachedAnalysisRiskLevels.useQuery(
+    { documentIds },
+    { enabled: documentIds.length > 0 }
+  );
 
   // ============================================================================
   // FILTERED DOCUMENTS
@@ -574,6 +585,7 @@ export default function DocumentsPage() {
                   key={doc.id}
                   document={doc}
                   viewMode="grid"
+                  riskLevel={riskLevelsMap?.[doc.id] as RiskLevel | undefined}
                   onView={handleView}
                   onDownload={handleDownload}
                   onDelete={handleDeleteClick}
@@ -599,6 +611,7 @@ export default function DocumentsPage() {
                   key={doc.id}
                   document={doc}
                   viewMode="list"
+                  riskLevel={riskLevelsMap?.[doc.id] as RiskLevel | undefined}
                   onView={handleView}
                   onDownload={handleDownload}
                   onDelete={handleDeleteClick}

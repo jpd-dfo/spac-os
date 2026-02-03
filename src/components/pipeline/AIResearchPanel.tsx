@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useRef } from 'react';
 
 import {
   X,
@@ -22,9 +22,18 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
+import { ProgressIndicator } from '@/components/shared';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { cn } from '@/lib/utils';
+
+// Research steps for progress tracking
+const RESEARCH_STEPS = [
+  'Gathering company data',
+  'Analyzing market',
+  'Researching competitors',
+  'Evaluating management',
+];
 
 interface AIResearchPanelProps {
   targetId: string;
@@ -141,6 +150,53 @@ export function AIResearchPanel({
     new Set(['company', 'market', 'competitors', 'management'])
   );
 
+  // Progress tracking state for full research
+  const [currentStep, setCurrentStep] = useState(0);
+  const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState('');
+  const [estimatedTime, setEstimatedTime] = useState<number | undefined>(undefined);
+  const [isFullResearchLoading, setIsFullResearchLoading] = useState(false);
+
+  // AbortControllers for cancellation
+  const abortControllersRef = useRef<Map<string, AbortController>>(new Map());
+  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
+
+  const cancelAllResearch = useCallback(() => {
+    // Cancel all active requests
+    abortControllersRef.current.forEach((controller) => {
+      controller.abort();
+    });
+    abortControllersRef.current.clear();
+
+    // Clear progress interval
+    if (progressIntervalRef.current) {
+      clearInterval(progressIntervalRef.current);
+      progressIntervalRef.current = null;
+    }
+
+    // Reset states
+    setLoading({
+      company: false,
+      market: false,
+      competitors: false,
+      management: false,
+    });
+    setIsFullResearchLoading(false);
+    setCurrentStep(0);
+    setProgress(0);
+    setStatusMessage('');
+    setEstimatedTime(undefined);
+  }, []);
+
+  const cancelSingleResearch = useCallback((operation: string) => {
+    const controller = abortControllersRef.current.get(operation);
+    if (controller) {
+      controller.abort();
+      abortControllersRef.current.delete(operation);
+    }
+    setLoading((prev) => ({ ...prev, [operation]: false }));
+  }, []);
+
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {
       const next = new Set(prev);
@@ -155,6 +211,16 @@ export function AIResearchPanel({
 
   const fetchResearch = useCallback(
     async (operation: 'company' | 'market' | 'competitors' | 'management') => {
+      // Cancel any existing request for this operation
+      const existingController = abortControllersRef.current.get(operation);
+      if (existingController) {
+        existingController.abort();
+      }
+
+      // Create new AbortController
+      const controller = new AbortController();
+      abortControllersRef.current.set(operation, controller);
+
       setLoading((prev) => ({ ...prev, [operation]: true }));
       setErrors((prev) => ({ ...prev, [operation]: '' }));
 
@@ -169,6 +235,7 @@ export function AIResearchPanel({
               industry: targetSector || 'Technology',
             },
           }),
+          signal: controller.signal,
         });
 
         if (!response.ok) {
@@ -192,11 +259,17 @@ export function AIResearchPanel({
           }
         });
       } catch (error) {
+        // Don't show error if cancelled
+        if (error instanceof Error && error.name === 'AbortError') {
+          console.log(`${operation} research cancelled`);
+          return;
+        }
         setErrors((prev) => ({
           ...prev,
           [operation]: error instanceof Error ? error.message : 'An error occurred',
         }));
       } finally {
+        abortControllersRef.current.delete(operation);
         setLoading((prev) => ({ ...prev, [operation]: false }));
       }
     },
@@ -204,12 +277,44 @@ export function AIResearchPanel({
   );
 
   const fetchAllResearch = useCallback(async () => {
-    await Promise.all([
-      fetchResearch('company'),
-      fetchResearch('market'),
-      fetchResearch('competitors'),
-      fetchResearch('management'),
-    ]);
+    // Initialize progress tracking
+    setIsFullResearchLoading(true);
+    setCurrentStep(0);
+    setProgress(0);
+    setStatusMessage(RESEARCH_STEPS[0] ?? 'Starting research');
+    setEstimatedTime(60); // Initial estimate: 60 seconds
+
+    // Start progress simulation
+    let stepIndex = 0;
+    progressIntervalRef.current = setInterval(() => {
+      stepIndex = Math.min(stepIndex + 1, RESEARCH_STEPS.length - 1);
+      setCurrentStep(stepIndex);
+      setStatusMessage(RESEARCH_STEPS[stepIndex] ?? 'Processing');
+      setProgress((prev) => Math.min(prev + 25, 90)); // Max out at 90% until complete
+      setEstimatedTime((prev) => (prev !== undefined && prev > 10 ? prev - 10 : undefined));
+    }, 8000);
+
+    try {
+      await Promise.all([
+        fetchResearch('company'),
+        fetchResearch('market'),
+        fetchResearch('competitors'),
+        fetchResearch('management'),
+      ]);
+
+      // Complete progress
+      setCurrentStep(RESEARCH_STEPS.length - 1);
+      setProgress(100);
+      setStatusMessage('Research complete');
+      setEstimatedTime(undefined);
+    } finally {
+      // Clear progress interval
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+      setIsFullResearchLoading(false);
+    }
   }, [fetchResearch]);
 
   const copyToClipboard = (text: string) => {
@@ -288,17 +393,26 @@ export function AIResearchPanel({
           </div>
         )}
 
-        {/* Loading State for Initial Research */}
-        {isAnyLoading && !hasAnyData && (
-          <div className="flex flex-col items-center justify-center py-16">
-            <div className="relative">
-              <div className="h-16 w-16 rounded-full border-4 border-slate-200" />
-              <div className="absolute inset-0 h-16 w-16 animate-spin rounded-full border-4 border-primary-500 border-t-transparent" />
+        {/* Loading State for Initial Research with Progress Indicator */}
+        {isFullResearchLoading && !hasAnyData && (
+          <div className="flex flex-col items-center justify-center py-12 px-6">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-primary-100 mb-6">
+              <Sparkles className="h-8 w-8 text-primary-600" />
             </div>
-            <p className="mt-4 font-medium text-slate-900">Researching company...</p>
-            <p className="mt-1 text-sm text-slate-500">
-              Gathering data from multiple sources
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Researching {targetName}</h3>
+            <p className="text-sm text-slate-500 mb-6 text-center">
+              Gathering comprehensive data from multiple sources
             </p>
+            <div className="w-full max-w-sm">
+              <ProgressIndicator
+                progress={progress}
+                status={statusMessage}
+                steps={RESEARCH_STEPS}
+                currentStep={currentStep}
+                onCancel={cancelAllResearch}
+                estimatedTimeRemaining={estimatedTime}
+              />
+            </div>
           </div>
         )}
 
