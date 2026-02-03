@@ -6,14 +6,12 @@ import {
   Plus,
   ChevronDown,
   ChevronRight,
-  GripVertical,
   Settings,
   MoreHorizontal,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
-import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel } from '@/components/ui/Dropdown';
+import { Dropdown, DropdownItem } from '@/components/ui/Dropdown';
 import { cn, formatLargeNumber } from '@/lib/utils';
 
 import { TargetCard, TargetCardSkeleton, type Target, type PipelineStage, type QuickAction } from './TargetCard';
@@ -94,7 +92,7 @@ const DEFAULT_COLUMNS: KanbanColumn[] = [
 interface ColumnHeaderProps {
   column: KanbanColumn;
   targetCount: number;
-  totalValue: number;
+  totalValue?: number;
   isCollapsed: boolean;
   onToggleCollapse: () => void;
   onAddTarget?: () => void;
@@ -110,6 +108,8 @@ function ColumnHeader({
   onAddTarget,
   showSettings,
 }: ColumnHeaderProps) {
+  // Silence unused var warning - totalValue reserved for future use
+  void totalValue;
   return (
     <div className="mb-3 flex items-center justify-between">
       <div className="flex items-center gap-2">
@@ -245,6 +245,62 @@ function KanbanColumnContainer({
     onDrop(e, column);
   };
 
+  // Helper to render column content - avoids nested ternary
+  const renderColumnContent = () => {
+    if (isLoading) {
+      return (
+        <>
+          <TargetCardSkeleton />
+          <TargetCardSkeleton />
+        </>
+      );
+    }
+
+    if (targets.length === 0) {
+      return (
+        <div
+          className={cn(
+            'flex h-24 items-center justify-center rounded-lg border-2 border-dashed transition-colors',
+            isDragOver
+              ? 'border-primary-400 bg-primary-50'
+              : 'border-slate-300 text-slate-400'
+          )}
+        >
+          <span className="text-sm">
+            {isDragOver ? 'Drop here' : 'No targets'}
+          </span>
+        </div>
+      );
+    }
+
+    return targets.map((target) => (
+      <div
+        key={target.id}
+        draggable
+        onDragStart={(e) => {
+          e.dataTransfer.effectAllowed = 'move';
+          e.dataTransfer.setData('text/plain', target.id);
+          onDragStart(target);
+        }}
+        onDragEnd={onDragEnd}
+        className={cn(
+          'transition-transform duration-200',
+          draggedTarget?.id === target.id && 'opacity-50 scale-95'
+        )}
+      >
+        <TargetCard
+          target={target}
+          isDragging={draggedTarget?.id === target.id}
+          isSelected={selectedTargets?.has(target.id)}
+          showCheckbox={showCheckboxes}
+          onClick={onTargetClick}
+          onQuickAction={onTargetQuickAction}
+          onSelectionChange={onSelectionChange}
+        />
+      </div>
+    ));
+  };
+
   return (
     <div
       className={cn(
@@ -274,52 +330,7 @@ function KanbanColumnContainer({
       {/* Column Content */}
       {!isCollapsed && (
         <div className="flex-1 space-y-3 overflow-y-auto p-4 pt-0" style={{ maxHeight: 'calc(100vh - 320px)' }}>
-          {isLoading ? (
-            <>
-              <TargetCardSkeleton />
-              <TargetCardSkeleton />
-            </>
-          ) : targets.length === 0 ? (
-            <div
-              className={cn(
-                'flex h-24 items-center justify-center rounded-lg border-2 border-dashed transition-colors',
-                isDragOver
-                  ? 'border-primary-400 bg-primary-50'
-                  : 'border-slate-300 text-slate-400'
-              )}
-            >
-              <span className="text-sm">
-                {isDragOver ? 'Drop here' : 'No targets'}
-              </span>
-            </div>
-          ) : (
-            targets.map((target) => (
-              <div
-                key={target.id}
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.effectAllowed = 'move';
-                  e.dataTransfer.setData('text/plain', target.id);
-                  onDragStart(target);
-                }}
-                onDragEnd={onDragEnd}
-                className={cn(
-                  'transition-transform duration-200',
-                  draggedTarget?.id === target.id && 'opacity-50 scale-95'
-                )}
-              >
-                <TargetCard
-                  target={target}
-                  isDragging={draggedTarget?.id === target.id}
-                  isSelected={selectedTargets?.has(target.id)}
-                  showCheckbox={showCheckboxes}
-                  onClick={onTargetClick}
-                  onQuickAction={onTargetQuickAction}
-                  onSelectionChange={onSelectionChange}
-                />
-              </div>
-            ))
-          )}
+          {renderColumnContent()}
         </div>
       )}
 
@@ -384,7 +395,7 @@ export function KanbanBoard({
     setDraggedTarget(null);
   }, []);
 
-  const handleDragOver = useCallback((e: React.DragEvent, column: KanbanColumn) => {
+  const handleDragOver = useCallback((e: React.DragEvent, _column: KanbanColumn) => {
     e.preventDefault();
   }, []);
 

@@ -29,6 +29,7 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
+import { UploadModal } from '@/components/documents/UploadModal';
 import { StatusTransition, type SpacStatus as StatusTransitionStatus } from '@/components/spac';
 import { SpacStatusBadge } from '@/components/spacs';
 import { Badge } from '@/components/ui/Badge';
@@ -287,6 +288,7 @@ export default function SPACDetailPage() {
   const params = useParams();
   const id = params['id'] as string;
   const [_activeTab, setActiveTab] = useState<TabType>('overview');
+  const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   // ============================================================================
   // DATA FETCHING - Connected to tRPC
@@ -1001,7 +1003,7 @@ export default function SPACDetailPage() {
               <h3 className="text-lg font-medium text-slate-900">
                 Documents ({spac.documents?.length || 0})
               </h3>
-              <Button variant="primary" size="sm">
+              <Button variant="primary" size="sm" onClick={() => setIsUploadModalOpen(true)}>
                 <FileText className="mr-2 h-4 w-4" />
                 Upload Document
               </Button>
@@ -1014,7 +1016,7 @@ export default function SPACDetailPage() {
                 description="Upload your first document to get started"
                 action={{
                   label: 'Upload Document',
-                  onClick: () => {},
+                  onClick: () => setIsUploadModalOpen(true),
                 }}
               />
             ) : (
@@ -1332,6 +1334,18 @@ export default function SPACDetailPage() {
           </div>
         </TabContent>
       </Tabs>
+
+      {/* Upload Modal */}
+      <UploadModal
+        isOpen={isUploadModalOpen}
+        onClose={() => setIsUploadModalOpen(false)}
+        onUpload={async (files, metadata) => {
+          // TODO: Implement actual file upload with spacId
+          console.log('Upload files for SPAC:', spac.id, { files, metadata });
+          // After upload completes, refetch the SPAC data
+          refetch();
+        }}
+      />
     </div>
   );
 }

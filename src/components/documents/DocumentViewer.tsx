@@ -1,6 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
+
+import { Document, Page, pdfjs } from 'react-pdf';
+import 'react-pdf/dist/Page/AnnotationLayer.css';
+import 'react-pdf/dist/Page/TextLayer.css';
 
 import {
   X,
@@ -15,17 +19,17 @@ import {
   FileText,
   Clock,
   User,
-  Tag,
   MessageSquare,
   History,
   ExternalLink,
   Copy,
   MoreVertical,
   Edit2,
-  Trash2,
   Lock,
   Info,
   Sparkles,
+  Loader2,
+  AlertCircle,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
@@ -34,6 +38,13 @@ import { Tooltip } from '@/components/ui/Tooltip';
 import { cn, formatFileSize, formatDate, formatRelativeTime } from '@/lib/utils';
 
 import type { DocumentData } from './DocumentCard';
+
+// Configure PDF.js worker
+pdfjs.GlobalWorkerOptions.workerSrc = `//unpkg.com/pdfjs-dist@${pdfjs.version}/build/pdf.worker.min.js`;
+
+// ============================================================================
+// TYPES
+// ============================================================================
 
 interface VersionHistory {
   version: number;
@@ -59,7 +70,13 @@ interface DocumentViewerProps {
   onDownload?: (doc: DocumentData) => void;
   onShare?: (doc: DocumentData) => void;
   onShowAIAnalysis?: (doc: DocumentData) => void;
+  /** Optional URL to the actual PDF file for rendering */
+  pdfUrl?: string;
 }
+
+// ============================================================================
+// MOCK DATA
+// ============================================================================
 
 // Mock version history
 const mockVersionHistory: VersionHistory[] = [
@@ -110,6 +127,10 @@ const mockComments: Comment[] = [
   },
 ];
 
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
 export function DocumentViewer({
   document,
   isOpen,
@@ -117,21 +138,51 @@ export function DocumentViewer({
   onDownload,
   onShare,
   onShowAIAnalysis,
+  pdfUrl,
 }: DocumentViewerProps) {
+  // ============================================================================
+  // STATE
+  // ============================================================================
+
   const [activeTab, setActiveTab] = useState<'details' | 'versions' | 'comments'>('details');
-  const [zoom, setZoom] = useState(100);
+  const [scale, setScale] = useState(1.0);
   const [currentPage, setCurrentPage] = useState(1);
+  const [numPages, setNumPages] = useState<number>(0);
+  const [rotation, setRotation] = useState(0);
   const [showSidebar, setShowSidebar] = useState(true);
   const [newComment, setNewComment] = useState('');
+  const [pdfLoading, setPdfLoading] = useState(true);
+  const [pdfError, setPdfError] = useState<string | null>(null);
 
-  const totalPages = 24; // Mock total pages
+  // Check if document is a PDF
+  const isPdf = document.fileType?.toLowerCase() === 'pdf' ||
+    document.fileName?.toLowerCase().endsWith('.pdf');
 
-  if (!isOpen) {return null;}
+  // ============================================================================
+  // HANDLERS
+  // ============================================================================
 
-  const handleZoomIn = () => setZoom((prev) => Math.min(prev + 25, 200));
-  const handleZoomOut = () => setZoom((prev) => Math.max(prev - 25, 50));
+  const onDocumentLoadSuccess = useCallback(({ numPages }: { numPages: number }) => {
+    setNumPages(numPages);
+    setCurrentPage(1);
+    setPdfLoading(false);
+    setPdfError(null);
+  }, []);
+
+  const onDocumentLoadError = useCallback((err: Error) => {
+    setPdfError(err.message || 'Failed to load PDF');
+    setPdfLoading(false);
+  }, []);
+
+  const handleZoomIn = () => setScale((prev) => Math.min(prev + 0.25, 3.0));
+  const handleZoomOut = () => setScale((prev) => Math.max(prev - 0.25, 0.5));
+  const handleRotate = () => setRotation((prev) => (prev + 90) % 360);
   const handlePrevPage = () => setCurrentPage((prev) => Math.max(prev - 1, 1));
-  const handleNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, totalPages));
+  const handleNextPage = () => setCurrentPage((prev) => Math.min(prev + 1, numPages || 1));
+
+  if (!isOpen) {
+    return null;
+  }
 
   const statusConfig: Record<string, { label: string; variant: 'success' | 'warning' | 'secondary' | 'primary' }> = {
     DRAFT: { label: 'Draft', variant: 'secondary' },
@@ -142,6 +193,9 @@ export function DocumentViewer({
   };
 
   const status = statusConfig[document.status] ?? { label: 'Draft', variant: 'secondary' as const };
+
+  // Display pages - use numPages from PDF or default to 1
+  const displayTotalPages = numPages || 1;
 
   return (
     <div className="fixed inset-0 z-50 flex bg-black/50">
@@ -177,17 +231,19 @@ export function DocumentViewer({
               <Tooltip content="Zoom Out">
                 <button
                   onClick={handleZoomOut}
-                  disabled={zoom <= 50}
+                  disabled={scale <= 0.5}
                   className="rounded p-1.5 hover:bg-white disabled:opacity-50"
                 >
                   <ZoomOut className="h-4 w-4 text-slate-600" />
                 </button>
               </Tooltip>
-              <span className="min-w-[50px] text-center text-sm text-slate-600">{zoom}%</span>
+              <span className="min-w-[50px] text-center text-sm text-slate-600">
+                {Math.round(scale * 100)}%
+              </span>
               <Tooltip content="Zoom In">
                 <button
                   onClick={handleZoomIn}
-                  disabled={zoom >= 200}
+                  disabled={scale >= 3.0}
                   className="rounded p-1.5 hover:bg-white disabled:opacity-50"
                 >
                   <ZoomIn className="h-4 w-4 text-slate-600" />
@@ -207,18 +263,28 @@ export function DocumentViewer({
                 </button>
               </Tooltip>
               <span className="min-w-[80px] text-center text-sm text-slate-600">
-                {currentPage} / {totalPages}
+                {currentPage} / {displayTotalPages}
               </span>
               <Tooltip content="Next Page">
                 <button
                   onClick={handleNextPage}
-                  disabled={currentPage >= totalPages}
+                  disabled={currentPage >= displayTotalPages}
                   className="rounded p-1.5 hover:bg-white disabled:opacity-50"
                 >
                   <ChevronRight className="h-4 w-4 text-slate-600" />
                 </button>
               </Tooltip>
             </div>
+
+            {/* Rotate */}
+            <Tooltip content="Rotate">
+              <button
+                onClick={handleRotate}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              >
+                <RotateCw className="h-5 w-5" />
+              </button>
+            </Tooltip>
 
             <div className="h-6 w-px bg-slate-200" />
 
@@ -271,25 +337,85 @@ export function DocumentViewer({
 
         {/* Document Preview Area */}
         <div className="flex-1 overflow-auto p-8">
-          <div
-            className="mx-auto bg-white shadow-lg"
-            style={{
-              width: `${(8.5 * 96 * zoom) / 100}px`,
-              minHeight: `${(11 * 96 * zoom) / 100}px`,
-            }}
-          >
-            {/* Mock PDF Preview */}
-            <div className="flex h-full flex-col items-center justify-center p-8 text-center">
-              <FileText className="h-24 w-24 text-slate-300" />
-              <h3 className="mt-4 text-lg font-medium text-slate-600">{document.name}</h3>
-              <p className="mt-2 text-sm text-slate-400">
-                Page {currentPage} of {totalPages}
-              </p>
-              <p className="mt-4 max-w-md text-sm text-slate-500">
-                Document preview would be rendered here using a PDF viewer library like
-                react-pdf or pdfjs-dist for actual PDF rendering.
-              </p>
-            </div>
+          <div className="flex min-h-full items-center justify-center">
+            {/* PDF Rendering */}
+            {isPdf && pdfUrl ? (
+              <>
+                {/* Loading State */}
+                {pdfLoading && !pdfError && (
+                  <div className="flex flex-col items-center gap-3 text-slate-500">
+                    <Loader2 className="h-8 w-8 animate-spin" />
+                    <span>Loading PDF...</span>
+                  </div>
+                )}
+
+                {/* Error State */}
+                {pdfError && (
+                  <div className="flex flex-col items-center gap-3 rounded-lg bg-red-50 p-8 text-center">
+                    <AlertCircle className="h-12 w-12 text-red-500" />
+                    <div>
+                      <h3 className="font-semibold text-red-800">Failed to Load PDF</h3>
+                      <p className="mt-1 text-sm text-red-600">{pdfError}</p>
+                    </div>
+                  </div>
+                )}
+
+                {/* PDF Document */}
+                <Document
+                  file={pdfUrl}
+                  onLoadSuccess={onDocumentLoadSuccess}
+                  onLoadError={onDocumentLoadError}
+                  loading={null}
+                  className="flex justify-center"
+                >
+                  <Page
+                    pageNumber={currentPage}
+                    scale={scale}
+                    rotate={rotation}
+                    className="shadow-xl"
+                    renderTextLayer={true}
+                    renderAnnotationLayer={true}
+                    loading={
+                      <div className="flex h-[800px] w-[600px] items-center justify-center bg-white shadow-xl">
+                        <Loader2 className="h-8 w-8 animate-spin text-slate-400" />
+                      </div>
+                    }
+                  />
+                </Document>
+              </>
+            ) : (
+              /* Placeholder Preview for non-PDF or when URL not available */
+              <div
+                className="bg-white shadow-lg"
+                style={{
+                  width: `${(8.5 * 96 * scale)}px`,
+                  minHeight: `${(11 * 96 * scale)}px`,
+                  transform: `rotate(${rotation}deg)`,
+                }}
+              >
+                <div className="flex h-full flex-col items-center justify-center p-8 text-center">
+                  <FileText className="h-24 w-24 text-slate-300" />
+                  <h3 className="mt-4 text-lg font-medium text-slate-600">{document.name}</h3>
+                  <p className="mt-2 text-sm text-slate-400">
+                    {isPdf ? 'PDF preview not available' : `${document.fileType?.toUpperCase() || 'File'} document`}
+                  </p>
+                  <p className="mt-4 max-w-md text-sm text-slate-500">
+                    {isPdf
+                      ? 'The PDF file URL is not available. Click Download to view the document.'
+                      : 'Preview is only available for PDF documents. Click Download to view this file.'}
+                  </p>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    className="mt-4"
+                    onClick={() => onDownload?.(document)}
+                  >
+                    <Download className="mr-2 h-4 w-4" />
+                    Download to View
+                  </Button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -397,6 +523,12 @@ export function DocumentViewer({
                       <span className="text-sm text-slate-500">Category</span>
                       <span className="text-sm font-medium text-slate-900">{document.category}</span>
                     </div>
+                    {numPages > 0 && (
+                      <div className="flex items-center justify-between">
+                        <span className="text-sm text-slate-500">Pages</span>
+                        <span className="text-sm font-medium text-slate-900">{numPages}</span>
+                      </div>
+                    )}
                   </div>
                 </div>
 
@@ -543,7 +675,10 @@ export function DocumentViewer({
                             </div>
                             <p className="mt-1 text-sm text-slate-600">{comment.content}</p>
                             {comment.page && (
-                              <button className="mt-1 text-xs text-primary-600 hover:underline">
+                              <button
+                                className="mt-1 text-xs text-primary-600 hover:underline"
+                                onClick={() => setCurrentPage(comment.page!)}
+                              >
                                 Go to page {comment.page}
                               </button>
                             )}

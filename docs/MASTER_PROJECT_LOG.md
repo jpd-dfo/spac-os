@@ -7,40 +7,75 @@ This document serves as the central tracking document for the SPAC OS applicatio
 ## RECOVERY INFORMATION
 
 ### Current State (Updated: February 3, 2026)
-- **Last Completed Sprint:** Sprint 3 - Deal Pipeline Backend Integration
-- **Current Sprint:** Sprint 4 - Document Management (NEXT)
-- **Current PRD Version:** v4.3
+- **Last Completed Sprint:** Sprint 4 - Document Management
+- **Current Sprint:** Sprint 5 - AI Integration (NEXT)
+- **Current PRD Version:** v4.4
 - **Current Branch:** develop
 - **Base Branch:** main
 
-### Sprint 3 Summary (Just Completed)
-Sprint 3 connected the existing deal pipeline UI to the real tRPC backend:
-- Pipeline pages fetch real data from database
-- Drag-and-drop persists stage changes
-- Edit target with modal form
-- Export to CSV/Excel
-- Bulk operations (select, batch stage change, batch archive)
-
-### What Sprint 4 Will Build
-**Document Management:**
-- Document upload with drag-and-drop
-- Document storage (Supabase Storage or S3)
-- Document viewer for PDFs
-- Document versioning
+### Sprint 4 Summary (Just Completed)
+Sprint 4 delivered comprehensive document management:
+- Document upload with drag-and-drop (react-dropzone)
+- Supabase Storage integration with signed URLs
+- PDF viewer with react-pdf (zoom, page nav)
+- Document versioning with history tracking
 - Document categorization and tagging
-- Document search
-- Integration with SPAC and Target pages
+- Full-text document search
+- SPAC/Target document integration
+
+Also completed Sprint 3 carryover:
+- Add Note functionality (note.router.ts)
+- Change Priority quick action (updatePriority mutation)
+- Move Stage quick action (updateStage mutation)
+
+### What Sprint 5 Will Build
+**AI Integration:**
+- Claude API integration for analysis
+- Document summarization
+- Target company research
+- Deal scoring algorithm
+- Investment memo generation
+- Risk analysis
 
 ### Quick Recovery Steps
 1. `git checkout develop`
 2. `npm install`
 3. `npm run dev`
-4. Review `/docs/PRD/SPAC_OS_PRD_v4.3.md` for current state
+4. Review `/docs/PRD/SPAC_OS_PRD_v4.4.md` for current state
 5. Review `/docs/sprints/` for sprint plans
 
 ---
 
 ## PROJECT LOG
+
+### February 3, 2026 - Sprint 4 Completed
+**Sprint:** Sprint 4 - Document Management
+**Status:** COMPLETED
+
+**Accomplishments:**
+- Document upload with drag-and-drop (react-dropzone)
+- Supabase Storage integration with signed URLs
+- PDF viewer with react-pdf (zoom, page navigation)
+- Document versioning with history tracking
+- Document categorization and tagging
+- Full-text document search with filters
+- SPAC/Target document integration
+- Note system (note.router.ts) for Sprint 3 carryover
+- Priority and Stage quick actions completed
+- 5 new E2E tests for document module
+- Fixed flaky E2E tests (Clerk selectors)
+
+**Quality Gate Results:**
+- Build: PASS
+- Lint: PASS (no errors)
+- Unit Tests: PASS
+- E2E Tests: 17/17 passed
+
+**Technical Notes:**
+- react-pdf with pdfjs-dist for PDF rendering
+- react-dropzone for drag-and-drop uploads
+- Supabase Storage with signed URLs for secure access
+- Document versioning via parentId references
 
 ### February 3, 2026 - Sprint 3 Completed
 **Sprint:** Sprint 3 - Deal Pipeline Backend Integration
@@ -89,7 +124,8 @@ Sprint 3 connected the existing deal pipeline UI to the real tRPC backend:
 | 1 | Initial Setup & Foundation | Completed | Feb 1, 2026 | Auth, DB, Dashboard shell |
 | 2 | SPAC Management & Dashboard Integration | Completed | Feb 2, 2026 | SPAC CRUD, tRPC integration |
 | 3 | Deal Pipeline Backend Integration | Completed | Feb 3, 2026 | Backend integration, export, bulk ops |
-| 4 | Document Management | Planned | - | Document upload, storage, viewer |
+| 4 | Document Management | Completed | Feb 3, 2026 | Upload, storage, PDF viewer, versioning |
+| 5 | AI Integration | Planned | - | Claude API, document analysis |
 
 ---
 
@@ -118,11 +154,26 @@ Sprint 3 connected the existing deal pipeline UI to the real tRPC backend:
 - Edit target with modal form
 - Export to CSV/Excel
 - Bulk operations (select, batch changes)
-- Quick actions (archive, move stage)
+- Quick actions (archive, move stage, add note, change priority)
+
+**Document Management (Sprint 4):**
+- Document upload with drag-and-drop (react-dropzone)
+- Supabase Storage with signed URLs
+- PDF viewer with react-pdf (zoom, page nav)
+- Document versioning with history
+- Categorization and tagging
+- Full-text search with filters
+- Integration with SPAC/Target pages
+
+**Notes System (Sprint 4):**
+- Note router with CRUD operations
+- Notes linked to Targets and SPACs
+- Add Note quick action functional
 
 **Components Library:**
 - Full UI component set (Button, Card, Modal, etc.)
 - Pipeline-specific components (KanbanBoard, TargetCard, BulkActionBar)
+- Document components (DocumentUpload, PDFViewer)
 - Form components with validation
 - Export utilities
 
@@ -130,17 +181,16 @@ Sprint 3 connected the existing deal pipeline UI to the real tRPC backend:
 
 | Area | Status | Notes |
 |------|--------|-------|
-| Add Note | Not Built | Needs notes table |
-| Change Priority | Not Built | Needs mutation |
 | User Assignment | Not Built | Needs assignment system |
-| Documents Module | Not Started | Sprint 4 |
 | AI Integration | Not Started | Sprint 5 |
+| SEC Compliance | Not Started | Sprint 6 |
+| Financial Module | Not Started | Sprint 7 |
 
 ---
 
 ## RELATED DOCUMENTS
 
-- **PRD:** `/docs/PRD/SPAC_OS_PRD_v4.3.md`
+- **PRD:** `/docs/PRD/SPAC_OS_PRD_v4.4.md`
 - **Sprint Plans:** `/docs/sprints/`
 - **Sprint Completions:** `/docs/sprints/SPRINT_*_COMPLETION.md`
 - **QA Reports:** `/.project-tracking/`

@@ -517,4 +517,33 @@ export const targetRouter = createTRPCRouter({
 
       return updated;
     }),
+
+  /**
+   * Update target priority
+   */
+  updatePriority: orgAuditedProcedure
+    .input(z.object({
+      id: UuidSchema,
+      priority: z.number().int().min(1).max(5),
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const target = await ctx.db.target.findUnique({
+        where: { id: input.id },
+      });
+
+      if (!target) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Target not found',
+        });
+      }
+
+      const updated = await ctx.db.target.update({
+        where: { id: input.id },
+        data: { priority: input.priority },
+        include: { spac: true },
+      });
+
+      return updated;
+    }),
 });
