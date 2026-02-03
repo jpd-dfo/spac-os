@@ -22,8 +22,11 @@ import {
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
+import { RiskBadge } from '@/components/shared/RiskBadge';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn, formatFileSize, formatRelativeTime } from '@/lib/utils';
+
+export type RiskLevel = 'high' | 'medium' | 'low' | 'none';
 
 export interface DocumentData {
   id: string;
@@ -43,12 +46,14 @@ export interface DocumentData {
   updatedAt: Date;
   tags?: string[];
   description?: string;
+  riskLevel?: RiskLevel;
 }
 
 interface DocumentCardProps {
   document: DocumentData;
   viewMode?: 'grid' | 'list';
   isSelected?: boolean;
+  riskLevel?: RiskLevel;
   onSelect?: (doc: DocumentData) => void;
   onView?: (doc: DocumentData) => void;
   onDownload?: (doc: DocumentData) => void;
@@ -117,6 +122,7 @@ export function DocumentCard({
   document: doc,
   viewMode = 'grid',
   isSelected = false,
+  riskLevel,
   onSelect,
   onView,
   onDownload,
@@ -124,6 +130,8 @@ export function DocumentCard({
   onDelete,
   onToggleFavorite,
 }: DocumentCardProps) {
+  // Use riskLevel from prop or from document data
+  const effectiveRiskLevel = riskLevel ?? doc.riskLevel;
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -178,6 +186,9 @@ export function DocumentCard({
             )}
             {doc.isFavorite && (
               <Star className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" />
+            )}
+            {effectiveRiskLevel && effectiveRiskLevel !== 'none' && (
+              <RiskBadge level={effectiveRiskLevel} compact />
             )}
           </div>
           <p className="text-sm text-slate-500 truncate">
@@ -270,7 +281,14 @@ export function DocumentCard({
       )}
       onClick={() => onSelect?.(doc)}
     >
-      {/* Favorite Star */}
+      {/* Risk Badge - Top Left */}
+      {effectiveRiskLevel && effectiveRiskLevel !== 'none' && (
+        <div className="absolute left-3 top-3">
+          <RiskBadge level={effectiveRiskLevel} compact />
+        </div>
+      )}
+
+      {/* Favorite Star - Top Right */}
       <button
         onClick={(e) => { e.stopPropagation(); onToggleFavorite?.(doc); }}
         className={cn(

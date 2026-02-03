@@ -34,6 +34,11 @@ import {
   Users,
   Vote,
   Building2,
+  ExternalLink,
+  XCircle,
+  Send,
+  Edit3,
+  Eye,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
@@ -47,6 +52,12 @@ import type { FilingType, FilingStatus, SPACPhase } from '@/types';
 // TYPES
 // ============================================================================
 
+export interface StatusChangeEvent {
+  status: FilingStatus;
+  date: Date;
+  description?: string;
+}
+
 export interface TimelineFiling {
   id: string;
   type: FilingType;
@@ -54,7 +65,11 @@ export interface TimelineFiling {
   status: FilingStatus;
   dueDate: Date;
   filedDate?: Date;
+  effectiveDate?: Date;
   priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
+  cik?: string;
+  accessionNumber?: string;
+  statusHistory?: StatusChangeEvent[];
 }
 
 export interface Milestone {
@@ -77,6 +92,266 @@ interface FilingTimelineProps {
   onFilingClick?: (filing: TimelineFiling) => void;
   onMilestoneClick?: (milestone: Milestone) => void;
   className?: string;
+}
+
+// ============================================================================
+// FILING STATUS PROGRESSION COMPONENT
+// ============================================================================
+
+interface FilingStatusProgressionProps {
+  filing: TimelineFiling;
+  onEdgarClick?: () => void;
+  className?: string;
+}
+
+// Define the status workflow progression
+const STATUS_PROGRESSION: FilingStatus[] = [
+  'DRAFT',
+  'INTERNAL_REVIEW',
+  'EXTERNAL_REVIEW',
+  'SUBMITTED',
+  'SEC_COMMENT',
+  'RESPONSE_FILED',
+  'EFFECTIVE',
+];
+
+// Alternative final statuses (branching paths)
+const TERMINAL_STATUSES: FilingStatus[] = ['EFFECTIVE', 'COMPLETE'];
+
+function getStatusProgressionConfig(status: FilingStatus): {
+  label: string;
+  icon: React.ElementType;
+  color: string;
+  bgColor: string;
+  borderColor: string;
+} {
+  const configs: Record<FilingStatus, {
+    label: string;
+    icon: React.ElementType;
+    color: string;
+    bgColor: string;
+    borderColor: string;
+  }> = {
+    DRAFT: {
+      label: 'Draft',
+      icon: Edit3,
+      color: 'text-slate-600',
+      bgColor: 'bg-slate-100',
+      borderColor: 'border-slate-300',
+    },
+    INTERNAL_REVIEW: {
+      label: 'Internal Review',
+      icon: Eye,
+      color: 'text-yellow-600',
+      bgColor: 'bg-yellow-100',
+      borderColor: 'border-yellow-300',
+    },
+    EXTERNAL_REVIEW: {
+      label: 'Under Review',
+      icon: Users,
+      color: 'text-blue-600',
+      bgColor: 'bg-blue-100',
+      borderColor: 'border-blue-300',
+    },
+    SUBMITTED: {
+      label: 'Submitted',
+      icon: Send,
+      color: 'text-indigo-600',
+      bgColor: 'bg-indigo-100',
+      borderColor: 'border-indigo-300',
+    },
+    SEC_COMMENT: {
+      label: 'SEC Comment',
+      icon: AlertTriangle,
+      color: 'text-orange-600',
+      bgColor: 'bg-orange-100',
+      borderColor: 'border-orange-300',
+    },
+    RESPONSE_FILED: {
+      label: 'Response Filed',
+      icon: FileText,
+      color: 'text-purple-600',
+      bgColor: 'bg-purple-100',
+      borderColor: 'border-purple-300',
+    },
+    EFFECTIVE: {
+      label: 'Effective',
+      icon: CheckCircle2,
+      color: 'text-green-600',
+      bgColor: 'bg-green-100',
+      borderColor: 'border-green-300',
+    },
+    COMPLETE: {
+      label: 'Complete',
+      icon: CheckCircle2,
+      color: 'text-green-600',
+      bgColor: 'bg-green-100',
+      borderColor: 'border-green-300',
+    },
+  };
+  return configs[status] || configs.DRAFT;
+}
+
+function getStatusIndex(status: FilingStatus): number {
+  const index = STATUS_PROGRESSION.indexOf(status);
+  if (index === -1) {
+    // Handle COMPLETE as equivalent to EFFECTIVE
+    if (status === 'COMPLETE') {
+      return STATUS_PROGRESSION.indexOf('EFFECTIVE');
+    }
+    return 0;
+  }
+  return index;
+}
+
+function buildSecEdgarUrl(cik?: string, formType?: FilingType): string | null {
+  if (!cik) {
+    return null;
+  }
+  const cleanCik = cik.replace(/^0+/, ''); // Remove leading zeros
+  return `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cleanCik}&type=${formType || ''}&dateb=&owner=include&count=40`;
+}
+
+export function FilingStatusProgression({
+  filing,
+  onEdgarClick,
+  className,
+}: FilingStatusProgressionProps) {
+  const currentStatusIndex = getStatusIndex(filing.status);
+  const edgarUrl = buildSecEdgarUrl(filing.cik, filing.type);
+
+  // Get status dates from history if available
+  const getStatusDate = (status: FilingStatus): Date | null => {
+    if (filing.statusHistory) {
+      const event = filing.statusHistory.find((e) => e.status === status);
+      return event?.date || null;
+    }
+    // Fallback to known dates
+    if (status === 'SUBMITTED' && filing.filedDate) {
+      return filing.filedDate;
+    }
+    if ((status === 'EFFECTIVE' || status === 'COMPLETE') && filing.effectiveDate) {
+      return filing.effectiveDate;
+    }
+    return null;
+  };
+
+  return (
+    <div className={cn('rounded-lg border border-slate-200 bg-white p-4', className)}>
+      <div className="flex items-center justify-between mb-4">
+        <h3 className="text-sm font-semibold text-slate-900">Filing Status Progression</h3>
+        {edgarUrl && (
+          <a
+            href={edgarUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={(e) => {
+              e.stopPropagation();
+              onEdgarClick?.();
+            }}
+            className="flex items-center gap-1 text-xs text-primary-600 hover:text-primary-700 hover:underline"
+          >
+            <ExternalLink className="h-3 w-3" />
+            View on SEC EDGAR
+          </a>
+        )}
+      </div>
+
+      {/* Status Timeline */}
+      <div className="relative">
+        {/* Progress Line */}
+        <div className="absolute top-5 left-5 right-5 h-0.5 bg-slate-200">
+          <div
+            className="h-full bg-green-500 transition-all duration-500"
+            style={{
+              width: `${(currentStatusIndex / (STATUS_PROGRESSION.length - 1)) * 100}%`,
+            }}
+          />
+        </div>
+
+        {/* Status Steps */}
+        <div className="relative flex justify-between">
+          {STATUS_PROGRESSION.map((status, index) => {
+            const config = getStatusProgressionConfig(status);
+            const IconComponent = config.icon;
+            const isPast = index < currentStatusIndex;
+            const isCurrent = index === currentStatusIndex;
+            const isFuture = index > currentStatusIndex;
+            const statusDate = getStatusDate(status);
+
+            return (
+              <div
+                key={status}
+                className="flex flex-col items-center"
+                style={{ width: `${100 / STATUS_PROGRESSION.length}%` }}
+              >
+                {/* Status Icon */}
+                <div
+                  className={cn(
+                    'relative z-10 flex h-10 w-10 items-center justify-center rounded-full border-2 transition-all',
+                    isPast && 'border-green-500 bg-green-500 text-white',
+                    isCurrent && cn('border-2', config.borderColor, config.bgColor, config.color, 'ring-2 ring-offset-2 ring-primary-300'),
+                    isFuture && 'border-slate-300 bg-white text-slate-400'
+                  )}
+                >
+                  {isPast ? (
+                    <CheckCircle2 className="h-5 w-5" />
+                  ) : (
+                    <IconComponent className="h-5 w-5" />
+                  )}
+                </div>
+
+                {/* Status Label */}
+                <p
+                  className={cn(
+                    'mt-2 text-xs font-medium text-center',
+                    isPast && 'text-green-600',
+                    isCurrent && config.color,
+                    isFuture && 'text-slate-400'
+                  )}
+                >
+                  {config.label}
+                </p>
+
+                {/* Status Date */}
+                {statusDate && (
+                  <p className="mt-0.5 text-[10px] text-slate-500">
+                    {formatDate(statusDate)}
+                  </p>
+                )}
+
+                {/* Current Indicator */}
+                {isCurrent && (
+                  <div className="mt-1 flex items-center gap-1">
+                    <span className="relative flex h-2 w-2">
+                      <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-400 opacity-75" />
+                      <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-500" />
+                    </span>
+                    <span className="text-[10px] font-medium text-primary-600">Current</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Rejected Status (if applicable - shown separately) */}
+      {filing.status === ('REJECTED' as FilingStatus) && (
+        <div className="mt-4 flex items-center gap-2 rounded-lg border border-red-200 bg-red-50 p-3">
+          <XCircle className="h-5 w-5 text-red-600" />
+          <div>
+            <p className="text-sm font-medium text-red-800">Filing Rejected</p>
+            {filing.statusHistory?.find((e) => e.status === ('REJECTED' as FilingStatus))?.date && (
+              <p className="text-xs text-red-600">
+                {formatDate(filing.statusHistory.find((e) => e.status === ('REJECTED' as FilingStatus))!.date)}
+              </p>
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
 }
 
 // ============================================================================

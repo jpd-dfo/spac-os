@@ -14,12 +14,16 @@ import {
   Target,
   Users,
   DollarSign,
+  Gavel,
+  Building2,
+  MessageSquare,
   type LucideIcon,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatDate, daysUntil } from '@/lib/utils';
+import type { UrgencyLevel, FilingDeadlineItem } from '@/lib/compliance/filingDeadlines';
 
 // ============================================================================
 // TYPES
@@ -34,6 +38,10 @@ type DeadlineType =
   | 'DUE_DILIGENCE'
   | 'CONTRACT_DEADLINE'
   | 'REGULATORY'
+  | 'PERIODIC'
+  | 'CURRENT'
+  | 'PROXY'
+  | 'SEC_RESPONSE'
   | 'OTHER';
 
 type DeadlineStatus = 'UPCOMING' | 'DUE_SOON' | 'OVERDUE' | 'COMPLETED';
@@ -51,16 +59,22 @@ export interface DeadlineItem {
     href?: string;
   };
   priority?: 'low' | 'medium' | 'high' | 'critical';
+  urgency?: UrgencyLevel;
   assignee?: string;
+  href?: string;
+  filingType?: string;
+  category?: string;
 }
 
 interface UpcomingDeadlinesProps {
   deadlines?: DeadlineItem[];
+  filingDeadlines?: FilingDeadlineItem[];
   isLoading?: boolean;
   maxItems?: number;
   onViewAll?: () => void;
   onDeadlineClick?: (deadline: DeadlineItem) => void;
   showHeader?: boolean;
+  showUrgencyBadges?: boolean;
   className?: string;
 }
 
@@ -122,11 +136,69 @@ const deadlineTypeConfig: Record<DeadlineType, {
     bgColor: 'bg-warning-100',
     label: 'Regulatory',
   },
+  PERIODIC: {
+    icon: Calendar,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100',
+    label: 'Periodic Filing',
+  },
+  CURRENT: {
+    icon: FileText,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-100',
+    label: 'Current Report',
+  },
+  PROXY: {
+    icon: Gavel,
+    color: 'text-purple-600',
+    bgColor: 'bg-purple-100',
+    label: 'Proxy Filing',
+  },
+  SEC_RESPONSE: {
+    icon: MessageSquare,
+    color: 'text-amber-600',
+    bgColor: 'bg-amber-100',
+    label: 'SEC Response',
+  },
   OTHER: {
     icon: Calendar,
     color: 'text-slate-600',
     bgColor: 'bg-slate-100',
     label: 'Other',
+  },
+};
+
+// ============================================================================
+// URGENCY COLOR CONFIGURATION
+// ============================================================================
+
+const urgencyConfig: Record<UrgencyLevel, {
+  bgColor: string;
+  textColor: string;
+  borderColor: string;
+  badgeVariant: 'danger' | 'warning' | 'secondary';
+  label: string;
+}> = {
+  critical: {
+    bgColor: 'bg-danger-50',
+    textColor: 'text-danger-700',
+    borderColor: 'border-l-danger-500',
+    badgeVariant: 'danger',
+    label: 'Critical',
+  },
+  warning: {
+    bgColor: 'bg-warning-50',
+    textColor: 'text-warning-700',
+    borderColor: 'border-l-warning-500',
+    badgeVariant: 'warning',
+    label: 'Warning',
+  },
+  normal: {
+    bgColor: 'bg-success-50',
+    textColor: 'text-success-700',
+    borderColor: 'border-l-success-500',
+    badgeVariant: 'secondary',
+    label: 'Normal',
   },
 };
 
@@ -213,10 +285,10 @@ export const mockUpcomingDeadlines: DeadlineItem[] = [
 // UTILITY FUNCTIONS
 // ============================================================================
 
-function getStatusBadgeVariant(status: DeadlineStatus, daysRemaining: number | null): 'success' | 'warning' | 'danger' | 'secondary' {
+function getStatusBadgeVariant(status: DeadlineStatus, daysRemaining: number | null, urgency?: UrgencyLevel): 'success' | 'warning' | 'danger' | 'secondary' {
   if (status === 'COMPLETED') {return 'success';}
-  if (status === 'OVERDUE' || (daysRemaining !== null && daysRemaining < 0)) {return 'danger';}
-  if (status === 'DUE_SOON' || (daysRemaining !== null && daysRemaining <= 14)) {return 'warning';}
+  if (urgency === 'critical' || status === 'OVERDUE' || (daysRemaining !== null && daysRemaining < 0)) {return 'danger';}
+  if (urgency === 'warning' || status === 'DUE_SOON' || (daysRemaining !== null && daysRemaining <= 14)) {return 'warning';}
   return 'secondary';
 }
 
@@ -232,7 +304,11 @@ function getStatusLabel(status: DeadlineStatus, daysRemaining: number | null): s
   return formatDate(new Date(Date.now() + (daysRemaining || 0) * 24 * 60 * 60 * 1000));
 }
 
-function getPriorityIndicator(priority: DeadlineItem['priority']): string {
+function getPriorityIndicator(priority: DeadlineItem['priority'], urgency?: UrgencyLevel): string {
+  // Use urgency if available, otherwise fall back to priority
+  if (urgency) {
+    return `border-l-4 ${urgencyConfig[urgency].borderColor}`;
+  }
   switch (priority) {
     case 'critical':
       return 'border-l-4 border-l-danger-500';
@@ -245,6 +321,62 @@ function getPriorityIndicator(priority: DeadlineItem['priority']): string {
   }
 }
 
+function getUrgencyBackgroundColor(urgency?: UrgencyLevel, daysRemaining?: number | null): string {
+  if (urgency === 'critical' || (daysRemaining !== null && daysRemaining !== undefined && daysRemaining < 7)) {
+    return 'bg-danger-50/50';
+  }
+  if (urgency === 'warning' || (daysRemaining !== null && daysRemaining !== undefined && daysRemaining < 30)) {
+    return 'bg-warning-50/50';
+  }
+  return 'bg-white';
+}
+
+/**
+ * Convert FilingDeadlineItem to DeadlineItem for display
+ */
+function convertFilingDeadlineToDeadlineItem(filing: FilingDeadlineItem): DeadlineItem {
+  // Map filing category to deadline type
+  const typeMap: Record<string, DeadlineType> = {
+    PERIODIC: 'PERIODIC',
+    CURRENT: 'CURRENT',
+    PROXY: 'PROXY',
+    REGISTRATION: 'SEC_FILING',
+    BENEFICIAL: 'SEC_FILING',
+    INSIDER: 'SEC_FILING',
+    BUSINESS_COMBINATION: 'BUSINESS_COMBINATION',
+    SEC_RESPONSE: 'SEC_RESPONSE',
+    OTHER: 'OTHER',
+  };
+
+  // Map status
+  const statusMap: Record<string, DeadlineStatus> = {
+    OVERDUE: 'OVERDUE',
+    DUE_TODAY: 'DUE_SOON',
+    DUE_SOON: 'DUE_SOON',
+    UPCOMING: 'UPCOMING',
+    FUTURE: 'UPCOMING',
+  };
+
+  return {
+    id: filing.id,
+    title: filing.filingShortName,
+    type: typeMap[filing.category] || 'OTHER',
+    dueDate: filing.deadline,
+    status: statusMap[filing.status] || 'UPCOMING',
+    description: filing.description,
+    relatedSpac: {
+      id: filing.spacId,
+      name: filing.spacName,
+      href: `/spacs/${filing.spacId}`,
+    },
+    urgency: filing.urgency,
+    priority: filing.urgency === 'critical' ? 'critical' : filing.urgency === 'warning' ? 'high' : 'medium',
+    href: filing.href,
+    filingType: filing.filingType,
+    category: filing.category,
+  };
+}
+
 // ============================================================================
 // SUB-COMPONENTS
 // ============================================================================
@@ -252,31 +384,26 @@ function getPriorityIndicator(priority: DeadlineItem['priority']): string {
 function DeadlineRow({
   deadline,
   onClick,
+  showUrgencyBadges = false,
 }: {
   deadline: DeadlineItem;
   onClick?: (deadline: DeadlineItem) => void;
+  showUrgencyBadges?: boolean;
 }) {
-  const config = deadlineTypeConfig[deadline.type];
+  const config = deadlineTypeConfig[deadline.type] || deadlineTypeConfig.OTHER;
   const DeadlineIcon = config.icon;
   const daysRemaining = daysUntil(deadline.dueDate);
-  const statusVariant = getStatusBadgeVariant(deadline.status, daysRemaining);
+  const statusVariant = getStatusBadgeVariant(deadline.status, daysRemaining, deadline.urgency);
   const statusLabel = getStatusLabel(deadline.status, daysRemaining);
-  const priorityClass = getPriorityIndicator(deadline.priority);
+  const priorityClass = getPriorityIndicator(deadline.priority, deadline.urgency);
+  const bgColorClass = getUrgencyBackgroundColor(deadline.urgency, daysRemaining);
 
-  const isUrgent = daysRemaining !== null && daysRemaining <= 7 && deadline.status !== 'COMPLETED';
+  const isUrgent = deadline.urgency === 'critical' || (daysRemaining !== null && daysRemaining <= 7 && deadline.status !== 'COMPLETED');
   const isOverdue = daysRemaining !== null && daysRemaining < 0;
 
-  return (
-    <div
-      className={cn(
-        'group flex items-start gap-3 rounded-lg p-3 transition-colors bg-white',
-        priorityClass,
-        isUrgent && !isOverdue && 'bg-warning-50/50',
-        isOverdue && 'bg-danger-50/50',
-        onClick && 'cursor-pointer hover:bg-slate-50'
-      )}
-      onClick={() => onClick?.(deadline)}
-    >
+  // Determine the content to wrap - either a Link if href exists, or a div
+  const rowContent = (
+    <>
       {/* Icon */}
       <div className={cn('rounded-lg p-2 flex-shrink-0', config.bgColor)}>
         <DeadlineIcon className={cn('h-4 w-4', config.color)} />
@@ -285,12 +412,23 @@ function DeadlineRow({
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-start justify-between gap-2">
-          <p className={cn(
-            'text-sm font-medium line-clamp-1',
-            isOverdue ? 'text-danger-900' : 'text-slate-900'
-          )}>
-            {deadline.title}
-          </p>
+          <div className="flex items-center gap-2 min-w-0">
+            <p className={cn(
+              'text-sm font-medium line-clamp-1',
+              isOverdue ? 'text-danger-900' : 'text-slate-900'
+            )}>
+              {deadline.title}
+            </p>
+            {showUrgencyBadges && deadline.urgency && (
+              <Badge
+                variant={urgencyConfig[deadline.urgency].badgeVariant}
+                size="sm"
+                className="flex-shrink-0"
+              >
+                {urgencyConfig[deadline.urgency].label}
+              </Badge>
+            )}
+          </div>
           <Badge variant={statusVariant} size="sm" className="flex-shrink-0">
             {statusLabel}
           </Badge>
@@ -305,6 +443,13 @@ function DeadlineRow({
         <div className="mt-1.5 flex items-center gap-2 text-xs text-slate-400">
           <Calendar className="h-3 w-3" />
           <span>{formatDate(deadline.dueDate)}</span>
+          {deadline.filingType && (
+            <>
+              <span className="text-slate-300">|</span>
+              <FileText className="h-3 w-3" />
+              <span>{deadline.filingType}</span>
+            </>
+          )}
           {deadline.assignee && (
             <>
               <span className="text-slate-300">|</span>
@@ -320,6 +465,7 @@ function DeadlineRow({
             className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary-600 hover:text-primary-700"
             onClick={(e) => e.stopPropagation()}
           >
+            <Building2 className="h-3 w-3" />
             {deadline.relatedSpac.name}
             <ChevronRight className="h-3 w-3" />
           </Link>
@@ -340,6 +486,37 @@ function DeadlineRow({
           />
         )}
       </div>
+    </>
+  );
+
+  // If there's a direct href, make the whole row a link
+  if (deadline.href) {
+    return (
+      <Link
+        href={deadline.href}
+        className={cn(
+          'group flex items-start gap-3 rounded-lg p-3 transition-colors',
+          priorityClass,
+          bgColorClass,
+          'cursor-pointer hover:bg-slate-50'
+        )}
+      >
+        {rowContent}
+      </Link>
+    );
+  }
+
+  return (
+    <div
+      className={cn(
+        'group flex items-start gap-3 rounded-lg p-3 transition-colors',
+        priorityClass,
+        bgColorClass,
+        onClick && 'cursor-pointer hover:bg-slate-50'
+      )}
+      onClick={() => onClick?.(deadline)}
+    >
+      {rowContent}
     </div>
   );
 }
@@ -368,29 +545,60 @@ function DeadlinesSkeleton() {
 
 export function UpcomingDeadlines({
   deadlines = mockUpcomingDeadlines,
+  filingDeadlines,
   isLoading = false,
   maxItems = 5,
   onViewAll,
   onDeadlineClick,
   showHeader = true,
+  showUrgencyBadges = false,
   className,
 }: UpcomingDeadlinesProps) {
-  // Sort by due date and filter to show upcoming ones first
+  // Convert filing deadlines to deadline items if provided
+  const allDeadlines = useMemo(() => {
+    if (filingDeadlines && filingDeadlines.length > 0) {
+      return filingDeadlines.map(convertFilingDeadlineToDeadlineItem);
+    }
+    return deadlines;
+  }, [deadlines, filingDeadlines]);
+
+  // Sort by urgency first, then by due date
   const sortedDeadlines = useMemo(() => {
-    return [...deadlines]
+    const urgencyOrder: Record<UrgencyLevel, number> = {
+      critical: 0,
+      warning: 1,
+      normal: 2,
+    };
+
+    return [...allDeadlines]
       .filter((d) => d.status !== 'COMPLETED')
       .sort((a, b) => {
+        // First sort by urgency if available
+        if (a.urgency && b.urgency) {
+          const urgencyDiff = urgencyOrder[a.urgency] - urgencyOrder[b.urgency];
+          if (urgencyDiff !== 0) {return urgencyDiff;}
+        }
+        // Then by date
         const dateA = new Date(a.dueDate).getTime();
         const dateB = new Date(b.dueDate).getTime();
         return dateA - dateB;
       })
       .slice(0, maxItems);
-  }, [deadlines, maxItems]);
+  }, [allDeadlines, maxItems]);
 
   const urgentCount = useMemo(() => {
     return sortedDeadlines.filter((d) => {
+      if (d.urgency === 'critical') {return true;}
       const days = daysUntil(d.dueDate);
       return days !== null && days <= 14;
+    }).length;
+  }, [sortedDeadlines]);
+
+  const criticalCount = useMemo(() => {
+    return sortedDeadlines.filter((d) => {
+      if (d.urgency === 'critical') {return true;}
+      const days = daysUntil(d.dueDate);
+      return days !== null && days < 7;
     }).length;
   }, [sortedDeadlines]);
 
@@ -412,7 +620,7 @@ export function UpcomingDeadlines({
     );
   }
 
-  if (!deadlines || sortedDeadlines.length === 0) {
+  if (!allDeadlines || sortedDeadlines.length === 0) {
     return (
       <Card className={className}>
         {showHeader && (
@@ -444,12 +652,20 @@ export function UpcomingDeadlines({
             <Calendar className="h-5 w-5 text-primary-600" />
             Upcoming Deadlines
           </CardTitle>
-          {urgentCount > 0 && (
-            <Badge variant="warning">
-              <AlertTriangle className="h-3 w-3 mr-1" />
-              {urgentCount} Urgent
-            </Badge>
-          )}
+          <div className="flex items-center gap-2">
+            {criticalCount > 0 && (
+              <Badge variant="danger">
+                <AlertTriangle className="h-3 w-3 mr-1" />
+                {criticalCount} Critical
+              </Badge>
+            )}
+            {urgentCount > criticalCount && (
+              <Badge variant="warning">
+                <Clock className="h-3 w-3 mr-1" />
+                {urgentCount - criticalCount} Warning
+              </Badge>
+            )}
+          </div>
         </CardHeader>
       )}
 
@@ -459,16 +675,17 @@ export function UpcomingDeadlines({
             key={deadline.id}
             deadline={deadline}
             onClick={onDeadlineClick}
+            showUrgencyBadges={showUrgencyBadges}
           />
         ))}
 
         {/* View All Button */}
-        {onViewAll && deadlines.length > maxItems && (
+        {onViewAll && allDeadlines.length > maxItems && (
           <button
             onClick={onViewAll}
             className="flex w-full items-center justify-center gap-2 rounded-lg border border-slate-200 py-2.5 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50 hover:text-slate-900 mt-4"
           >
-            View All Deadlines ({deadlines.length} total)
+            View All Deadlines ({allDeadlines.length} total)
             <ChevronRight className="h-4 w-4" />
           </button>
         )}

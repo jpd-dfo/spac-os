@@ -25,6 +25,8 @@ import {
   Trash2,
   MoreHorizontal,
   Copy,
+  RefreshCw,
+  ArrowRightCircle,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
@@ -32,6 +34,8 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Dropdown, DropdownItem } from '@/components/ui/Dropdown';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
+import { FilingStatusBadge } from '@/components/filings/FilingStatusBadge';
+import { FilingStatusProgression, type StatusChangeEvent } from '@/components/filings/FilingTimeline';
 import { FILING_DEFINITIONS } from '@/lib/compliance/complianceRules';
 import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
@@ -96,6 +100,7 @@ interface FilingPageData {
   spacId: string;
   spacName: string;
   ticker: string;
+  cik?: string;
   status: FilingStatus;
   priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW';
   dueDate: Date;
@@ -104,6 +109,7 @@ interface FilingPageData {
   accessionNumber?: string;
   edgarUrl?: string;
   secFileNumber?: string;
+  statusHistory: StatusChangeEvent[];
   assignee?: {
     id: string;
     name: string;
@@ -138,6 +144,7 @@ const getMockFilingData = (id: string): FilingPageData => {
     spacId: 'spac-001',
     spacName: 'Alpha Acquisition Corp',
     ticker: 'AACU',
+    cik: '0001234567',
     status: 'SEC_COMMENT',
     priority: 'CRITICAL',
     dueDate: addDays(today, 15),
@@ -145,6 +152,13 @@ const getMockFilingData = (id: string): FilingPageData => {
     accessionNumber: '0001234567-26-000025',
     edgarUrl: 'https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&company=alpha',
     secFileNumber: '333-123456',
+    statusHistory: [
+      { status: 'DRAFT' as FilingStatus, date: subDays(today, 60), description: 'Filing created' },
+      { status: 'INTERNAL_REVIEW' as FilingStatus, date: subDays(today, 50), description: 'Sent for internal review' },
+      { status: 'EXTERNAL_REVIEW' as FilingStatus, date: subDays(today, 40), description: 'Sent for external legal review' },
+      { status: 'SUBMITTED' as FilingStatus, date: subDays(today, 30), description: 'Filed with SEC via EDGAR' },
+      { status: 'SEC_COMMENT' as FilingStatus, date: subDays(today, 5), description: 'SEC comment letter received - 15 comments' },
+    ],
     assignee: {
       id: 'user-002',
       name: 'Sarah Johnson',
@@ -384,6 +398,48 @@ function formatFileSize(bytes: number): string {
   return `${parseFloat((bytes / Math.pow(k, i)).toFixed(1))} ${sizes[i]}`;
 }
 
+// Build SEC EDGAR URL from CIK and form type
+function buildSecEdgarUrl(cik?: string, formType?: FilingType): string | null {
+  if (!cik) {
+    return null;
+  }
+  const cleanCik = cik.replace(/^0+/, '');
+  return `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cleanCik}&type=${formType || ''}&dateb=&owner=include&count=40`;
+}
+
+// Get valid status transitions
+function getValidStatusTransitions(currentStatus: FilingStatus): { status: FilingStatus; label: string }[] {
+  const transitions: Record<FilingStatus, { status: FilingStatus; label: string }[]> = {
+    DRAFT: [
+      { status: 'INTERNAL_REVIEW', label: 'Send for Internal Review' },
+    ],
+    INTERNAL_REVIEW: [
+      { status: 'EXTERNAL_REVIEW', label: 'Send for External Review' },
+      { status: 'DRAFT', label: 'Return to Draft' },
+    ],
+    EXTERNAL_REVIEW: [
+      { status: 'SUBMITTED', label: 'Mark as Submitted to SEC' },
+      { status: 'INTERNAL_REVIEW', label: 'Return to Internal Review' },
+    ],
+    SUBMITTED: [
+      { status: 'SEC_COMMENT', label: 'SEC Comment Received' },
+      { status: 'EFFECTIVE', label: 'Mark as Effective' },
+      { status: 'COMPLETE', label: 'Mark as Complete' },
+    ],
+    SEC_COMMENT: [
+      { status: 'RESPONSE_FILED', label: 'Response Filed' },
+    ],
+    RESPONSE_FILED: [
+      { status: 'SEC_COMMENT', label: 'Additional Comment Received' },
+      { status: 'EFFECTIVE', label: 'Mark as Effective' },
+      { status: 'COMPLETE', label: 'Mark as Complete' },
+    ],
+    EFFECTIVE: [],
+    COMPLETE: [],
+  };
+  return transitions[currentStatus] || [];
+}
+
 // ============================================================================
 // PAGE COMPONENT
 // ============================================================================
@@ -395,9 +451,19 @@ export default function FilingDetailPage() {
 
   const [activeTab, setActiveTab] = useState<'overview' | 'documents' | 'comments' | 'checklist' | 'history'>('overview');
   const [newComment, setNewComment] = useState('');
+  const [showUpdateStatusModal, setShowUpdateStatusModal] = useState(false);
+  const [selectedNewStatus, setSelectedNewStatus] = useState<FilingStatus | null>(null);
 
   // Get mock filing data
   const filing = useMemo(() => getMockFilingData(filingId), [filingId]);
+
+  // Valid status transitions
+  const validTransitions = useMemo(() => getValidStatusTransitions(filing.status), [filing.status]);
+
+  // SEC EDGAR URL
+  const secEdgarUrl = useMemo(() => {
+    return filing.edgarUrl || buildSecEdgarUrl(filing.cik, filing.type);
+  }, [filing.edgarUrl, filing.cik, filing.type]);
 
   const statusConfig = getStatusConfig(filing.status);
   const priorityConfig = getPriorityConfig(filing.priority);
@@ -451,7 +517,7 @@ export default function FilingDetailPage() {
               <h1 className="text-2xl font-bold text-slate-900">
                 {FILING_TYPE_LABELS[filing.type]}
               </h1>
-              <Badge variant={statusConfig.variant}>{statusConfig.label}</Badge>
+              <FilingStatusBadge status={filing.status} showIcon />
               <Badge variant={priorityConfig.variant}>{priorityConfig.label}</Badge>
               {isOverdue && <Badge variant="danger">Overdue</Badge>}
             </div>
@@ -461,9 +527,9 @@ export default function FilingDetailPage() {
               {filing.accessionNumber && (
                 <span className="flex items-center gap-1">
                   Accession: {filing.accessionNumber}
-                  {filing.edgarUrl && (
+                  {secEdgarUrl && (
                     <a
-                      href={filing.edgarUrl}
+                      href={secEdgarUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-primary-600 hover:text-primary-700"
@@ -480,6 +546,43 @@ export default function FilingDetailPage() {
           </div>
         </div>
         <div className="flex items-center gap-2">
+          {/* SEC EDGAR Link */}
+          {secEdgarUrl && (
+            <Button
+              variant="secondary"
+              onClick={() => window.open(secEdgarUrl, '_blank')}
+            >
+              <ExternalLink className="mr-2 h-4 w-4" />
+              View on SEC EDGAR
+            </Button>
+          )}
+
+          {/* Update Status Button */}
+          {validTransitions.length > 0 && (
+            <Dropdown
+              trigger={
+                <Button variant="secondary">
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Update Status
+                </Button>
+              }
+              align="right"
+            >
+              {validTransitions.map((transition) => (
+                <DropdownItem
+                  key={transition.status}
+                  onClick={() => {
+                    setSelectedNewStatus(transition.status);
+                    setShowUpdateStatusModal(true);
+                  }}
+                >
+                  <ArrowRightCircle className="mr-2 h-4 w-4" />
+                  {transition.label}
+                </DropdownItem>
+              ))}
+            </Dropdown>
+          )}
+
           <Dropdown
             trigger={
               <Button variant="secondary">
@@ -515,6 +618,23 @@ export default function FilingDetailPage() {
           )}
         </div>
       </div>
+
+      {/* Status Progression Timeline */}
+      <FilingStatusProgression
+        filing={{
+          id: filing.id,
+          type: filing.type,
+          title: filing.title,
+          status: filing.status,
+          dueDate: filing.dueDate,
+          filedDate: filing.filedDate,
+          effectiveDate: filing.effectiveDate,
+          priority: filing.priority,
+          cik: filing.cik,
+          accessionNumber: filing.accessionNumber,
+          statusHistory: filing.statusHistory,
+        }}
+      />
 
       {/* Alert Banner for SEC Comments */}
       {filing.status === 'SEC_COMMENT' && openSecComments > 0 && (
@@ -1023,48 +1143,174 @@ export default function FilingDetailPage() {
 
           {/* History Tab */}
           {activeTab === 'history' && (
-            <div className="space-y-4">
-              {filing.amendments.length === 0 ? (
-                <div className="text-center py-8">
-                  <History className="mx-auto h-12 w-12 text-slate-300" />
-                  <p className="mt-4 text-sm text-slate-500">No amendments filed yet</p>
-                </div>
-              ) : (
-                filing.amendments.map((amendment) => (
-                  <div
-                    key={amendment.id}
-                    className="flex items-start gap-4 rounded-lg border border-slate-200 p-4"
-                  >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-sm font-medium text-primary-700">
-                      <FileText className="h-5 w-5" />
-                    </div>
-                    <div className="flex-1">
-                      <div className="flex items-center justify-between">
-                        <p className="text-sm font-medium text-slate-900">{amendment.version}</p>
-                        {amendment.edgarUrl && (
-                          <a
-                            href={amendment.edgarUrl}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
-                          >
-                            View on EDGAR
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        )}
+            <div className="space-y-6">
+              {/* Status Change History */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 mb-4">Status Change History</h3>
+                <div className="space-y-3">
+                  {filing.statusHistory.length === 0 ? (
+                    <p className="text-sm text-slate-500">No status changes recorded</p>
+                  ) : (
+                    filing.statusHistory.slice().reverse().map((event, index) => (
+                      <div
+                        key={index}
+                        className="flex items-start gap-4 rounded-lg border border-slate-200 p-4"
+                      >
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-sm font-medium text-primary-700">
+                          <RefreshCw className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2">
+                            <FilingStatusBadge status={event.status} size="sm" />
+                            <span className="text-xs text-slate-500">{formatDateTime(event.date)}</span>
+                          </div>
+                          {event.description && (
+                            <p className="mt-1 text-sm text-slate-600">{event.description}</p>
+                          )}
+                        </div>
                       </div>
-                      <p className="mt-1 text-sm text-slate-600">{amendment.description}</p>
-                      <p className="mt-1 text-xs text-slate-500">
-                        Filed: {formatDate(amendment.filedDate)} | Accession: {amendment.accessionNumber}
-                      </p>
-                    </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Amendments/Filings History */}
+              <div>
+                <h3 className="text-sm font-semibold text-slate-900 mb-4">Amendment History</h3>
+                {filing.amendments.length === 0 ? (
+                  <div className="text-center py-8">
+                    <History className="mx-auto h-12 w-12 text-slate-300" />
+                    <p className="mt-4 text-sm text-slate-500">No amendments filed yet</p>
                   </div>
-                ))
-              )}
+                ) : (
+                  <div className="space-y-4">
+                    {filing.amendments.map((amendment) => (
+                      <div
+                        key={amendment.id}
+                        className="flex items-start gap-4 rounded-lg border border-slate-200 p-4"
+                      >
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-sm font-medium text-primary-700">
+                          <FileText className="h-5 w-5" />
+                        </div>
+                        <div className="flex-1">
+                          <div className="flex items-center justify-between">
+                            <p className="text-sm font-medium text-slate-900">{amendment.version}</p>
+                            {amendment.edgarUrl && (
+                              <a
+                                href={amendment.edgarUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-sm text-primary-600 hover:text-primary-700"
+                              >
+                                View on EDGAR
+                                <ExternalLink className="h-3 w-3" />
+                              </a>
+                            )}
+                          </div>
+                          <p className="mt-1 text-sm text-slate-600">{amendment.description}</p>
+                          <p className="mt-1 text-xs text-slate-500">
+                            Filed: {formatDate(amendment.filedDate)} | Accession: {amendment.accessionNumber}
+                          </p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </CardContent>
       </Card>
+
+      {/* Update Status Modal */}
+      {showUpdateStatusModal && selectedNewStatus && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50">
+          <div className="w-full max-w-md rounded-lg bg-white p-6 shadow-xl">
+            <h2 className="text-lg font-semibold text-slate-900">Update Filing Status</h2>
+            <p className="mt-2 text-sm text-slate-600">
+              Are you sure you want to change the status from{' '}
+              <FilingStatusBadge status={filing.status} size="sm" /> to{' '}
+              <FilingStatusBadge status={selectedNewStatus} size="sm" />?
+            </p>
+
+            <div className="mt-4">
+              <label htmlFor="status-notes" className="block text-sm font-medium text-slate-700">
+                Notes (optional)
+              </label>
+              <textarea
+                id="status-notes"
+                className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                rows={3}
+                placeholder="Add any notes about this status change..."
+              />
+            </div>
+
+            {/* Additional fields for specific status transitions */}
+            {selectedNewStatus === 'SUBMITTED' && (
+              <div className="mt-4 space-y-4">
+                <div>
+                  <label htmlFor="filed-date" className="block text-sm font-medium text-slate-700">
+                    Filed Date
+                  </label>
+                  <input
+                    id="filed-date"
+                    type="date"
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    defaultValue={new Date().toISOString().split('T')[0]}
+                  />
+                </div>
+                <div>
+                  <label htmlFor="accession-number" className="block text-sm font-medium text-slate-700">
+                    Accession Number
+                  </label>
+                  <input
+                    id="accession-number"
+                    type="text"
+                    className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                    placeholder="0001234567-26-000001"
+                  />
+                </div>
+              </div>
+            )}
+
+            {selectedNewStatus === 'EFFECTIVE' && (
+              <div className="mt-4">
+                <label htmlFor="effective-date" className="block text-sm font-medium text-slate-700">
+                  Effective Date
+                </label>
+                <input
+                  id="effective-date"
+                  type="date"
+                  className="mt-1 w-full rounded-md border border-slate-200 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-primary-500"
+                  defaultValue={new Date().toISOString().split('T')[0]}
+                />
+              </div>
+            )}
+
+            <div className="mt-6 flex justify-end gap-3">
+              <Button
+                variant="secondary"
+                onClick={() => {
+                  setShowUpdateStatusModal(false);
+                  setSelectedNewStatus(null);
+                }}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  // TODO: Call API to update status
+                  console.log('Updating status to:', selectedNewStatus);
+                  setShowUpdateStatusModal(false);
+                  setSelectedNewStatus(null);
+                }}
+              >
+                Update Status
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

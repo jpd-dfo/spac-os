@@ -64,10 +64,11 @@ export default defineConfig({
   ],
 
   // Run local dev server before starting the tests
-  webServer: {
+  // Skip webServer if SKIP_WEB_SERVER is set or if server is already running
+  webServer: process.env['SKIP_WEB_SERVER'] ? undefined : {
     command: 'npm run dev',
     url: 'http://localhost:3000',
-    reuseExistingServer: !process.env['CI'],
+    reuseExistingServer: true,
     timeout: 120 * 1000,
   },
 });

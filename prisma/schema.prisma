@@ -301,8 +301,8 @@ model Sponsor {
 
 /// SpacSponsor - Many-to-many relationship between SPACs and Sponsors
 model SpacSponsor {
-  id          String   @id @default(cuid())
-  isPrimary   Boolean  @default(false)
+  id           String   @id @default(cuid())
+  isPrimary    Boolean  @default(false)
   ownershipPct Decimal? @db.Decimal(5, 4)
 
   createdAt DateTime @default(now())
@@ -322,52 +322,52 @@ model SpacSponsor {
 
 /// SPAC entity - Represents a Special Purpose Acquisition Company
 model Spac {
-  id               String     @id @default(cuid())
-  name             String
-  ticker           String?    @unique
-  cik              String?
-  status           SpacStatus @default(SEARCHING)
-  phase            SpacPhase  @default(TARGET_SEARCH)
-  description      String?    @db.Text
+  id          String     @id @default(cuid())
+  name        String
+  ticker      String?    @unique
+  cik         String?
+  status      SpacStatus @default(SEARCHING)
+  phase       SpacPhase  @default(TARGET_SEARCH)
+  description String?    @db.Text
 
   // Financial
-  trustAmount      Decimal?   @db.Decimal(18, 2)
-  ipoSize          Decimal?   @db.Decimal(18, 2)
-  trustBalance     Decimal?   @db.Decimal(18, 2)
+  trustAmount       Decimal? @db.Decimal(18, 2)
+  ipoSize           Decimal? @db.Decimal(18, 2)
+  trustBalance      Decimal? @db.Decimal(18, 2)
   sharesOutstanding BigInt?
 
   // Key Dates
-  ipoDate          DateTime?
-  deadline         DateTime?
-  deadlineDate     DateTime?
+  ipoDate           DateTime?
+  deadline          DateTime?
+  deadlineDate      DateTime?
   extensionDeadline DateTime?
-  daAnnouncedDate  DateTime?
-  proxyFiledDate   DateTime?
-  voteDate         DateTime?
-  closingDate      DateTime?
+  daAnnouncedDate   DateTime?
+  proxyFiledDate    DateTime?
+  voteDate          DateTime?
+  closingDate       DateTime?
 
   // Extensions
-  maxExtensions    Int        @default(2)
-  extensionsUsed   Int        @default(0)
-  extensionCount   Int        @default(0)
+  maxExtensions  Int @default(2)
+  extensionsUsed Int @default(0)
+  extensionCount Int @default(0)
 
   // Redemption
-  redemptionRate   Decimal?   @db.Decimal(5, 4)
+  redemptionRate Decimal? @db.Decimal(5, 4)
 
   // Target criteria
-  targetSectors    String[]   @default([])
-  targetGeographies String[]  @default([])
-  tags             String[]   @default([])
+  targetSectors     String[] @default([])
+  targetGeographies String[] @default([])
+  tags              String[] @default([])
 
   // Soft delete
-  deletedAt        DateTime?
+  deletedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
   organizationId   String?
-  organization     Organization?    @relation(fields: [organizationId], references: [id])
+  organization     Organization?          @relation(fields: [organizationId], references: [id])
   sponsors         SpacSponsor[]
   targets          Target[]
   documents        Document[]
@@ -389,6 +389,7 @@ model Spac {
   secComments      SecComment[]
   webhooks         Webhook[]
   notes            Note[]
+  complianceAlerts ComplianceAlert[]
 
   @@index([organizationId])
   @@index([status])
@@ -398,25 +399,25 @@ model Spac {
 
 /// Target company - Potential acquisition targets for SPACs
 model Target {
-  id               String       @id @default(cuid())
-  name             String
-  description      String?      @db.Text
-  industry         String?
-  sector           String?
-  status           TargetStatus @default(IDENTIFIED)
-  stage            TargetStage?
+  id          String       @id @default(cuid())
+  name        String
+  description String?      @db.Text
+  industry    String?
+  sector      String?
+  status      TargetStatus @default(IDENTIFIED)
+  stage       TargetStage?
 
   // Valuation
-  valuation        Decimal?     @db.Decimal(18, 2)
-  enterpriseValue  Decimal?     @db.Decimal(18, 2)
-  revenue          Decimal?     @db.Decimal(18, 2)
-  ebitda           Decimal?     @db.Decimal(18, 2)
-  evRevenue        Decimal?     @db.Decimal(10, 2)
-  evEbitda         Decimal?     @db.Decimal(10, 2)
+  valuation       Decimal? @db.Decimal(18, 2)
+  enterpriseValue Decimal? @db.Decimal(18, 2)
+  revenue         Decimal? @db.Decimal(18, 2)
+  ebitda          Decimal? @db.Decimal(18, 2)
+  evRevenue       Decimal? @db.Decimal(10, 2)
+  evEbitda        Decimal? @db.Decimal(10, 2)
 
   // Scoring
-  aiScore          Decimal?     @db.Decimal(5, 2)
-  overallScore     Decimal?     @db.Decimal(5, 2)
+  aiScore          Decimal? @db.Decimal(5, 2)
+  overallScore     Decimal? @db.Decimal(5, 2)
   managementScore  Int?
   marketScore      Int?
   financialScore   Int?
@@ -424,39 +425,40 @@ model Target {
   riskScore        Int?
 
   // Priority
-  priority         Int          @default(0)
-  probability      Decimal?     @db.Decimal(5, 4)
+  priority    Int      @default(0)
+  probability Decimal? @db.Decimal(5, 4)
 
   // Due Diligence
   dueDiligenceStatus Json?
-  keyRisks           String[]   @default([])
-  keyOpportunities   String[]   @default([])
+  keyRisks           String[] @default([])
+  keyOpportunities   String[] @default([])
 
   // Key Dates
-  identifiedDate   DateTime?
-  ndaDate          DateTime?
-  ndaSignedDate    DateTime?
-  loiDate          DateTime?
-  loiSignedDate    DateTime?
-  daDate           DateTime?
-  daSignedDate     DateTime?
+  identifiedDate    DateTime?
+  ndaDate           DateTime?
+  ndaSignedDate     DateTime?
+  loiDate           DateTime?
+  loiSignedDate     DateTime?
+  daDate            DateTime?
+  daSignedDate      DateTime?
   expectedCloseDate DateTime?
-  actualCloseDate  DateTime?
+  actualCloseDate   DateTime?
 
   // Soft delete
-  deletedAt        DateTime?
+  deletedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  spacId       String?
-  spac         Spac?           @relation(fields: [spacId], references: [id])
-  documents    Document[]
-  tasks        Task[]
-  contacts     TargetContact[]
-  transactions Transaction[]
-  notes        Note[]
+  spacId         String?
+  spac           Spac?           @relation(fields: [spacId], references: [id])
+  documents      Document[]
+  tasks          Task[]
+  contacts       TargetContact[]
+  transactions   Transaction[]
+  notes          Note[]
+  scoreHistories ScoreHistory[]
 
   @@index([spacId])
   @@index([status])
@@ -487,10 +489,10 @@ model TargetContact {
 
 /// Transaction - Target transaction records
 model Transaction {
-  id          String   @id @default(cuid())
+  id          String    @id @default(cuid())
   type        String
-  amount      Decimal? @db.Decimal(18, 2)
-  description String?  @db.Text
+  amount      Decimal?  @db.Decimal(18, 2)
+  description String?   @db.Text
   date        DateTime?
 
   createdAt DateTime @default(now())
@@ -518,24 +520,25 @@ model Document {
   aiExtractedData Json?
 
   // Versioning
-  version         Int            @default(1)
-  parentId        String?
-  parent          Document?      @relation("DocumentVersions", fields: [parentId], references: [id])
-  versions        Document[]     @relation("DocumentVersions")
-  isLatest        Boolean        @default(true)
+  version  Int        @default(1)
+  parentId String?
+  parent   Document?  @relation("DocumentVersions", fields: [parentId], references: [id])
+  versions Document[] @relation("DocumentVersions")
+  isLatest Boolean    @default(true)
 
   // Soft delete
-  deletedAt       DateTime?
+  deletedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  spacId   String?
-  spac     Spac?            @relation(fields: [spacId], references: [id])
-  targetId String?
-  target   Target?          @relation(fields: [targetId], references: [id])
-  filings  FilingDocument[]
+  spacId           String?
+  spac             Spac?              @relation(fields: [spacId], references: [id])
+  targetId         String?
+  target           Target?            @relation(fields: [targetId], references: [id])
+  filings          FilingDocument[]
+  documentAnalyses DocumentAnalysis[]
 
   @@index([spacId])
   @@index([targetId])
@@ -568,35 +571,35 @@ model SecFiling {
 
 /// Filing - Enhanced SEC filing management
 model Filing {
-  id               String       @id @default(cuid())
-  type             FilingType
-  status           FilingStatus @default(DRAFTING)
-  title            String?
-  description      String?      @db.Text
+  id          String       @id @default(cuid())
+  type        FilingType
+  status      FilingStatus @default(DRAFTING)
+  title       String?
+  description String?      @db.Text
 
   // SEC Details
-  cik              String?
-  accessionNumber  String?
-  fileNumber       String?
-  edgarUrl         String?
+  cik             String?
+  accessionNumber String?
+  fileNumber      String?
+  edgarUrl        String?
 
   // Dates
-  dueDate          DateTime?
-  filedDate        DateTime?
-  effectiveDate    DateTime?
+  dueDate            DateTime?
+  filedDate          DateTime?
+  effectiveDate      DateTime?
   internalReviewDate DateTime?
   externalReviewDate DateTime?
-  secCommentDate   DateTime?
-  responseDate     DateTime?
+  secCommentDate     DateTime?
+  responseDate       DateTime?
 
   // Amendment tracking
-  amendmentNumber  Int          @default(0)
-  parentFilingId   String?
-  parentFiling     Filing?      @relation("FilingAmendments", fields: [parentFilingId], references: [id])
-  amendments       Filing[]     @relation("FilingAmendments")
+  amendmentNumber Int      @default(0)
+  parentFilingId  String?
+  parentFiling    Filing?  @relation("FilingAmendments", fields: [parentFilingId], references: [id])
+  amendments      Filing[] @relation("FilingAmendments")
 
   // SEC Comment tracking
-  secCommentCount  Int          @default(0)
+  secCommentCount Int @default(0)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -636,16 +639,16 @@ model FilingDocument {
 
 /// SecComment - SEC comment letters and responses
 model SecComment {
-  id             String    @id @default(cuid())
-  commentNumber  Int
-  commentText    String    @db.Text
-  category       String?
-  receivedDate   DateTime
-  dueDate        DateTime?
-  responseText   String?   @db.Text
-  responseDate   DateTime?
-  isResolved     Boolean   @default(false)
-  resolvedDate   DateTime?
+  id            String    @id @default(cuid())
+  commentNumber Int
+  commentText   String    @db.Text
+  category      String?
+  receivedDate  DateTime
+  dueDate       DateTime?
+  responseText  String?   @db.Text
+  responseDate  DateTime?
+  isResolved    Boolean   @default(false)
+  resolvedDate  DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -664,8 +667,8 @@ model SecComment {
 
 /// Comment - User comments on various entities
 model Comment {
-  id      String  @id @default(cuid())
-  content String  @db.Text
+  id      String @id @default(cuid())
+  content String @db.Text
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -714,7 +717,7 @@ model Task {
   completedAt DateTime?
 
   // Soft delete
-  deletedAt   DateTime?
+  deletedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -761,13 +764,13 @@ model Financial {
 
 /// TrustAccount - Trust account balance tracking
 model TrustAccount {
-  id              String    @id @default(cuid())
+  id              String   @id @default(cuid())
   accountName     String?
-  currentBalance  Decimal   @db.Decimal(18, 2)
+  currentBalance  Decimal  @db.Decimal(18, 2)
   balanceDate     DateTime
-  perShareValue   Decimal?  @db.Decimal(10, 4)
-  accruedInterest Decimal?  @db.Decimal(18, 2)
-  balanceHistory  Json?     // Array of historical balances
+  perShareValue   Decimal? @db.Decimal(10, 4)
+  accruedInterest Decimal? @db.Decimal(18, 2)
+  balanceHistory  Json? // Array of historical balances
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -785,8 +788,8 @@ model TrustAccount {
 model CapTableEntry {
   id           String  @id @default(cuid())
   holderName   String
-  holderType   String  // FOUNDER, SPONSOR, PUBLIC, PIPE, etc.
-  shareClass   String  // CLASS_A, CLASS_B, FOUNDER, etc.
+  holderType   String // FOUNDER, SPONSOR, PUBLIC, PIPE, etc.
+  shareClass   String // CLASS_A, CLASS_B, FOUNDER, etc.
   sharesOwned  BigInt
   ownershipPct Decimal @db.Decimal(10, 6)
   vestingInfo  Json?
@@ -829,7 +832,7 @@ model Warrant {
 /// Redemption - Redemption event tracking
 model Redemption {
   id              String   @id @default(cuid())
-  eventType       String   // EXTENSION, VOTE, OTHER
+  eventType       String // EXTENSION, VOTE, OTHER
   eventDate       DateTime
   sharesEligible  BigInt
   sharesRedeemed  BigInt
@@ -855,7 +858,7 @@ model Redemption {
 model PipeInvestor {
   id              String     @id @default(cuid())
   investorName    String
-  investorType    String?    // STRATEGIC, FINANCIAL, etc.
+  investorType    String? // STRATEGIC, FINANCIAL, etc.
   status          PipeStatus @default(PROSPECT)
   targetAmount    Decimal?   @db.Decimal(18, 2)
   committedAmount Decimal?   @db.Decimal(18, 2)
@@ -882,7 +885,7 @@ model Earnout {
   name             String
   description      String?       @db.Text
   status           EarnoutStatus @default(PENDING)
-  metricType       String        // STOCK_PRICE, REVENUE, EBITDA, etc.
+  metricType       String // STOCK_PRICE, REVENUE, EBITDA, etc.
   targetValue      Decimal       @db.Decimal(18, 2)
   currentValue     Decimal?      @db.Decimal(18, 2)
   earnoutShares    BigInt
@@ -934,7 +937,7 @@ model ComplianceItem {
   id            String           @id @default(cuid())
   name          String
   description   String?          @db.Text
-  category      String           // SEC, LEGAL, CORPORATE, etc.
+  category      String // SEC, LEGAL, CORPORATE, etc.
   status        ComplianceStatus @default(PENDING)
   dueDate       DateTime?
   completedDate DateTime?
@@ -959,7 +962,7 @@ model ComplianceItem {
 model BoardMeeting {
   id             String    @id @default(cuid())
   title          String
-  type           String    // REGULAR, SPECIAL, UNANIMOUS_CONSENT
+  type           String // REGULAR, SPECIAL, UNANIMOUS_CONSENT
   status         String    @default("scheduled") // scheduled, in_progress, completed, cancelled
   scheduledDate  DateTime
   actualDate     DateTime?
@@ -969,7 +972,7 @@ model BoardMeeting {
   attendees      String[]  @default([])
   quorumRequired Int?
   quorumMet      Boolean?
-  resolutions    Json?     // Array of resolutions with voting results
+  resolutions    Json? // Array of resolutions with voting results
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -995,7 +998,7 @@ model Conflict {
   resolution      String?          @db.Text
   resolvedDate    DateTime?
   disclosedDate   DateTime?
-  disclosedIn     String?          // Filing or document where disclosed
+  disclosedIn     String? // Filing or document where disclosed
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1012,22 +1015,22 @@ model Conflict {
 
 /// InsiderTradingWindow - Insider trading window management
 model InsiderTradingWindow {
-  id          String              @id @default(cuid())
-  name        String?
-  status      TradingWindowStatus @default(OPEN)
-  startDate   DateTime
-  endDate     DateTime?
-  reason      String?             @db.Text
-  affectsAll  Boolean             @default(false)
+  id         String              @id @default(cuid())
+  name       String?
+  status     TradingWindowStatus @default(OPEN)
+  startDate  DateTime
+  endDate    DateTime?
+  reason     String?             @db.Text
+  affectsAll Boolean             @default(false)
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
   spacId String
-  spac   Spac   @relation(fields: [spacId], references: [id], onDelete: Cascade)
+  spac   Spac    @relation(fields: [spacId], references: [id], onDelete: Cascade)
   userId String?
-  user   User?  @relation(fields: [userId], references: [id])
+  user   User?   @relation(fields: [userId], references: [id])
 
   @@index([spacId])
   @@index([userId])
@@ -1042,14 +1045,14 @@ model InsiderTradingWindow {
 
 /// Webhook - Webhook configuration
 model Webhook {
-  id              String   @id @default(cuid())
+  id              String    @id @default(cuid())
   name            String
   url             String
   secret          String
-  events          String[] @default([])
+  events          String[]  @default([])
   headers         Json?
-  isActive        Boolean  @default(true)
-  failureCount    Int      @default(0)
+  isActive        Boolean   @default(true)
+  failureCount    Int       @default(0)
   lastTriggeredAt DateTime?
 
   createdAt DateTime @default(now())
@@ -1076,7 +1079,7 @@ model WebhookDelivery {
   statusCode  Int?
   response    String?   @db.Text
   error       String?   @db.Text
-  duration    Int?      // milliseconds
+  duration    Int? // milliseconds
   success     Boolean   @default(false)
   attempts    Int       @default(1)
   deliveredAt DateTime?
@@ -1116,7 +1119,7 @@ model Organization {
 model OrganizationUser {
   id     String           @id @default(cuid())
   role   OrganizationRole @default(MEMBER)
-  userId String           // Clerk user ID
+  userId String // Clerk user ID
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1168,11 +1171,86 @@ model Note {
   updatedAt DateTime @updatedAt
 
   // Relations
-  target    Target?  @relation(fields: [targetId], references: [id], onDelete: Cascade)
-  spac      Spac?    @relation(fields: [spacId], references: [id], onDelete: Cascade)
+  target Target? @relation(fields: [targetId], references: [id], onDelete: Cascade)
+  spac   Spac?   @relation(fields: [spacId], references: [id], onDelete: Cascade)
 
   @@index([targetId])
   @@index([spacId])
   @@index([createdAt])
   @@map("notes")
+}
+
+// ============================================================================
+// SPRINT 6 - AI ANALYSIS MODELS
+// ============================================================================
+
+/// DocumentAnalysis - Cached AI analysis results for documents
+model DocumentAnalysis {
+  id                  String    @id @default(cuid())
+  documentId          String
+  summary             String?   @db.Text
+  keyTerms            Json?
+  riskFlags           Json?
+  actionItems         Json?
+  insights            Json?
+  financialHighlights Json?
+  riskLevel           String? // "high", "medium", "low", "none"
+  createdAt           DateTime  @default(now())
+  updatedAt           DateTime  @updatedAt
+  expiresAt           DateTime?
+
+  // Relations
+  document Document @relation(fields: [documentId], references: [id], onDelete: Cascade)
+
+  @@index([documentId])
+  @@index([riskLevel])
+  @@index([expiresAt])
+  @@map("document_analyses")
+}
+
+/// ScoreHistory - Historical tracking of AI scores for targets
+model ScoreHistory {
+  id               String   @id @default(cuid())
+  targetId         String
+  overallScore     Int
+  managementScore  Int?
+  marketScore      Int?
+  financialScore   Int?
+  operationalScore Int?
+  transactionScore Int?
+  thesis           String?  @db.Text
+  createdAt        DateTime @default(now())
+
+  // Relations
+  target Target @relation(fields: [targetId], references: [id], onDelete: Cascade)
+
+  @@index([targetId])
+  @@index([createdAt])
+  @@map("score_histories")
+}
+
+/// ComplianceAlert - Compliance alerts and notifications
+model ComplianceAlert {
+  id          String    @id @default(cuid())
+  spacId      String?
+  type        String // "DEADLINE_APPROACHING", "DEADLINE_MISSED", "FILING_REQUIRED", etc.
+  severity    String // "high", "medium", "low"
+  title       String
+  description String    @db.Text
+  dueDate     DateTime?
+  isRead      Boolean   @default(false)
+  isDismissed Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  // Relations
+  spac Spac? @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  @@index([spacId])
+  @@index([type])
+  @@index([severity])
+  @@index([isRead])
+  @@index([isDismissed])
+  @@index([dueDate])
+  @@map("compliance_alerts")
 }

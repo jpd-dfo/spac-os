@@ -29,6 +29,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Dropdown, DropdownItem } from '@/components/ui/Dropdown';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
+import { FilingStatusBadge } from '@/components/filings/FilingStatusBadge';
 import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn, formatDate } from '@/lib/utils';
 import type { FilingType, FilingStatus } from '@/types';
@@ -45,6 +46,7 @@ export interface FilingListItem {
   spacId: string;
   spacName: string;
   ticker: string;
+  cik?: string;
   status: FilingStatus;
   dueDate: Date;
   filedDate?: Date;
@@ -64,6 +66,27 @@ export interface FilingListItem {
   secCommentCount: number;
   attachmentCount: number;
   lastUpdated: Date;
+}
+
+// Status order for sorting
+const STATUS_ORDER: Record<FilingStatus, number> = {
+  DRAFT: 0,
+  INTERNAL_REVIEW: 1,
+  EXTERNAL_REVIEW: 2,
+  SUBMITTED: 3,
+  SEC_COMMENT: 4,
+  RESPONSE_FILED: 5,
+  EFFECTIVE: 6,
+  COMPLETE: 7,
+};
+
+// Helper to build SEC EDGAR URL
+function buildSecEdgarUrl(cik?: string, formType?: FilingType): string | null {
+  if (!cik) {
+    return null;
+  }
+  const cleanCik = cik.replace(/^0+/, '');
+  return `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cleanCik}&type=${formType || ''}&dateb=&owner=include&count=40`;
 }
 
 interface FilingListProps {
@@ -254,7 +277,7 @@ export function FilingList({
           comparison = new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
           break;
         case 'status':
-          comparison = a.status.localeCompare(b.status);
+          comparison = (STATUS_ORDER[a.status] ?? 0) - (STATUS_ORDER[b.status] ?? 0);
           break;
         case 'priority': {
           const priorityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
@@ -473,7 +496,9 @@ export function FilingList({
                         </div>
                       </div>
                     </TableCell>
-                    <TableCell>{getStatusBadge(filing.status)}</TableCell>
+                    <TableCell>
+                      <FilingStatusBadge status={filing.status} showIcon />
+                    </TableCell>
                     <TableCell>{getPriorityBadge(filing.priority)}</TableCell>
                     <TableCell>
                       {filing.assignee ? (
@@ -511,12 +536,17 @@ export function FilingList({
                             <Eye className="mr-2 h-4 w-4" />
                             View Details
                           </DropdownItem>
-                          {filing.edgarUrl && (
+                          {(filing.edgarUrl || filing.cik) && (
                             <DropdownItem
-                              onClick={() => window.open(filing.edgarUrl, '_blank')}
+                              onClick={() => {
+                                const url = filing.edgarUrl || buildSecEdgarUrl(filing.cik, filing.type);
+                                if (url) {
+                                  window.open(url, '_blank');
+                                }
+                              }}
                             >
                               <ExternalLink className="mr-2 h-4 w-4" />
-                              View on SEC
+                              View on SEC EDGAR
                             </DropdownItem>
                           )}
                           <DropdownItem onClick={() => onFilingEdit?.(filing)}>

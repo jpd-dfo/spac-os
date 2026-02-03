@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 
 import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
+import toast from 'react-hot-toast';
 
 import {
   ArrowLeft,
@@ -142,6 +143,57 @@ function getTaskPriorityBadge(priority: string) {
     default:
       return <Badge variant="secondary" size="sm">{priority}</Badge>;
   }
+}
+
+// ============================================================================
+// SYNC FROM SEC BUTTON COMPONENT
+// ============================================================================
+
+function SyncFromSecButton({
+  spacId,
+  cik,
+  onSuccess,
+}: {
+  spacId: string;
+  cik: string;
+  onSuccess: () => void;
+}) {
+  const syncMutation = trpc.filing.syncFilingsFromEdgar.useMutation({
+    onSuccess: (data) => {
+      if (data.synced > 0) {
+        toast.success(
+          `Synced ${data.synced} filings from SEC EDGAR (${data.created} new, ${data.updated} updated)`
+        );
+      } else {
+        toast('No new filings found in SEC EDGAR');
+      }
+      onSuccess();
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to sync filings from SEC EDGAR');
+    },
+  });
+
+  return (
+    <Button
+      variant="secondary"
+      size="sm"
+      onClick={() => syncMutation.mutate({ spacId })}
+      disabled={syncMutation.isPending}
+    >
+      {syncMutation.isPending ? (
+        <>
+          <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+          Syncing...
+        </>
+      ) : (
+        <>
+          <RefreshCw className="mr-2 h-4 w-4" />
+          Sync from SEC
+        </>
+      )}
+    </Button>
+  );
 }
 
 // ============================================================================
@@ -1083,11 +1135,16 @@ export default function SPACDetailPage() {
             )}
 
             {/* SEC Filings Section */}
-            {spac.filings && spac.filings.length > 0 && (
-              <div className="mt-8">
-                <h3 className="text-lg font-medium text-slate-900 mb-4">
-                  SEC Filings ({spac.filings.length})
+            <div className="mt-8">
+              <div className="flex items-center justify-between mb-4">
+                <h3 className="text-lg font-medium text-slate-900">
+                  SEC Filings ({spac.filings?.length || 0})
                 </h3>
+                {spac.cik && (
+                  <SyncFromSecButton spacId={spac.id} cik={spac.cik} onSuccess={() => refetch()} />
+                )}
+              </div>
+              {spac.filings && spac.filings.length > 0 ? (
                 <Card>
                   <Table>
                     <TableHead>
@@ -1135,8 +1192,21 @@ export default function SPACDetailPage() {
                     </TableBody>
                   </Table>
                 </Card>
-              </div>
-            )}
+              ) : (
+                <Card>
+                  <CardContent className="py-12">
+                    <EmptyState
+                      icon={<FileText className="h-12 w-12" />}
+                      title="No SEC filings"
+                      description={spac.cik
+                        ? "Click 'Sync from SEC' to import filings from SEC EDGAR"
+                        : "Add a CIK number to this SPAC to sync filings from SEC EDGAR"
+                      }
+                    />
+                  </CardContent>
+                </Card>
+              )}
+            </div>
           </div>
         </TabContent>
 
