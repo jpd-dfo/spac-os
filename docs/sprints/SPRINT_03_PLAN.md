@@ -1,173 +1,243 @@
-# Sprint 3: Deal Pipeline
+# Sprint 3: Deal Pipeline Backend Integration
 
 **Sprint Number:** 3
-**Sprint Name:** Deal Pipeline
+**Sprint Name:** Deal Pipeline Backend Integration
 **Duration:** February 3-4, 2026
 **Branch:** `feature/sprint-3-deal-pipeline`
-**PRD Version:** v4.1
+**PRD Version:** v4.2
 
 ---
 
 ## Sprint Goal
 
-Build a visual deal pipeline with Kanban board for tracking acquisition targets and detailed target company profiles integrated with SPAC relationships.
+Connect the existing deal pipeline UI to the real tRPC backend, implementing all data persistence and completing stub functionality.
+
+---
+
+## Pre-Sprint Discovery
+
+### What Already Exists (UI Complete)
+
+| Component | Status | Location |
+|-----------|--------|----------|
+| Kanban Board | ✅ Built | `/pipeline` page, 6-stage columns |
+| Drag-and-Drop | ✅ Built | HTML5 + @dnd-kit dual implementation |
+| Target Profiles | ✅ Built | `/pipeline/[id]` with 5 tabs |
+| Evaluation Scores | ✅ Built | 6 score types with visual display |
+| Financial Metrics | ✅ Built | EV, Revenue, EBITDA, multiples |
+| Activity Timeline | ✅ Built | Stage changes, notes, meetings |
+| Due Diligence | ✅ Built | Progress tracking by category |
+| Pipeline Filters | ✅ Built | Search, industry, stage, value, score |
+| Pipeline Stats | ✅ Built | Distribution, conversion, insights |
+| Dashboard Widget | ✅ Built | Pipeline funnel, top targets |
+| Quick Actions | ✅ Built | Menu with action stubs |
+| Add Target Form | ✅ Built | Multi-field with file upload |
+
+### What Needs Work
+
+| Gap | Issue | Priority |
+|-----|-------|----------|
+| Backend Integration | UI uses MOCK DATA | P0 - Critical |
+| Edit Target | Button exists, no handler | P1 - High |
+| Stage Transitions | Drag-drop not persisted | P0 - Critical |
+| Quick Actions | Handlers are stubs | P1 - High |
+| Export Feature | UI only, no logic | P2 - Medium |
+| Bulk Operations | No implementation | P2 - Medium |
 
 ---
 
 ## Features to Build
 
-### Feature 1: Deal Pipeline Kanban Board
+### Feature 1: Connect Pipeline to tRPC Backend (P0)
 
-**Description:** A drag-and-drop Kanban board for visualizing and managing the deal pipeline across lifecycle stages.
+**Description:** Replace mock data with real tRPC queries and mutations throughout the pipeline pages.
 
 **Acceptance Criteria:**
-- [ ] Pipeline page at `/pipeline` displays Kanban board layout
-- [ ] Columns represent deal stages: PROSPECT, OUTREACH, NDA_SIGNED, LOI_SIGNED, DUE_DILIGENCE, DA_SIGNED, CLOSING, COMPLETED, PASSED
-- [ ] Deal cards display: target name, SPAC association, stage, key metrics (valuation, sector)
-- [ ] Drag-and-drop moves deals between stages with optimistic UI updates
-- [ ] Stage changes persist to database via tRPC mutation
-- [ ] Visual indicators for deal health (days in stage, deadline proximity)
-- [ ] Filter by: SPAC, sector, date range
-- [ ] Search deals by company name or ticker
-- [ ] "Add Deal" button opens quick-create modal
-- [ ] Mobile-responsive column layout (horizontal scroll on mobile)
+- [ ] Pipeline page fetches targets from `target.list` or `target.getPipeline` endpoint
+- [ ] Target detail page uses `target.getById` with full relations
+- [ ] Drag-and-drop stage changes call `target.updateStatus` mutation
+- [ ] Add target form calls `target.create` mutation
+- [ ] All loading states show skeletons (already built)
+- [ ] All error states display appropriate messages
+- [ ] Data refreshes after mutations (optimistic updates preferred)
 
-**Technical Requirements:**
-- Use `@dnd-kit/core` for drag-and-drop (already installed)
-- Integrate with existing `target.ts` tRPC router
-- Add `updateStage` mutation with audit logging
-- Implement optimistic updates with React Query
+**Technical Tasks:**
+```
+1. Update /app/(dashboard)/pipeline/page.tsx:
+   - Import trpc client
+   - Replace MOCK_TARGETS with trpc.target.list.useQuery()
+   - Wire onTargetMove to trpc.target.updateStatus.useMutation()
+   - Wire onAddTarget to trpc.target.create.useMutation()
+
+2. Update /app/(dashboard)/pipeline/[id]/page.tsx:
+   - Replace mock target with trpc.target.getById.useQuery()
+   - Add proper loading/error states
+   - Wire action buttons to mutations
+
+3. Verify target.ts router has all needed endpoints:
+   - list (with pipeline stage filtering)
+   - getById (with relations)
+   - create
+   - update
+   - updateStatus (for stage changes)
+   - delete (soft delete)
+```
 
 ---
 
-### Feature 2: Target Company Profiles
+### Feature 2: Implement Edit Target Functionality (P1)
 
-**Description:** Detailed profile pages for acquisition target companies with comprehensive information display.
+**Description:** Complete the edit target flow with form and mutation.
 
 **Acceptance Criteria:**
-- [ ] Target detail page at `/pipeline/[id]` shows full company profile
-- [ ] Header section: company name, logo placeholder, sector, status badge
-- [ ] Overview tab: description, key metrics, AI score (placeholder), contact info
-- [ ] Financials tab: valuation, enterprise value, revenue, EBITDA, multiples (EV/Revenue, EV/EBITDA)
-- [ ] Documents tab: list of associated documents (links to Sprint 4)
-- [ ] Activity tab: timeline of status changes, notes, interactions
-- [ ] SPAC Association section: linked SPAC with quick navigation
-- [ ] Edit button opens edit form with validation
-- [ ] Delete with confirmation modal
-- [ ] Breadcrumb navigation back to pipeline
+- [ ] Edit button opens pre-populated form modal
+- [ ] Form validates all fields with Zod schema
+- [ ] Submit calls `target.update` mutation
+- [ ] Success closes modal and refreshes data
+- [ ] Error displays validation messages
 
-**Technical Requirements:**
-- Extend `target.ts` router with `getById` including relations
-- Add activity/notes system to Target model if needed
-- Reuse UI components from SPAC detail page pattern
-- Format financial numbers with proper currency/abbreviations
+**Technical Tasks:**
+```
+1. Create EditTargetModal component (or reuse AddTargetForm in edit mode)
+2. Wire edit button click to open modal with target data
+3. Implement update mutation call
+4. Add success/error toast notifications
+```
 
 ---
 
-### Feature 3: Deal Quick Actions
+### Feature 3: Wire Quick Actions to Backend (P1)
 
-**Description:** Quick action workflows for common deal operations.
+**Description:** Connect all quick action menu items to real functionality.
 
 **Acceptance Criteria:**
-- [ ] Quick-create deal modal from pipeline page
-- [ ] Quick-edit deal modal (inline from Kanban card)
-- [ ] Bulk status update (select multiple, change stage)
-- [ ] Quick notes: add note without opening full profile
-- [ ] Stage transition confirmation for critical stages (DA_SIGNED, CLOSING)
+- [ ] "Add Note" opens note input and saves via mutation
+- [ ] "Change Priority" updates target priority
+- [ ] "Move Stage" opens stage picker and updates status
+- [ ] "Assign" opens assignee picker and updates target
+- [ ] "Archive" soft-deletes with confirmation
+- [ ] All actions show loading state during mutation
+- [ ] All actions show success/error feedback
 
-**Technical Requirements:**
-- Modal components with form validation
-- Batch mutation endpoint for bulk updates
-- Confirmation dialogs for destructive/critical actions
+**Technical Tasks:**
+```
+1. Add mutations for each action type
+2. Create small modal/popover components for inputs
+3. Wire handlers in TargetCard and detail page
+4. Add toast notifications for feedback
+```
 
 ---
 
-### Feature 4: Pipeline Analytics Widget
+### Feature 4: Implement Export Functionality (P2)
 
-**Description:** Summary statistics for the deal pipeline displayed on dashboard and pipeline page.
+**Description:** Enable CSV and Excel export of pipeline data.
 
 **Acceptance Criteria:**
-- [ ] Pipeline summary card showing: total deals, deals by stage, conversion rates
-- [ ] Deals added this week/month metric
-- [ ] Average time in each stage
-- [ ] Integration with main dashboard page
-- [ ] Pipeline page header shows key stats
+- [ ] Export dropdown triggers download
+- [ ] CSV export includes all visible columns
+- [ ] Excel export with proper formatting
+- [ ] Filters applied to export (export what you see)
+- [ ] Loading indicator during export generation
 
-**Technical Requirements:**
-- Add `getStats` query to target router
-- Aggregate queries for stage counts and timing metrics
-- Reusable stats component
+**Technical Tasks:**
+```
+1. Create export utility functions (CSV, Excel)
+2. Wire export dropdown handlers
+3. Apply current filters to export data
+4. Generate and trigger file download
+```
+
+---
+
+### Feature 5: Add Bulk Operations (P2)
+
+**Description:** Enable multi-select and batch operations on targets.
+
+**Acceptance Criteria:**
+- [ ] Checkbox selection on target cards
+- [ ] "Select All" in header
+- [ ] Bulk action bar appears when items selected
+- [ ] Bulk stage change moves all selected
+- [ ] Bulk archive with confirmation
+- [ ] Selection clears after action
+
+**Technical Tasks:**
+```
+1. Add selection state management
+2. Create BulkActionBar component
+3. Add batch mutation endpoints if needed
+4. Wire bulk handlers
+```
 
 ---
 
 ## Dependencies
 
 ### From Previous Sprints
-- ✅ Sprint 1: Authentication, database, dashboard shell
-- ✅ Sprint 2: SPAC management, tRPC infrastructure, UI components
+- ✅ Sprint 1: Authentication, database, tRPC setup
+- ✅ Sprint 2: SPAC management, dashboard integration
 
-### External Dependencies
-- `@dnd-kit/core` - Already installed for drag-and-drop
-- Existing `Target` Prisma model with all required fields
-- Existing `target.ts` router with base CRUD operations
+### Existing Backend Infrastructure
+- `target.ts` router with CRUD operations
+- `target.router.ts` with extended operations
+- Prisma `Target` model with all fields
+- `TargetStatus` enum for pipeline stages
 
-### Carryover Items (Address if time permits)
-- Add unit tests for tRPC routers
-- Add skeleton loaders for loading states
-- Fix high-priority lint warnings
+### UI Components (Already Built)
+- KanbanBoard, KanbanColumn components
+- TargetCard, DealCard components
+- AddTargetForm, AddDealForm components
+- PipelineFilters, PipelineStats components
+- Detail page with tabs
 
 ---
 
 ## Technical Notes
 
-### Existing Infrastructure to Leverage
-```
-- src/server/api/routers/target.ts - Base CRUD operations
-- src/server/api/routers/target.router.ts - Extended operations
-- prisma/schema.prisma - Target model with relations
-- src/components/ui/* - Reusable UI components
-- src/lib/trpc/* - tRPC client setup
+### Target Router Endpoints Available
+```typescript
+// From target.ts
+- list: Paginated list with filters
+- getById: Single target with relations
+- create: Create new target
+- update: Update target fields
+- delete: Soft delete
+
+// From target.router.ts (extended)
+- getPipeline: Grouped by status for Kanban
+- updateStatus: Change stage with audit
+- updateScores: Update evaluation scores
+- getStatistics: Pipeline analytics
+- assignToSpac: Link target to SPAC
 ```
 
-### Target Model Fields (from Prisma schema)
-```prisma
-model Target {
-  id              String   @id @default(cuid())
-  spacId          String
-  name            String
-  description     String?
-  sector          String?
-  status          TargetStatus @default(IDENTIFIED)
-  valuation       Decimal?
-  enterpriseValue Decimal?
-  revenue         Decimal?
-  ebitda          Decimal?
-  evRevenue       Decimal?
-  evEbitda        Decimal?
-  aiScore         Decimal?
-  overallScore    Decimal?
-  probability     Decimal?
-  // ... relations
-}
-```
-
-### TargetStatus Enum Values
-```
-IDENTIFIED, RESEARCHING, OUTREACH, NDA_SIGNED, LOI_SIGNED,
-DUE_DILIGENCE, DA_SIGNED, CLOSING, COMPLETED, PASSED
+### Status to Stage Mapping
+```typescript
+// Database TargetStatus → UI Pipeline Stage
+IDENTIFIED → Sourcing
+RESEARCHING → Sourcing
+OUTREACH → Initial Screening
+NDA_SIGNED → Initial Screening
+LOI_SIGNED → Deep Evaluation
+DUE_DILIGENCE → Deep Evaluation
+DA_SIGNED → Negotiation
+CLOSING → Execution
+COMPLETED → Closed
+PASSED → Passed
 ```
 
 ---
 
 ## Definition of Done
 
-- [ ] All acceptance criteria met
+- [ ] All pipeline data comes from database (no mock data)
+- [ ] Stage changes persist via drag-and-drop
+- [ ] Edit target fully functional
+- [ ] All quick actions work
 - [ ] No TypeScript errors
-- [ ] No lint errors (warnings acceptable)
-- [ ] Responsive design verified on mobile/tablet/desktop
-- [ ] Loading and error states implemented
-- [ ] tRPC mutations have proper error handling
-- [ ] Code follows existing patterns and conventions
+- [ ] No lint errors
+- [ ] Loading and error states work correctly
 - [ ] Sprint completion document created
 
 ---
@@ -176,20 +246,21 @@ DUE_DILIGENCE, DA_SIGNED, CLOSING, COMPLETED, PASSED
 
 | Risk | Likelihood | Impact | Mitigation |
 |------|------------|--------|------------|
-| Drag-drop performance with many deals | Medium | Medium | Virtualize list if >100 deals |
-| Complex state management | Low | Medium | Use React Query for server state |
-| Mobile drag-drop UX | Medium | Low | Fallback to tap-to-move on mobile |
+| Router endpoint gaps | Low | Medium | Audit router before starting |
+| Type mismatches UI↔API | Medium | Medium | Use shared Zod schemas |
+| Optimistic update bugs | Medium | Low | Fallback to refetch on error |
 
 ---
 
 ## Sprint Backlog Order
 
-1. **Pipeline Kanban Board** (Core feature, highest priority)
-2. **Target Company Profiles** (Builds on existing detail page pattern)
-3. **Deal Quick Actions** (Enhances workflow efficiency)
-4. **Pipeline Analytics Widget** (Dashboard integration)
+1. **Connect Pipeline to tRPC** - Foundation for everything else
+2. **Implement Edit Target** - Core CRUD completion
+3. **Wire Quick Actions** - User workflow completion
+4. **Implement Export** - Nice-to-have if time permits
+5. **Add Bulk Operations** - Nice-to-have if time permits
 
 ---
 
 *Plan created: February 3, 2026*
-*Ready for implementation*
+*Revised after discovery: UI exists, focus on backend integration*
