@@ -289,7 +289,11 @@ export function AIScoreCard({
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          target: targetData,
+          target: {
+            ...targetData,
+            industry: targetData.sector || 'Technology',
+            description: targetData.description || `${targetData.name} is a company in the ${targetData.sector || 'technology'} sector.`,
+          },
           operation: 'score',
         }),
       });

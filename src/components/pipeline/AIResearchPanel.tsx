@@ -163,9 +163,11 @@ export function AIResearchPanel({
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            companyName: targetName,
-            sector: targetSector || '',
             operation,
+            params: {
+              companyName: targetName,
+              industry: targetSector || 'Technology',
+            },
           }),
         });
 
