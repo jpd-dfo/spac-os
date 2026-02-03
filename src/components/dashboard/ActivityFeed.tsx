@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+
 import {
   Activity,
   FileText,
@@ -15,10 +16,11 @@ import {
   ChevronRight,
   Filter,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
+import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Avatar } from '@/components/ui/Avatar';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatRelativeTime, getInitials } from '@/lib/utils';
 
 // ============================================================================
@@ -373,7 +375,7 @@ export function ActivityFeed({
   const [filter, setFilter] = useState<ActivityType | 'ALL'>('ALL');
 
   const filteredActivities = useMemo(() => {
-    if (!data?.activities) return [];
+    if (!data?.activities) {return [];}
     let activities = data.activities;
     if (filter !== 'ALL') {
       activities = activities.filter((a) => a.type === filter);

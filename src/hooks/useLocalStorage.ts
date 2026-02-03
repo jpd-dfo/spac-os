@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import { logger } from '@/lib/logger';
 
 export function useLocalStorage<T>(
@@ -12,7 +13,7 @@ export function useLocalStorage<T>(
 
   // Initialize from localStorage on mount
   useEffect(() => {
-    if (typeof window === 'undefined') return;
+    if (typeof window === 'undefined') {return;}
 
     try {
       const item = window.localStorage.getItem(key);

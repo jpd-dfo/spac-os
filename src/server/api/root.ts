@@ -3,9 +3,9 @@
  * Combines all tRPC routers into a single API
  */
 
-import { createTRPCRouter } from './trpc';
 import { spacRouter } from './routers/spac';
 import { targetRouter } from './routers/target';
+import { createTRPCRouter } from './trpc';
 
 /**
  * Main tRPC router combining all domain routers

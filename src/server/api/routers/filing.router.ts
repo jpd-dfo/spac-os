@@ -3,14 +3,10 @@
  * SEC filing management and tracking
  */
 
-import { z } from 'zod';
+import { type Prisma } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
-import { Prisma } from '@prisma/client';
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  orgAuditedProcedure,
-} from '../trpc';
+import { z } from 'zod';
+
 import {
   FilingCreateSchema,
   FilingUpdateSchema,
@@ -19,6 +15,12 @@ import {
   FilingTypeSchema,
   FilingStatusSchema,
 } from '@/schemas';
+
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  orgAuditedProcedure,
+} from '../trpc';
 
 export const filingRouter = createTRPCRouter({
   getById: protectedProcedure
@@ -82,9 +84,9 @@ export const filingRouter = createTRPCRouter({
 
       const where: Prisma.FilingWhereInput = {};
 
-      if (spacId) where.spacId = spacId;
-      if (type?.length) where.type = { in: type };
-      if (status?.length) where.status = { in: status };
+      if (spacId) {where.spacId = spacId;}
+      if (type?.length) {where.type = { in: type as any };}
+      if (status?.length) {where.status = { in: status };}
       if (filedAfter || filedBefore) {
         where.filedDate = {
           ...(filedAfter && { gte: filedAfter }),
@@ -136,7 +138,7 @@ export const filingRouter = createTRPCRouter({
 
       const filing = await ctx.db.filing.create({
         data: {
-          ...input,
+          ...input as any,
           cik,
         },
         include: {
@@ -166,7 +168,7 @@ export const filingRouter = createTRPCRouter({
 
       const filing = await ctx.db.filing.update({
         where: { id: input.id },
-        data: input.data,
+        data: input.data as any,
         include: {
           spac: true,
           secComments: true,
@@ -257,7 +259,7 @@ export const filingRouter = createTRPCRouter({
 
       if (input.status === 'FILED') {
         updateData.filedDate = input.filedDate || new Date();
-        if (input.accessionNumber) updateData.accessionNumber = input.accessionNumber;
+        if (input.accessionNumber) {updateData.accessionNumber = input.accessionNumber;}
       }
 
       if (input.status === 'EFFECTIVE') {
@@ -300,7 +302,7 @@ export const filingRouter = createTRPCRouter({
 
       const nextAmendmentNumber =
         parentFiling.amendments.length > 0
-          ? parentFiling.amendments[0].amendmentNumber + 1
+          ? (parentFiling.amendments[0]?.amendmentNumber ?? 0) + 1
           : 1;
 
       const amendment = await ctx.db.filing.create({
@@ -540,7 +542,7 @@ export const filingRouter = createTRPCRouter({
     .input(z.object({ spacId: UuidSchema.optional() }))
     .query(async ({ ctx, input }) => {
       const where: Prisma.FilingWhereInput = {};
-      if (input.spacId) where.spacId = input.spacId;
+      if (input.spacId) {where.spacId = input.spacId;}
 
       const [total, byType, byStatus, avgReviewTime] = await Promise.all([
         ctx.db.filing.count({ where }),
@@ -566,7 +568,7 @@ export const filingRouter = createTRPCRouter({
             effectiveDate: true,
           },
         }).then((filings) => {
-          if (filings.length === 0) return null;
+          if (filings.length === 0) {return null;}
           const totalDays = filings.reduce((sum, f) => {
             const days = Math.floor(
               (f.effectiveDate!.getTime() - f.filedDate!.getTime()) /

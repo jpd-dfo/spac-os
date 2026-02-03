@@ -4,14 +4,16 @@
  */
 
 import { PrismaAdapter } from '@auth/prisma-adapter';
+import bcrypt from 'bcryptjs';
+import CredentialsProvider from 'next-auth/providers/credentials';
+import EmailProvider from 'next-auth/providers/email';
+import GitHubProvider from 'next-auth/providers/github';
+import GoogleProvider from 'next-auth/providers/google';
+
+import { prisma } from './prisma';
+
 import type { NextAuthOptions } from 'next-auth';
 import type { Adapter } from 'next-auth/adapters';
-import GoogleProvider from 'next-auth/providers/google';
-import GitHubProvider from 'next-auth/providers/github';
-import EmailProvider from 'next-auth/providers/email';
-import CredentialsProvider from 'next-auth/providers/credentials';
-import { prisma } from './prisma';
-import bcrypt from 'bcryptjs';
 
 declare module 'next-auth' {
   interface Session {
@@ -63,29 +65,29 @@ export const authOptions: NextAuthOptions = {
   providers: [
     // Google OAuth
     GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
+      clientId: process.env['GOOGLE_CLIENT_ID']!,
+      clientSecret: process.env['GOOGLE_CLIENT_SECRET']!,
       allowDangerousEmailAccountLinking: true,
     }),
 
     // GitHub OAuth
     GitHubProvider({
-      clientId: process.env.GITHUB_CLIENT_ID!,
-      clientSecret: process.env.GITHUB_CLIENT_SECRET!,
+      clientId: process.env['GITHUB_CLIENT_ID']!,
+      clientSecret: process.env['GITHUB_CLIENT_SECRET']!,
       allowDangerousEmailAccountLinking: true,
     }),
 
     // Email Magic Link
     EmailProvider({
       server: {
-        host: process.env.EMAIL_SERVER_HOST,
-        port: Number(process.env.EMAIL_SERVER_PORT),
+        host: process.env['EMAIL_SERVER_HOST'],
+        port: Number(process.env['EMAIL_SERVER_PORT']),
         auth: {
-          user: process.env.EMAIL_SERVER_USER,
-          pass: process.env.EMAIL_SERVER_PASSWORD,
+          user: process.env['EMAIL_SERVER_USER'],
+          pass: process.env['EMAIL_SERVER_PASSWORD'],
         },
       },
-      from: process.env.EMAIL_FROM || 'SPAC OS <noreply@spacos.com>',
+      from: process.env['EMAIL_FROM'] || 'SPAC OS <noreply@spacos.com>',
     }),
 
     // Credentials (email/password)
@@ -102,20 +104,19 @@ export const authOptions: NextAuthOptions = {
 
         const user = await prisma.user.findUnique({
           where: { email: credentials.email },
-          include: {
-            organizations: {
-              take: 1,
-              orderBy: { createdAt: 'desc' },
-              include: { organization: true },
-            },
-          },
         });
 
-        if (!user || !user.password) {
+        if (!user) {
           throw new Error('Invalid credentials');
         }
 
-        const isValid = await bcrypt.compare(credentials.password, user.password);
+        // Type assertion for password field (may be stored externally or in extended schema)
+        const userWithPassword = user as typeof user & { password?: string };
+        if (!userWithPassword.password) {
+          throw new Error('Invalid credentials');
+        }
+
+        const isValid = await bcrypt.compare(credentials.password, userWithPassword.password);
         if (!isValid) {
           throw new Error('Invalid credentials');
         }
@@ -125,15 +126,13 @@ export const authOptions: NextAuthOptions = {
           email: user.email,
           name: user.name,
           image: user.image,
-          organizationId: user.organizations[0]?.organizationId,
-          role: user.organizations[0]?.role,
         };
       },
     }),
   ],
 
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ account }) {
       // Allow OAuth linking
       if (account?.provider && account.provider !== 'credentials') {
         return true;
@@ -158,19 +157,15 @@ export const authOptions: NextAuthOptions = {
 
       // Refresh organization data periodically
       if (token.id && !token.organizationId) {
-        const dbUser = await prisma.user.findUnique({
-          where: { id: token.id },
-          include: {
-            organizations: {
-              take: 1,
-              orderBy: { createdAt: 'desc' },
-            },
-          },
+        // Query organization membership separately
+        const membership = await prisma.organizationUser.findFirst({
+          where: { userId: token.id },
+          orderBy: { createdAt: 'desc' },
         });
 
-        if (dbUser?.organizations[0]) {
-          token.organizationId = dbUser.organizations[0].organizationId;
-          token.role = dbUser.organizations[0].role;
+        if (membership) {
+          token.organizationId = membership.organizationId;
+          token.role = membership.role;
         }
       }
 
@@ -204,32 +199,49 @@ export const authOptions: NextAuthOptions = {
     async signIn({ user, account, isNewUser }) {
       // Log sign-in event
       if (user.id) {
-        await prisma.auditLog.create({
-          data: {
-            action: 'SIGN_IN',
-            entityType: 'User',
-            entityId: user.id,
-            userId: user.id,
-            metadata: {
-              provider: account?.provider,
-              isNewUser,
-            },
-          },
+        // Get user's organization for audit log
+        const membership = await prisma.organizationUser.findFirst({
+          where: { userId: user.id },
         });
+
+        if (membership) {
+          await prisma.auditLog.create({
+            data: {
+              action: 'SIGN_IN',
+              entityType: 'User',
+              entityId: user.id,
+              userId: user.id,
+              organizationId: membership.organizationId,
+              metadata: {
+                provider: account?.provider,
+                isNewUser,
+              },
+            },
+          });
+        }
       }
     },
 
     async signOut(message) {
       // Log sign-out event
       if ('token' in message && message.token?.id) {
-        await prisma.auditLog.create({
-          data: {
-            action: 'SIGN_OUT',
-            entityType: 'User',
-            entityId: message.token.id as string,
-            userId: message.token.id as string,
-          },
+        const userId = message.token.id as string;
+        // Get user's organization for audit log
+        const membership = await prisma.organizationUser.findFirst({
+          where: { userId },
         });
+
+        if (membership) {
+          await prisma.auditLog.create({
+            data: {
+              action: 'SIGN_OUT',
+              entityType: 'User',
+              entityId: userId,
+              userId: userId,
+              organizationId: membership.organizationId,
+            },
+          });
+        }
       }
     },
 

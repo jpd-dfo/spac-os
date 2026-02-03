@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+
+import { TrendingDown, Info, AlertTriangle, ChevronDown, ArrowRight, Users, Building2 } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -16,10 +18,10 @@ import {
   Line,
   Legend,
 } from 'recharts';
-import { TrendingDown, Info, AlertTriangle, ChevronDown, ArrowRight, Users, Building2 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { Tooltip as UITooltip } from '@/components/ui/Tooltip';
 import { cn, formatPercent, formatLargeNumber } from '@/lib/utils';
 
@@ -144,7 +146,7 @@ interface ChartTooltipProps {
 }
 
 function ChartTooltip({ active, payload, label }: ChartTooltipProps) {
-  if (!active || !payload || !payload.length) return null;
+  if (!active || !payload || !payload.length) {return null;}
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-lg">
@@ -324,7 +326,7 @@ export function DilutionWaterfall({
     const postIpo = stages.find((s) => s.id === 'post_ipo');
     const current = selectedStageData;
 
-    if (!postIpo || !current) return null;
+    if (!postIpo || !current) {return null;}
 
     const publicDilution = postIpo.publicOwnership - current.publicOwnership;
     const sponsorDilution = postIpo.sponsorOwnership - current.sponsorOwnership;

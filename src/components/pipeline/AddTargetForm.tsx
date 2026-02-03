@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback } from 'react';
+
 import {
   X,
   Building2,
@@ -11,13 +12,15 @@ import {
   Trash2,
   Info,
 } from 'lucide-react';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
+import { Modal, ModalHeader, ModalTitle, ModalFooter } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { Badge } from '@/components/ui/Badge';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn } from '@/lib/utils';
+
 import type { PipelineStage } from './TargetCard';
 
 // ============================================================================
@@ -186,8 +189,8 @@ function FileUpload({ files, onFilesChange, maxFiles = 10, acceptedTypes = ['.pd
   );
 
   const formatFileSize = (bytes: number): string => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+    if (bytes < 1024) {return `${bytes} B`;}
+    if (bytes < 1024 * 1024) {return `${(bytes / 1024).toFixed(1)} KB`;}
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
   };
 
@@ -284,7 +287,10 @@ function TagInput({ tags, onTagsChange, placeholder = 'Add tags...', suggestions
         e.preventDefault();
         addTag(inputValue);
       } else if (e.key === 'Backspace' && !inputValue && tags.length > 0) {
-        removeTag(tags[tags.length - 1]);
+        const lastTag = tags[tags.length - 1];
+        if (lastTag) {
+          removeTag(lastTag);
+        }
       }
     },
     [inputValue, tags, addTag, removeTag]
@@ -444,7 +450,10 @@ export function AddTargetForm({
   const availableSubIndustries = SUB_INDUSTRIES[formData.industry] || [];
 
   return (
-    <Modal isOpen={isOpen} onClose={handleClose} title="Add New Target" size="full">
+    <Modal isOpen={isOpen} onClose={handleClose} size="full">
+      <ModalHeader>
+        <ModalTitle>Add New Target</ModalTitle>
+      </ModalHeader>
       <form onSubmit={handleSubmit} className="flex flex-col h-[70vh]">
         <div className="flex-1 overflow-y-auto px-1 space-y-8">
           {/* Company Information */}

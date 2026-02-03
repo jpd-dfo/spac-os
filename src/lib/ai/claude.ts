@@ -3,7 +3,9 @@
 // ============================================================================
 
 import Anthropic from '@anthropic-ai/sdk';
+
 import { AI_CONFIG } from './prompts';
+
 import type { AIError, AIResponseMetadata } from './types';
 
 // ============================================================================
@@ -180,7 +182,7 @@ export class ClaudeClient {
   private isConfigured: boolean;
 
   constructor(config: ClaudeClientConfig = {}) {
-    const apiKey = config.apiKey || process.env.ANTHROPIC_API_KEY || '';
+    const apiKey = config.apiKey || process.env['ANTHROPIC_API_KEY'] || '';
     this.isConfigured = !!apiKey;
 
     this.client = new Anthropic({
@@ -443,7 +445,7 @@ export class ClaudeClient {
 
     // Handle markdown code blocks
     const jsonMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
+    if (jsonMatch && jsonMatch[1]) {
       jsonString = jsonMatch[1];
     }
 
@@ -466,8 +468,8 @@ export class ClaudeClient {
       const closeBracket = openBracket === '{' ? '}' : ']';
 
       for (let i = 0; i < jsonString.length; i++) {
-        if (jsonString[i] === openBracket) depth++;
-        if (jsonString[i] === closeBracket) depth--;
+        if (jsonString[i] === openBracket) {depth++;}
+        if (jsonString[i] === closeBracket) {depth--;}
         if (depth === 0) {
           endIndex = i + 1;
           break;
@@ -495,9 +497,9 @@ export class ClaudeClient {
    * Check if an error is retryable
    */
   private isRetryableError(error: unknown): boolean {
-    if (error instanceof Anthropic.RateLimitError) return true;
-    if (error instanceof Anthropic.InternalServerError) return true;
-    if (error instanceof Anthropic.APIConnectionError) return true;
+    if (error instanceof Anthropic.RateLimitError) {return true;}
+    if (error instanceof Anthropic.InternalServerError) {return true;}
+    if (error instanceof Anthropic.APIConnectionError) {return true;}
     return false;
   }
 

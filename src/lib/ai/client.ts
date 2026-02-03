@@ -3,6 +3,7 @@
 // ============================================================================
 
 import { AI_CONFIG } from './prompts';
+
 import type { AIError, AIResponseMetadata } from './types';
 
 /**
@@ -75,7 +76,7 @@ export class AIClient {
   private timeout: number;
 
   constructor(config: AIClientConfig = {}) {
-    this.apiKey = config.apiKey || process.env.ANTHROPIC_API_KEY || '';
+    this.apiKey = config.apiKey || process.env['ANTHROPIC_API_KEY'] || '';
     this.baseUrl = config.baseUrl || 'https://api.anthropic.com/v1';
     this.defaultModel = config.defaultModel || AI_CONFIG.models.default;
     this.timeout = config.timeout || 60000;
@@ -275,7 +276,7 @@ export class AIClient {
 
     // Handle markdown code blocks
     const jsonMatch = jsonString.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
+    if (jsonMatch && jsonMatch[1]) {
       jsonString = jsonMatch[1];
     }
 
@@ -297,8 +298,8 @@ export class AIClient {
       const closeBracket = openBracket === '{' ? '}' : ']';
 
       for (let i = 0; i < jsonString.length; i++) {
-        if (jsonString[i] === openBracket) depth++;
-        if (jsonString[i] === closeBracket) depth--;
+        if (jsonString[i] === openBracket) {depth++;}
+        if (jsonString[i] === closeBracket) {depth--;}
         if (depth === 0) {
           endIndex = i + 1;
           break;
@@ -326,7 +327,7 @@ export class AIClient {
    * Handle API errors and create appropriate error objects
    */
   private handleAPIError(status: number, errorData: Record<string, unknown>): AIError {
-    const errorMessage = (errorData.error as { message?: string })?.message || 'Unknown API error';
+    const errorMessage = (errorData['error'] as { message?: string })?.message || 'Unknown API error';
 
     switch (status) {
       case 400:

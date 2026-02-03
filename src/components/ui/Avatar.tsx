@@ -1,5 +1,6 @@
-import { cn, getInitials } from '@/lib/utils';
 import { cva, type VariantProps } from 'class-variance-authority';
+
+import { cn, getInitials } from '@/lib/utils';
 
 const avatarVariants = cva(
   'inline-flex items-center justify-center rounded-full font-medium',

@@ -1,4 +1,5 @@
 import { cn } from '@/lib/utils';
+
 import { Button } from './Button';
 
 interface EmptyStateProps {

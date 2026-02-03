@@ -1,19 +1,18 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+
 import {
   ArrowLeft,
   Building2,
-  TrendingUp,
   Users,
   MapPin,
   Calendar,
-  DollarSign,
   FileText,
   MessageSquare,
-  Clock,
   CheckCircle2,
   AlertCircle,
   ChevronRight,
@@ -25,16 +24,16 @@ import {
   Globe,
   BarChart3,
   Activity,
-  Plus,
   MoreHorizontal,
   LinkIcon,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+
 import { Avatar } from '@/components/ui/Avatar';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
-import { Tooltip } from '@/components/ui/Tooltip';
 import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { cn, formatLargeNumber, formatDate, formatRelativeTime } from '@/lib/utils';
 
 // ============================================================================
@@ -236,9 +235,9 @@ const MOCK_TARGET: TargetDetails = {
 function ScoreBar({ label, score, maxScore = 100 }: { label: string; score: number; maxScore?: number }) {
   const percentage = (score / maxScore) * 100;
   const getColor = (p: number) => {
-    if (p >= 80) return 'bg-success-500';
-    if (p >= 60) return 'bg-primary-500';
-    if (p >= 40) return 'bg-warning-500';
+    if (p >= 80) {return 'bg-success-500';}
+    if (p >= 60) {return 'bg-primary-500';}
+    if (p >= 40) {return 'bg-warning-500';}
     return 'bg-danger-500';
   };
 
@@ -356,7 +355,7 @@ export default function TargetDetailPage({ params }: PageProps) {
   }, [params.id]);
 
   const handleAdvanceStage = useCallback(() => {
-    if (!target) return;
+    if (!target) {return;}
     const stageOrder: PipelineStage[] = [
       'sourcing',
       'initial_screening',
@@ -366,13 +365,14 @@ export default function TargetDetailPage({ params }: PageProps) {
       'closed_passed',
     ];
     const currentIndex = stageOrder.indexOf(target.stage);
-    if (currentIndex < stageOrder.length - 1) {
-      setTarget({ ...target, stage: stageOrder[currentIndex + 1], daysInStage: 0 });
+    const nextStage = stageOrder[currentIndex + 1];
+    if (currentIndex < stageOrder.length - 1 && nextStage) {
+      setTarget({ ...target, stage: nextStage, daysInStage: 0 });
     }
   }, [target]);
 
   const handleReject = useCallback(() => {
-    if (!target) return;
+    if (!target) {return;}
     setTarget({ ...target, stage: 'closed_passed', daysInStage: 0 });
   }, [target]);
 
@@ -512,7 +512,7 @@ export default function TargetDetailPage({ params }: PageProps) {
             <DropdownItem>Export to PDF</DropdownItem>
             <DropdownItem>Share</DropdownItem>
             <DropdownDivider />
-            <DropdownItem danger>Archive</DropdownItem>
+            <DropdownItem variant="danger">Archive</DropdownItem>
           </Dropdown>
           {canReject && (
             <Button variant="danger" onClick={handleReject}>

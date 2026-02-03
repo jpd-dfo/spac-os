@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   Building2,
   Calendar,
@@ -16,11 +17,12 @@ import {
   TrendingUp,
   Briefcase,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
-import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
 
 interface SPACData {
@@ -84,18 +86,18 @@ export function SPACSettings() {
     const newErrors: Record<string, string> = {};
 
     if (!spacData.name.trim()) {
-      newErrors.name = 'SPAC name is required';
+      newErrors['name'] = 'SPAC name is required';
     }
     if (!spacData.ticker.trim()) {
-      newErrors.ticker = 'Ticker symbol is required';
+      newErrors['ticker'] = 'Ticker symbol is required';
     } else if (!/^[A-Z]{2,5}$/.test(spacData.ticker)) {
-      newErrors.ticker = 'Invalid ticker format (2-5 uppercase letters)';
+      newErrors['ticker'] = 'Invalid ticker format (2-5 uppercase letters)';
     }
     if (!spacData.ipoDate) {
-      newErrors.ipoDate = 'IPO date is required';
+      newErrors['ipoDate'] = 'IPO date is required';
     }
     if (!spacData.liquidationDeadline) {
-      newErrors.liquidationDeadline = 'Liquidation deadline is required';
+      newErrors['liquidationDeadline'] = 'Liquidation deadline is required';
     }
 
     setErrors(newErrors);
@@ -103,7 +105,7 @@ export function SPACSettings() {
   };
 
   const handleSaveSPAC = async () => {
-    if (!validateSPACData()) return;
+    if (!validateSPACData()) {return;}
 
     setIsSaving(true);
     await new Promise((resolve) => setTimeout(resolve, 1000));
@@ -252,7 +254,7 @@ export function SPACSettings() {
                 value={spacData.name}
                 onChange={(e) => setSpacData({ ...spacData, name: e.target.value })}
                 disabled={!isEditingSPAC}
-                error={errors.name}
+                error={errors['name']}
               />
               <Input
                 label="Ticker Symbol"
@@ -261,7 +263,7 @@ export function SPACSettings() {
                   setSpacData({ ...spacData, ticker: e.target.value.toUpperCase() })
                 }
                 disabled={!isEditingSPAC}
-                error={errors.ticker}
+                error={errors['ticker']}
               />
               <Input
                 label="IPO Date"
@@ -269,7 +271,7 @@ export function SPACSettings() {
                 value={spacData.ipoDate}
                 onChange={(e) => setSpacData({ ...spacData, ipoDate: e.target.value })}
                 disabled={!isEditingSPAC}
-                error={errors.ipoDate}
+                error={errors['ipoDate']}
               />
               <Input
                 label="Liquidation Deadline"
@@ -279,7 +281,7 @@ export function SPACSettings() {
                   setSpacData({ ...spacData, liquidationDeadline: e.target.value })
                 }
                 disabled={!isEditingSPAC}
-                error={errors.liquidationDeadline}
+                error={errors['liquidationDeadline']}
               />
               {isEditingSPAC && (
                 <Select
@@ -323,12 +325,13 @@ export function SPACSettings() {
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label htmlFor="trust-account-size" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Trust Account Size
               </label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="trust-account-size"
                   type="text"
                   value={spacData.trustAccountSize}
                   onChange={(e) =>
@@ -340,12 +343,13 @@ export function SPACSettings() {
               </div>
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label htmlFor="per-share-redemption-value" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Per Share Redemption Value
               </label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="per-share-redemption-value"
                   type="text"
                   value={spacData.perShareValue}
                   onChange={(e) => setSpacData({ ...spacData, perShareValue: e.target.value })}
@@ -381,9 +385,9 @@ export function SPACSettings() {
         <CardContent>
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <span className="block text-sm font-medium text-slate-700 mb-1.5">
                 Extension Period (Months)
-              </label>
+              </span>
               <Select
                 options={[
                   { value: '1', label: '1 Month' },
@@ -399,9 +403,9 @@ export function SPACSettings() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <span className="block text-sm font-medium text-slate-700 mb-1.5">
                 Maximum Extensions
-              </label>
+              </span>
               <Select
                 options={[
                   { value: '1', label: '1 Extension' },
@@ -416,12 +420,13 @@ export function SPACSettings() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
+              <label htmlFor="extension-cost" className="block text-sm font-medium text-slate-700 mb-1.5">
                 Extension Cost ($ per share)
               </label>
               <div className="relative">
                 <DollarSign className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
+                  id="extension-cost"
                   type="text"
                   value={spacData.extensionCost}
                   onChange={(e) => setSpacData({ ...spacData, extensionCost: e.target.value })}

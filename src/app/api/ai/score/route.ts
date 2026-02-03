@@ -2,7 +2,9 @@
 // SPAC OS AI Deal Scoring API Endpoint
 // ============================================================================
 
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
+
+import { getClaudeClient } from '@/lib/ai/claude';
 import {
   scoreDeal,
   generateInvestmentThesis,
@@ -15,7 +17,6 @@ import {
   type DealScore,
   type DealScoreBreakdown,
 } from '@/lib/ai/deal-scorer';
-import { getClaudeClient } from '@/lib/ai/claude';
 import { logger } from '@/lib/logger';
 
 // ============================================================================

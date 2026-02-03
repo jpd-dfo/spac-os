@@ -3,12 +3,13 @@
 // ============================================================================
 
 import { getClaudeClient, type ClaudeRequestOptions } from './claude';
-import { SYSTEM_PROMPTS, AI_CONFIG } from './prompts';
+import { compareDocuments } from './comparisonEngine';
 import { extractContractTerms } from './contractExtractor';
-import { parseFinancials } from './financialParser';
+import { parseFinancialStatements } from './financialParser';
+import { SYSTEM_PROMPTS, AI_CONFIG } from './prompts';
 import { detectRisks } from './riskDetector';
 import { generateSummary, generateExecutiveBriefing } from './summaryGenerator';
-import { compareDocuments } from './comparisonEngine';
+
 import type {
   DocumentAnalysisResult,
   DocumentSummary,
@@ -194,7 +195,7 @@ export async function analyzeDocument(
     // Financial data extraction
     if (analysisTypes.includes('financial') || options.extractFinancials) {
       analysisPromises.push(
-        parseFinancials(documentContent).then((res) => {
+        parseFinancialStatements(documentContent).then((res) => {
           if (res.success && res.data) {
             results.financialData = res.data;
           }
@@ -512,7 +513,7 @@ export async function extractFinancialData(
     focusMetrics?: string[];
   }
 ): Promise<AIResponse<FinancialData>> {
-  return parseFinancials(documentContent, options?.period);
+  return parseFinancialStatements(documentContent, { periodType: options?.period as 'annual' | 'quarterly' | 'ltm' | 'ytd' | undefined });
 }
 
 /**

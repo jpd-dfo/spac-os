@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   AlertTriangle,
   FileText,
@@ -18,11 +19,12 @@ import {
   History,
   Shield,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Input, Textarea } from '@/components/ui/Input';
+import { Modal, ModalHeader, ModalTitle, ModalFooter } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
 import { cn, formatDate, formatDateTime, formatCurrency } from '@/lib/utils';
@@ -658,9 +660,11 @@ export function ConflictOfInterestLog() {
       <Modal
         isOpen={isDetailModalOpen}
         onClose={() => setIsDetailModalOpen(false)}
-        title="Disclosure Details"
         size="lg"
       >
+        <ModalHeader>
+          <ModalTitle>Disclosure Details</ModalTitle>
+        </ModalHeader>
         {selectedDisclosure && (
           <div className="space-y-6">
             <div className="flex items-start justify-between">
@@ -748,9 +752,11 @@ export function ConflictOfInterestLog() {
       <Modal
         isOpen={isNewDisclosureModalOpen}
         onClose={() => setIsNewDisclosureModalOpen(false)}
-        title="New Conflict of Interest Disclosure"
         size="lg"
       >
+        <ModalHeader>
+          <ModalTitle>New Conflict of Interest Disclosure</ModalTitle>
+        </ModalHeader>
         <div className="space-y-4">
           <Select
             label="Conflict Type"

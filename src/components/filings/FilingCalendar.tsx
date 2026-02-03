@@ -1,18 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import {
-  ChevronLeft,
-  ChevronRight,
-  Calendar as CalendarIcon,
-  FileText,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  List,
-  LayoutGrid,
-  CalendarDays,
-} from 'lucide-react';
+
 import {
   format,
   startOfMonth,
@@ -31,12 +20,25 @@ import {
   getWeek,
   differenceInDays,
 } from 'date-fns';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import {
+  ChevronLeft,
+  ChevronRight,
+  Calendar as CalendarIcon,
+  FileText,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  List,
+  LayoutGrid,
+  CalendarDays,
+} from 'lucide-react';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import type { FilingType, FilingStatus } from '@/types';
-import { FILING_TYPE_LABELS } from '@/lib/constants';
 
 // ============================================================================
 // TYPES
@@ -92,7 +94,7 @@ function getFilingTypeColor(type: FilingType): string {
     FORM_5: 'bg-teal-100 border-teal-300 text-teal-800',
     OTHER: 'bg-slate-100 border-slate-300 text-slate-700',
   };
-  return colors[type] || colors.OTHER;
+  return colors[type] ?? 'bg-slate-100 border-slate-300 text-slate-700';
 }
 
 function getPriorityDot(priority: CalendarFiling['priority']): string {
@@ -163,8 +165,8 @@ export function FilingCalendar({
   // Filter filings
   const filteredFilings = useMemo(() => {
     return filings.filter((filing) => {
-      if (filterType !== 'all' && filing.type !== filterType) return false;
-      if (filterStatus !== 'all' && filing.status !== filterStatus) return false;
+      if (filterType !== 'all' && filing.type !== filterType) {return false;}
+      if (filterStatus !== 'all' && filing.status !== filterStatus) {return false;}
       return true;
     });
   }, [filings, filterType, filterStatus]);

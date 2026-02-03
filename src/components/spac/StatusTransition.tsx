@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import toast from 'react-hot-toast';
+
 import {
   ArrowRight,
   AlertTriangle,
@@ -9,9 +9,10 @@ import {
   XCircle,
   Loader2,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Select';
+import toast from 'react-hot-toast';
+
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import {
   Modal,
   ModalHeader,
@@ -20,24 +21,13 @@ import {
   ModalBody,
   ModalFooter,
 } from '@/components/ui/Modal';
-import { cn } from '@/lib/utils';
+import { Select } from '@/components/ui/Select';
 import { trpc } from '@/lib/trpc/client';
+import { cn } from '@/lib/utils';
+import type { SpacStatus } from '@/schemas';
 
-// ============================================================================
-// TYPES
-// ============================================================================
-
-/**
- * SpacStatus enum values matching Prisma schema
- */
-export type SpacStatus =
-  | 'PRE_IPO'
-  | 'SEARCHING'
-  | 'LOI_SIGNED'
-  | 'DEFINITIVE_AGREEMENT'
-  | 'VOTE_PENDING'
-  | 'DE_SPAC_COMPLETE'
-  | 'LIQUIDATED';
+// Re-export SpacStatus for consumers of this module
+export type { SpacStatus } from '@/schemas';
 
 interface StatusTransitionProps {
   /** Current SPAC status */
@@ -60,13 +50,16 @@ interface StatusTransitionProps {
  * Human-readable status labels
  */
 const STATUS_LABELS: Record<SpacStatus, string> = {
-  PRE_IPO: 'Pre-IPO',
   SEARCHING: 'Searching',
   LOI_SIGNED: 'LOI Signed',
-  DEFINITIVE_AGREEMENT: 'Definitive Agreement',
-  VOTE_PENDING: 'Vote Pending',
-  DE_SPAC_COMPLETE: 'De-SPAC Complete',
+  DA_ANNOUNCED: 'DA Announced',
+  SEC_REVIEW: 'SEC Review',
+  SHAREHOLDER_VOTE: 'Shareholder Vote',
+  CLOSING: 'Closing',
+  COMPLETED: 'Completed',
+  LIQUIDATING: 'Liquidating',
   LIQUIDATED: 'Liquidated',
+  TERMINATED: 'Terminated',
 };
 
 /**
@@ -80,11 +73,6 @@ const STATUS_CONFIG: Record<
     category: 'positive' | 'negative' | 'in-progress';
   }
 > = {
-  PRE_IPO: {
-    variant: 'secondary',
-    description: 'SPAC is preparing for initial public offering',
-    category: 'in-progress',
-  },
   SEARCHING: {
     variant: 'primary',
     description: 'Actively searching for acquisition targets',
@@ -95,24 +83,44 @@ const STATUS_CONFIG: Record<
     description: 'Letter of Intent signed with target company',
     category: 'in-progress',
   },
-  DEFINITIVE_AGREEMENT: {
+  DA_ANNOUNCED: {
     variant: 'info',
-    description: 'Definitive Agreement executed, pending SEC review',
+    description: 'Definitive Agreement announced with target',
     category: 'in-progress',
   },
-  VOTE_PENDING: {
+  SEC_REVIEW: {
+    variant: 'secondary',
+    description: 'SEC is reviewing the registration statement',
+    category: 'in-progress',
+  },
+  SHAREHOLDER_VOTE: {
     variant: 'warning',
     description: 'Shareholder vote scheduled or in progress',
     category: 'in-progress',
   },
-  DE_SPAC_COMPLETE: {
+  CLOSING: {
+    variant: 'info',
+    description: 'Transaction is in the closing process',
+    category: 'in-progress',
+  },
+  COMPLETED: {
     variant: 'success',
     description: 'Business combination successfully completed',
     category: 'positive',
   },
+  LIQUIDATING: {
+    variant: 'danger',
+    description: 'SPAC is in the process of liquidation',
+    category: 'negative',
+  },
   LIQUIDATED: {
     variant: 'danger',
-    description: 'SPAC has been liquidated or terminated',
+    description: 'SPAC has been fully liquidated',
+    category: 'negative',
+  },
+  TERMINATED: {
+    variant: 'danger',
+    description: 'SPAC has been terminated',
     category: 'negative',
   },
 };
@@ -123,13 +131,16 @@ const STATUS_CONFIG: Record<
  * Value: Array of valid next statuses
  */
 const VALID_TRANSITIONS: Record<SpacStatus, SpacStatus[]> = {
-  PRE_IPO: ['SEARCHING'],
-  SEARCHING: ['LOI_SIGNED', 'LIQUIDATED'],
-  LOI_SIGNED: ['DEFINITIVE_AGREEMENT', 'SEARCHING', 'LIQUIDATED'],
-  DEFINITIVE_AGREEMENT: ['VOTE_PENDING', 'SEARCHING', 'LIQUIDATED'],
-  VOTE_PENDING: ['DE_SPAC_COMPLETE', 'LIQUIDATED'],
-  DE_SPAC_COMPLETE: [], // Terminal state - no transitions allowed
+  SEARCHING: ['LOI_SIGNED', 'LIQUIDATING', 'TERMINATED'],
+  LOI_SIGNED: ['DA_ANNOUNCED', 'SEARCHING', 'LIQUIDATING', 'TERMINATED'],
+  DA_ANNOUNCED: ['SEC_REVIEW', 'SEARCHING', 'LIQUIDATING', 'TERMINATED'],
+  SEC_REVIEW: ['SHAREHOLDER_VOTE', 'DA_ANNOUNCED', 'LIQUIDATING', 'TERMINATED'],
+  SHAREHOLDER_VOTE: ['CLOSING', 'LIQUIDATING', 'TERMINATED'],
+  CLOSING: ['COMPLETED', 'TERMINATED'],
+  COMPLETED: [], // Terminal state - no transitions allowed
+  LIQUIDATING: ['LIQUIDATED'],
   LIQUIDATED: [], // Terminal state - no transitions allowed
+  TERMINATED: [], // Terminal state - no transitions allowed
 };
 
 // ============================================================================
@@ -248,7 +259,7 @@ export function StatusTransition({
   );
 
   const handleConfirm = useCallback(() => {
-    if (!selectedStatus) return;
+    if (!selectedStatus) {return;}
 
     updateStatusMutation.mutate({
       id: spacId,

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   Bell,
   Mail,
@@ -17,10 +18,11 @@ import {
   Volume2,
   VolumeX,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Select } from '@/components/ui/Select';
+
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import { Select } from '@/components/ui/Select';
 import { cn } from '@/lib/utils';
 
 interface NotificationChannel {
@@ -583,10 +585,11 @@ export function NotificationSettings() {
                 />
               )}
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="digest-time" className="block text-sm font-medium text-slate-700 mb-1.5">
                   Time
                 </label>
                 <input
+                  id="digest-time"
                   type="time"
                   value={digestSettings.time}
                   onChange={(e) =>
@@ -643,10 +646,11 @@ export function NotificationSettings() {
           <CardContent>
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="quiet-hours-start" className="block text-sm font-medium text-slate-700 mb-1.5">
                   Start Time
                 </label>
                 <input
+                  id="quiet-hours-start"
                   type="time"
                   value={quietHours.start}
                   onChange={(e) =>
@@ -656,10 +660,11 @@ export function NotificationSettings() {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">
+                <label htmlFor="quiet-hours-end" className="block text-sm font-medium text-slate-700 mb-1.5">
                   End Time
                 </label>
                 <input
+                  id="quiet-hours-end"
                   type="time"
                   value={quietHours.end}
                   onChange={(e) =>

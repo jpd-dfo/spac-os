@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   Shield,
   CheckSquare,
@@ -11,16 +12,17 @@ import {
   History,
   LayoutDashboard,
 } from 'lucide-react';
-import { cn } from '@/lib/utils';
+
+import { AuditTrail } from '@/components/compliance/AuditTrail';
+import { BoardMeetingManager } from '@/components/compliance/BoardMeetingManager';
+import { ComplianceChecklist } from '@/components/compliance/ComplianceChecklist';
+import { ComplianceDashboard } from '@/components/compliance/ComplianceDashboard';
 
 // Import compliance modules
-import { ComplianceDashboard } from '@/components/compliance/ComplianceDashboard';
-import { ComplianceChecklist } from '@/components/compliance/ComplianceChecklist';
-import { BoardMeetingManager } from '@/components/compliance/BoardMeetingManager';
-import { InsiderTradingWindow } from '@/components/compliance/InsiderTradingWindow';
 import { ConflictOfInterestLog } from '@/components/compliance/ConflictOfInterestLog';
+import { InsiderTradingWindow } from '@/components/compliance/InsiderTradingWindow';
 import { PolicyLibrary } from '@/components/compliance/PolicyLibrary';
-import { AuditTrail } from '@/components/compliance/AuditTrail';
+import { cn } from '@/lib/utils';
 
 type ComplianceModule =
   | 'dashboard'

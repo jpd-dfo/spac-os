@@ -3,11 +3,15 @@
  * Handles document retrieval and management
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import crypto from 'crypto';
+
+import { type NextRequest, NextResponse } from 'next/server';
+
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
+
 import { authOptions } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { prisma } from '@/lib/prisma';
 
 interface RouteParams {
   params: { id: string };
@@ -48,11 +52,20 @@ export async function GET(
       );
     }
 
+    // Check if document has a SPAC with organization
+    const organizationId = document.spac?.organizationId;
+    if (!organizationId) {
+      return NextResponse.json(
+        { error: 'Document not associated with an organization' },
+        { status: 403 }
+      );
+    }
+
     // Verify user has access
     const membership = await prisma.organizationUser.findUnique({
       where: {
         organizationId_userId: {
-          organizationId: document.spac.organizationId,
+          organizationId,
           userId: session.user.id,
         },
       },
@@ -65,52 +78,17 @@ export async function GET(
       );
     }
 
-    // Check document access level
-    if (document.accessLevel === 'RESTRICTED') {
-      // Additional access check for restricted documents
-      const hasRestrictedAccess = membership.role === 'ADMIN' || membership.role === 'OWNER';
-      if (!hasRestrictedAccess) {
-        return NextResponse.json(
-          { error: 'Access denied - restricted document' },
-          { status: 403 }
-        );
-      }
-    }
-
-    // Check for version query param
-    const url = new URL(request.url);
-    const versionParam = url.searchParams.get('version');
-
-    let storagePath = document.storagePath;
-    let fileName = document.fileName;
-
-    if (versionParam) {
-      const version = await prisma.documentVersion.findFirst({
-        where: {
-          documentId,
-          version: parseInt(versionParam),
-        },
-      });
-
-      if (!version) {
-        return NextResponse.json(
-          { error: 'Version not found' },
-          { status: 404 }
-        );
-      }
-
-      storagePath = version.storagePath;
-      fileName = version.fileName;
-    }
+    const fileUrl = document.fileUrl;
+    const fileName = document.name;
 
     // In production, fetch from cloud storage and stream
     // For now, return document metadata with download URL
     const downloadUrl = `/api/documents/${documentId}/download?token=${generateDownloadToken(documentId, session.user.id)}`;
 
-    // Update download count
+    // Update document timestamp to track access
     await prisma.document.update({
       where: { id: documentId },
-      data: { downloadCount: { increment: 1 } },
+      data: { updatedAt: new Date() },
     });
 
     // Create audit log
@@ -120,10 +98,9 @@ export async function GET(
         entityType: 'Document',
         entityId: documentId,
         userId: session.user.id,
-        organizationId: document.spac.organizationId,
+        organizationId: organizationId,
         metadata: {
           action: 'download',
-          version: versionParam || document.currentVersion,
         },
       },
     });
@@ -131,14 +108,13 @@ export async function GET(
     return NextResponse.json({
       document: {
         id: document.id,
-        title: document.title,
+        name: document.name,
         type: document.type,
         fileName,
+        fileUrl,
         fileSize: document.fileSize,
         mimeType: document.mimeType,
-        version: document.currentVersion,
         downloadUrl,
-        storagePath,
       },
     });
   } catch (error) {
@@ -184,11 +160,19 @@ export async function PATCH(
       );
     }
 
+    const patchOrgId = document.spac?.organizationId;
+    if (!patchOrgId) {
+      return NextResponse.json(
+        { error: 'Document not associated with an organization' },
+        { status: 403 }
+      );
+    }
+
     // Verify access
     const membership = await prisma.organizationUser.findUnique({
       where: {
         organizationId_userId: {
-          organizationId: document.spac.organizationId,
+          organizationId: patchOrgId,
           userId: session.user.id,
         },
       },
@@ -201,14 +185,14 @@ export async function PATCH(
       );
     }
 
-    // Update document
+    // Update document - only update fields that exist in the schema
     const updated = await prisma.document.update({
       where: { id: documentId },
       data: {
-        title: body.title,
-        description: body.description,
-        accessLevel: body.accessLevel,
-        tags: body.tags,
+        name: body.name,
+        category: body.category,
+        status: body.status,
+        type: body.type,
       },
     });
 
@@ -219,8 +203,8 @@ export async function PATCH(
         entityType: 'Document',
         entityId: documentId,
         userId: session.user.id,
-        organizationId: document.spac.organizationId,
-        changes: body,
+        organizationId: patchOrgId,
+        metadata: body,
       },
     });
 
@@ -267,11 +251,19 @@ export async function DELETE(
       );
     }
 
+    const deleteOrgId = document.spac?.organizationId;
+    if (!deleteOrgId) {
+      return NextResponse.json(
+        { error: 'Document not associated with an organization' },
+        { status: 403 }
+      );
+    }
+
     // Verify access (require admin/owner for deletion)
     const membership = await prisma.organizationUser.findUnique({
       where: {
         organizationId_userId: {
-          organizationId: document.spac.organizationId,
+          organizationId: deleteOrgId,
           userId: session.user.id,
         },
       },
@@ -289,7 +281,6 @@ export async function DELETE(
       where: { id: documentId },
       data: {
         deletedAt: new Date(),
-        deletedById: session.user.id,
       },
     });
 
@@ -300,7 +291,7 @@ export async function DELETE(
         entityType: 'Document',
         entityId: documentId,
         userId: session.user.id,
-        organizationId: document.spac.organizationId,
+        organizationId: deleteOrgId,
       },
     });
 
@@ -316,7 +307,6 @@ export async function DELETE(
 
 // Helper function to generate a temporary download token
 function generateDownloadToken(documentId: string, userId: string): string {
-  const crypto = require('crypto');
   const payload = `${documentId}:${userId}:${Date.now()}`;
   return crypto
     .createHmac('sha256', process.env.NEXTAUTH_SECRET || 'default-secret')

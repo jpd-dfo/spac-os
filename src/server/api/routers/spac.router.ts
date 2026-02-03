@@ -3,21 +3,25 @@
  * Full CRUD operations for SPACs with search, filter, and analytics
  */
 
-import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
-import type { Prisma } from '@prisma/client';
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  orgAuditedProcedure,
-} from '../trpc';
+import { z } from 'zod';
+
 import {
   SpacCreateSchema,
   SpacUpdateSchema,
   SpacFilterSchema,
   UuidSchema,
-  PaginationSchema,
 } from '@/schemas';
+
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  orgAuditedProcedure,
+} from '../trpc';
+
+import type { Prisma } from '@prisma/client';
+
+
 
 export const spacRouter = createTRPCRouter({
   // ============================================================================
@@ -47,6 +51,24 @@ export const spacRouter = createTRPCRouter({
           trustAccounts: {
             orderBy: { balanceDate: 'desc' },
             take: 1,
+          },
+          documents: {
+            where: { deletedAt: null },
+            take: 20,
+            orderBy: { createdAt: 'desc' },
+          },
+          filings: {
+            take: 10,
+            orderBy: { filedDate: 'desc' },
+          },
+          tasks: {
+            where: { deletedAt: null },
+            take: 20,
+            orderBy: { dueDate: 'asc' },
+          },
+          financials: {
+            take: 10,
+            orderBy: { createdAt: 'desc' },
           },
           _count: {
             select: {
@@ -99,10 +121,10 @@ export const spacRouter = createTRPCRouter({
         deletedAt: null,
       };
 
-      if (organizationId) where.organizationId = organizationId;
-      if (status?.length) where.status = { in: status };
-      if (phase?.length) where.phase = { in: phase };
-      if (ticker) where.ticker = { contains: ticker, mode: 'insensitive' };
+      if (organizationId) {where.organizationId = organizationId;}
+      if (status?.length) {where.status = { in: status };}
+      if (phase?.length) {where.phase = { in: phase as any };}
+      if (ticker) {where.ticker = { contains: ticker, mode: 'insensitive' };}
 
       if (search) {
         where.OR = [
@@ -124,9 +146,9 @@ export const spacRouter = createTRPCRouter({
           ...(ipoSizeMax && { lte: ipoSizeMax }),
         };
       }
-      if (targetSectors?.length) where.targetSectors = { hasSome: targetSectors };
-      if (targetGeographies?.length) where.targetGeographies = { hasSome: targetGeographies };
-      if (tags?.length) where.tags = { hasSome: tags };
+      if (targetSectors?.length) {where.targetSectors = { hasSome: targetSectors };}
+      if (targetGeographies?.length) {where.targetGeographies = { hasSome: targetGeographies };}
+      if (tags?.length) {where.tags = { hasSome: tags };}
 
       const [items, total] = await Promise.all([
         ctx.db.spac.findMany({
@@ -181,7 +203,7 @@ export const spacRouter = createTRPCRouter({
 
       const spac = await ctx.db.spac.create({
         data: {
-          ...input,
+          ...input as any,
           deadlineDate: input.deadline || input.deadlineDate,
         },
         include: {
@@ -227,7 +249,7 @@ export const spacRouter = createTRPCRouter({
 
       const spac = await ctx.db.spac.update({
         where: { id: input.id },
-        data: input.data,
+        data: input.data as any,
         include: {
           organization: true,
           sponsors: { include: { sponsor: true } },
@@ -496,8 +518,8 @@ export const spacRouter = createTRPCRouter({
 
       // Sort by date
       events.sort((a, b) => {
-        if (!a.date) return 1;
-        if (!b.date) return -1;
+        if (!a.date) {return 1;}
+        if (!b.date) {return -1;}
         return a.date.getTime() - b.date.getTime();
       });
 
@@ -604,8 +626,8 @@ export const spacRouter = createTRPCRouter({
       // Group by status
       const pipeline: Record<string, typeof spacs> = {};
       for (const spac of spacs) {
-        if (!pipeline[spac.status]) pipeline[spac.status] = [];
-        pipeline[spac.status].push(spac);
+        if (!pipeline[spac.status]) {pipeline[spac.status] = [];}
+        pipeline[spac.status]!.push(spac);
       }
 
       return pipeline;

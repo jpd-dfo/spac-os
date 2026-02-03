@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   X,
   Download,
@@ -26,10 +27,12 @@ import {
   Info,
   Sparkles,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn, formatFileSize, formatDate, formatRelativeTime } from '@/lib/utils';
+
 import type { DocumentData } from './DocumentCard';
 
 interface VersionHistory {
@@ -123,7 +126,7 @@ export function DocumentViewer({
 
   const totalPages = 24; // Mock total pages
 
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   const handleZoomIn = () => setZoom((prev) => Math.min(prev + 25, 200));
   const handleZoomOut = () => setZoom((prev) => Math.max(prev - 25, 50));
@@ -138,7 +141,7 @@ export function DocumentViewer({
     ARCHIVED: { label: 'Archived', variant: 'secondary' },
   };
 
-  const status = statusConfig[document.status] || statusConfig.DRAFT;
+  const status = statusConfig[document.status] ?? { label: 'Draft', variant: 'secondary' as const };
 
   return (
     <div className="fixed inset-0 z-50 flex bg-black/50">

@@ -1,12 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+
 import { UserButton } from '@clerk/nextjs';
 import {
   Search,
   Bell,
   Menu,
 } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 
 interface Notification {

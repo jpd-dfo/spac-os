@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo, useEffect, useRef } from 'react';
+
 import {
   Plus,
   ChevronDown,
@@ -9,10 +10,12 @@ import {
   Settings,
   MoreHorizontal,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel } from '@/components/ui/Dropdown';
 import { cn, formatLargeNumber } from '@/lib/utils';
+
 import { TargetCard, TargetCardSkeleton, type Target, type PipelineStage, type QuickAction } from './TargetCard';
 
 // ============================================================================
@@ -211,7 +214,7 @@ function KanbanColumnContainer({
   );
 
   const avgDaysInStage = useMemo(() => {
-    if (targets.length === 0) return 0;
+    if (targets.length === 0) {return 0;}
     return Math.round(targets.reduce((sum, t) => sum + t.daysInStage, 0) / targets.length);
   }, [targets]);
 
@@ -385,7 +388,7 @@ export function KanbanBoard({
   // Horizontal scroll with mouse wheel
   useEffect(() => {
     const board = boardRef.current;
-    if (!board) return;
+    if (!board) {return;}
 
     const handleWheel = (e: WheelEvent) => {
       if (Math.abs(e.deltaX) < Math.abs(e.deltaY)) {

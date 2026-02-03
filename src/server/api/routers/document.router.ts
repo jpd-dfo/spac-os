@@ -3,14 +3,10 @@
  * Document management and version control
  */
 
-import { z } from 'zod';
+import { type Prisma } from '@prisma/client';
 import { TRPCError } from '@trpc/server';
-import { Prisma } from '@prisma/client';
-import {
-  createTRPCRouter,
-  protectedProcedure,
-  orgAuditedProcedure,
-} from '../trpc';
+import { z } from 'zod';
+
 import {
   DocumentCreateSchema,
   DocumentUpdateSchema,
@@ -19,6 +15,12 @@ import {
   DocumentTypeSchema,
   DocumentStatusSchema,
 } from '@/schemas';
+
+import {
+  createTRPCRouter,
+  protectedProcedure,
+  orgAuditedProcedure,
+} from '../trpc';
 
 export const documentRouter = createTRPCRouter({
   getById: protectedProcedure
@@ -29,19 +31,8 @@ export const documentRouter = createTRPCRouter({
         include: {
           spac: { select: { id: true, name: true, ticker: true } },
           target: { select: { id: true, name: true } },
-          uploadedBy: { select: { id: true, name: true, email: true } },
-          parent: { select: { id: true, name: true, version: true } },
-          versions: {
-            orderBy: { version: 'desc' },
-            select: { id: true, version: true, createdAt: true, uploadedBy: { select: { name: true } } },
-          },
           filings: {
             include: { filing: { select: { id: true, type: true, title: true } } },
-          },
-          comments: {
-            include: { user: { select: { id: true, name: true, image: true } } },
-            orderBy: { createdAt: 'desc' },
-            take: 10,
           },
         },
       });
@@ -60,31 +51,23 @@ export const documentRouter = createTRPCRouter({
       type: z.array(DocumentTypeSchema).optional(),
       status: z.array(DocumentStatusSchema).optional(),
       category: z.string().optional(),
-      tags: z.array(z.string()).optional(),
       search: z.string().optional(),
-      isLatest: z.boolean().optional(),
-      uploadedById: UuidSchema.optional(),
       ...PaginationSchema.shape,
     }))
     .query(async ({ ctx, input }) => {
-      const { spacId, targetId, type, status, category, tags, search, isLatest, uploadedById, page, pageSize, sortBy, sortOrder } = input;
+      const { spacId, targetId, type, status, category, search, page, pageSize, sortBy, sortOrder } = input;
 
       const where: Prisma.DocumentWhereInput = { deletedAt: null };
 
-      if (spacId) where.spacId = spacId;
-      if (targetId) where.targetId = targetId;
-      if (type?.length) where.type = { in: type };
-      if (status?.length) where.status = { in: status };
-      if (category) where.category = category;
-      if (tags?.length) where.tags = { hasSome: tags };
-      if (isLatest !== undefined) where.isLatest = isLatest;
-      if (uploadedById) where.uploadedById = uploadedById;
+      if (spacId) {where.spacId = spacId;}
+      if (targetId) {where.targetId = targetId;}
+      if (type?.length) {where.type = { in: type as any };}
+      if (status?.length) {where.status = { in: status as any };}
+      if (category) {where.category = category;}
 
       if (search) {
         where.OR = [
           { name: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } },
-          { fileName: { contains: search, mode: 'insensitive' } },
         ];
       }
 
@@ -94,7 +77,6 @@ export const documentRouter = createTRPCRouter({
           include: {
             spac: { select: { id: true, name: true, ticker: true } },
             target: { select: { id: true, name: true } },
-            uploadedBy: { select: { id: true, name: true } },
           },
           orderBy: sortBy ? { [sortBy]: sortOrder } : { createdAt: 'desc' },
           skip: (page - 1) * pageSize,
@@ -110,11 +92,10 @@ export const documentRouter = createTRPCRouter({
     .input(DocumentCreateSchema)
     .mutation(async ({ ctx, input }) => {
       const document = await ctx.db.document.create({
-        data: input,
+        data: input as any,
         include: {
           spac: true,
           target: true,
-          uploadedBy: true,
         },
       });
 
@@ -137,8 +118,8 @@ export const documentRouter = createTRPCRouter({
 
       const document = await ctx.db.document.update({
         where: { id: input.id },
-        data: input.data,
-        include: { spac: true, target: true, uploadedBy: true },
+        data: input.data as any,
+        include: { spac: true, target: true },
       });
 
       return document;
@@ -164,124 +145,6 @@ export const documentRouter = createTRPCRouter({
     }),
 
   // ============================================================================
-  // VERSION CONTROL
-  // ============================================================================
-
-  /**
-   * Create a new version of a document
-   */
-  createVersion: orgAuditedProcedure
-    .input(z.object({
-      parentId: UuidSchema,
-      fileName: z.string().min(1),
-      fileType: z.string().min(1),
-      fileSize: z.number().int().positive(),
-      filePath: z.string().min(1),
-      storageKey: z.string().optional(),
-      storageBucket: z.string().optional(),
-      mimeType: z.string().optional(),
-      checksum: z.string().optional(),
-      description: z.string().optional(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const parent = await ctx.db.document.findUnique({
-        where: { id: input.parentId },
-      });
-
-      if (!parent) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Parent document not found' });
-      }
-
-      // Set parent to not latest
-      await ctx.db.document.update({
-        where: { id: input.parentId },
-        data: { isLatest: false },
-      });
-
-      // Create new version
-      const newVersion = await ctx.db.document.create({
-        data: {
-          spacId: parent.spacId,
-          targetId: parent.targetId,
-          uploadedById: ctx.user!.id,
-          name: parent.name,
-          description: input.description || parent.description,
-          type: parent.type,
-          category: parent.category,
-          status: 'DRAFT',
-          fileName: input.fileName,
-          fileType: input.fileType,
-          fileSize: input.fileSize,
-          filePath: input.filePath,
-          storageKey: input.storageKey,
-          storageBucket: input.storageBucket,
-          mimeType: input.mimeType,
-          checksum: input.checksum,
-          version: parent.version + 1,
-          parentId: input.parentId,
-          isLatest: true,
-          isConfidential: parent.isConfidential,
-          accessLevel: parent.accessLevel,
-          confidentialityLevel: parent.confidentialityLevel,
-          allowedUsers: parent.allowedUsers,
-          allowedRoles: parent.allowedRoles,
-          tags: parent.tags,
-          metadata: parent.metadata,
-        },
-        include: {
-          spac: true,
-          target: true,
-          uploadedBy: true,
-          parent: true,
-        },
-      });
-
-      return newVersion;
-    }),
-
-  /**
-   * Get version history
-   */
-  getVersionHistory: protectedProcedure
-    .input(z.object({ id: UuidSchema }))
-    .query(async ({ ctx, input }) => {
-      const document = await ctx.db.document.findUnique({
-        where: { id: input.id },
-        include: {
-          versions: {
-            orderBy: { version: 'desc' },
-            include: {
-              uploadedBy: { select: { id: true, name: true } },
-            },
-          },
-          parent: {
-            include: {
-              versions: {
-                orderBy: { version: 'desc' },
-                include: {
-                  uploadedBy: { select: { id: true, name: true } },
-                },
-              },
-            },
-          },
-        },
-      });
-
-      if (!document) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Document not found' });
-      }
-
-      // Build full version history
-      const versions = [
-        document,
-        ...document.versions,
-        ...(document.parent ? [document.parent, ...document.parent.versions] : []),
-      ].sort((a, b) => b.version - a.version);
-
-      return versions;
-    }),
-
-  // ============================================================================
   // STATUS & WORKFLOW
   // ============================================================================
 
@@ -304,7 +167,7 @@ export const documentRouter = createTRPCRouter({
 
       const updated = await ctx.db.document.update({
         where: { id: input.id },
-        data: { status: input.status },
+        data: { status: input.status as any },
       });
 
       return updated;
@@ -317,7 +180,6 @@ export const documentRouter = createTRPCRouter({
     .input(z.object({
       documentId: UuidSchema,
       filingId: UuidSchema,
-      role: z.string().max(100).optional(),
     }))
     .mutation(async ({ ctx, input }) => {
       await ctx.db.filingDocument.upsert({
@@ -330,11 +192,8 @@ export const documentRouter = createTRPCRouter({
         create: {
           filingId: input.filingId,
           documentId: input.documentId,
-          role: input.role,
         },
-        update: {
-          role: input.role,
-        },
+        update: {},
       });
 
       return { success: true };
@@ -362,40 +221,6 @@ export const documentRouter = createTRPCRouter({
     }),
 
   // ============================================================================
-  // ACCESS CONTROL
-  // ============================================================================
-
-  /**
-   * Update document access
-   */
-  updateAccess: orgAuditedProcedure
-    .input(z.object({
-      id: UuidSchema,
-      accessLevel: z.enum(['public', 'team', 'restricted']).optional(),
-      allowedUsers: z.array(UuidSchema).optional(),
-      allowedRoles: z.array(z.string()).optional(),
-      isConfidential: z.boolean().optional(),
-    }))
-    .mutation(async ({ ctx, input }) => {
-      const { id, ...accessData } = input;
-
-      const document = await ctx.db.document.findUnique({
-        where: { id },
-      });
-
-      if (!document) {
-        throw new TRPCError({ code: 'NOT_FOUND', message: 'Document not found' });
-      }
-
-      const updated = await ctx.db.document.update({
-        where: { id },
-        data: accessData,
-      });
-
-      return updated;
-    }),
-
-  // ============================================================================
   // ANALYTICS
   // ============================================================================
 
@@ -409,8 +234,8 @@ export const documentRouter = createTRPCRouter({
     }))
     .query(async ({ ctx, input }) => {
       const where: Prisma.DocumentWhereInput = { deletedAt: null };
-      if (input.spacId) where.spacId = input.spacId;
-      if (input.targetId) where.targetId = input.targetId;
+      if (input.spacId) {where.spacId = input.spacId;}
+      if (input.targetId) {where.targetId = input.targetId;}
 
       const [total, byType, byStatus, totalSize, recentUploads] = await Promise.all([
         ctx.db.document.count({ where }),
@@ -454,14 +279,13 @@ export const documentRouter = createTRPCRouter({
       limit: z.number().int().min(1).max(50).default(10),
     }))
     .query(async ({ ctx, input }) => {
-      const where: Prisma.DocumentWhereInput = { deletedAt: null, isLatest: true };
-      if (input.spacId) where.spacId = input.spacId;
+      const where: Prisma.DocumentWhereInput = { deletedAt: null };
+      if (input.spacId) {where.spacId = input.spacId;}
 
       return ctx.db.document.findMany({
         where,
         include: {
           spac: { select: { id: true, name: true, ticker: true } },
-          uploadedBy: { select: { id: true, name: true } },
         },
         orderBy: { createdAt: 'desc' },
         take: input.limit,
@@ -483,20 +307,16 @@ export const documentRouter = createTRPCRouter({
         deletedAt: null,
         OR: [
           { name: { contains: input.query, mode: 'insensitive' } },
-          { description: { contains: input.query, mode: 'insensitive' } },
-          { fileName: { contains: input.query, mode: 'insensitive' } },
-          { tags: { has: input.query } },
         ],
       };
 
-      if (input.spacId) where.spacId = input.spacId;
-      if (input.type?.length) where.type = { in: input.type };
+      if (input.spacId) {where.spacId = input.spacId;}
+      if (input.type?.length) {where.type = { in: input.type as any };}
 
       return ctx.db.document.findMany({
         where,
         include: {
           spac: { select: { id: true, name: true, ticker: true } },
-          uploadedBy: { select: { id: true, name: true } },
         },
         orderBy: { updatedAt: 'desc' },
         take: input.limit,

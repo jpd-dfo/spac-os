@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import {
@@ -16,12 +17,14 @@ import {
   CheckCircle2,
   GripVertical,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/Badge';
+
 import { Avatar, AvatarGroup } from '@/components/ui/Avatar';
-import { Tooltip } from '@/components/ui/Tooltip';
+import { Badge } from '@/components/ui/Badge';
 import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel } from '@/components/ui/Dropdown';
-import { cn, formatLargeNumber, formatDate, formatRelativeTime } from '@/lib/utils';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { TARGET_STATUS_LABELS, TASK_PRIORITY_LABELS } from '@/lib/constants';
+import { cn, formatLargeNumber, formatDate, formatRelativeTime } from '@/lib/utils';
+
 import type { Deal, QuickActionType } from './types';
 
 // ============================================================================
@@ -41,12 +44,12 @@ interface DealCardProps {
 // ============================================================================
 
 function ScoreIndicator({ score, label }: { score: number | undefined; label: string }) {
-  if (score === undefined) return null;
+  if (score === undefined) {return null;}
 
   const getColor = (value: number) => {
-    if (value >= 80) return 'bg-success-500';
-    if (value >= 60) return 'bg-primary-500';
-    if (value >= 40) return 'bg-warning-500';
+    if (value >= 80) {return 'bg-success-500';}
+    if (value >= 60) {return 'bg-primary-500';}
+    if (value >= 40) {return 'bg-warning-500';}
     return 'bg-danger-500';
   };
 
@@ -61,7 +64,7 @@ function ScoreIndicator({ score, label }: { score: number | undefined; label: st
 }
 
 function DueDiligenceProgressBar({ progress }: { progress: Deal['dueDiligence'] }) {
-  if (!progress) return null;
+  if (!progress) {return null;}
 
   const percentage = progress.total > 0 ? Math.round((progress.completed / progress.total) * 100) : 0;
 
@@ -136,9 +139,9 @@ export function DealCard({
   const isCurrentlyDragging = isDragging || isSortableDragging;
 
   const probabilityColor = useMemo(() => {
-    if (deal.probability === undefined) return 'bg-slate-300';
-    if (deal.probability >= 70) return 'bg-success-500';
-    if (deal.probability >= 40) return 'bg-warning-500';
+    if (deal.probability === undefined) {return 'bg-slate-300';}
+    if (deal.probability >= 70) {return 'bg-success-500';}
+    if (deal.probability >= 40) {return 'bg-warning-500';}
     return 'bg-slate-300';
   }, [deal.probability]);
 

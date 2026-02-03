@@ -1,7 +1,7 @@
 import type { ApiResponse, PaginatedResponse, ApiError } from '@/types';
 
 // Base API URL
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api';
+const API_BASE_URL = process.env['NEXT_PUBLIC_API_URL'] || '/api';
 
 // Default fetch options
 const defaultOptions: RequestInit = {
@@ -150,8 +150,8 @@ export const api = {
   documents: {
     list: (params?: { spacId?: string; targetId?: string }) => {
       const query = new URLSearchParams();
-      if (params?.spacId) query.set('spacId', params.spacId);
-      if (params?.targetId) query.set('targetId', params.targetId);
+      if (params?.spacId) {query.set('spacId', params.spacId);}
+      if (params?.targetId) {query.set('targetId', params.targetId);}
       const queryString = query.toString();
       return get(`/documents${queryString ? `?${queryString}` : ''}`);
     },
@@ -175,8 +175,8 @@ export const api = {
   tasks: {
     list: (params?: { spacId?: string; assigneeId?: string }) => {
       const query = new URLSearchParams();
-      if (params?.spacId) query.set('spacId', params.spacId);
-      if (params?.assigneeId) query.set('assigneeId', params.assigneeId);
+      if (params?.spacId) {query.set('spacId', params.spacId);}
+      if (params?.assigneeId) {query.set('assigneeId', params.assigneeId);}
       const queryString = query.toString();
       return get(`/tasks${queryString ? `?${queryString}` : ''}`);
     },

@@ -1,19 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
-import {
-  Calendar,
-  ChevronLeft,
-  ChevronRight,
-  FileText,
-  AlertTriangle,
-  CheckCircle2,
-  Clock,
-  Building2,
-  Filter,
-  List,
-  Grid3X3,
-} from 'lucide-react';
+
 import {
   format,
   startOfMonth,
@@ -29,11 +17,25 @@ import {
   isPast,
   addDays,
 } from 'date-fns';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import {
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  FileText,
+  AlertTriangle,
+  CheckCircle2,
+  Clock,
+  Building2,
+  Filter,
+  List,
+  Grid3X3,
+} from 'lucide-react';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { cn, formatDate } from '@/lib/utils';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { FILING_TYPE_LABELS } from '@/lib/constants';
+import { cn, formatDate } from '@/lib/utils';
 
 // ============================================================================
 // TYPES
@@ -131,8 +133,8 @@ function getFilingStatus(
     (due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
   );
 
-  if (daysUntilDue < 0) return 'overdue';
-  if (daysUntilDue <= dueSoonDays) return 'due_soon';
+  if (daysUntilDue < 0) {return 'overdue';}
+  if (daysUntilDue <= dueSoonDays) {return 'due_soon';}
   return 'upcoming';
 }
 
@@ -341,7 +343,7 @@ export function ComplianceCalendar({
 
   // Filter filings
   const filteredFilings = useMemo(() => {
-    if (statusFilter === 'all') return processedFilings;
+    if (statusFilter === 'all') {return processedFilings;}
     return processedFilings.filter((f) => f.status === statusFilter);
   }, [processedFilings, statusFilter]);
 

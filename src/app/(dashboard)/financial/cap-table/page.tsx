@@ -1,10 +1,11 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
+
 import { ArrowLeft, Download, Plus, Settings, Filter } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+
 import { CapTableView, SOREN_CAP_TABLE } from '@/components/financial/CapTableView';
+import { Button } from '@/components/ui/Button';
 
 export default function CapTablePage() {
   const handleExport = () => {

@@ -1,10 +1,13 @@
 'use client';
 
 import { useState } from 'react';
+
 import Link from 'next/link';
+
 import { ArrowLeft, Download, RefreshCw, Settings } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
+
 import { TrustAccountDashboard, SOREN_TRUST_DATA } from '@/components/financial/TrustAccountDashboard';
+import { Button } from '@/components/ui/Button';
 
 export default function TrustAccountPage() {
   const [isRefreshing, setIsRefreshing] = useState(false);

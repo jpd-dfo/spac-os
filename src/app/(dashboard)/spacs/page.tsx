@@ -1,9 +1,8 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
-import Link from 'next/link';
+import { useState, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import toast from 'react-hot-toast';
+
 import {
   Plus,
   Search,
@@ -24,17 +23,19 @@ import {
   ArrowUp,
   ArrowDown,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/Card';
+import toast from 'react-hot-toast';
+
+import { SpacCard, SpacStatusBadge } from '@/components/spacs';
 import { Button } from '@/components/ui/Button';
-import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '@/components/ui/Table';
+import { Card } from '@/components/ui/Card';
+import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { PageLoader, LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
 import { Modal, ModalHeader, ModalTitle, ModalDescription, ModalBody, ModalFooter } from '@/components/ui/Modal';
-import { SpacCard, SpacStatusBadge } from '@/components/spacs';
-import { formatLargeNumber, formatDate, daysUntil, cn } from '@/lib/utils';
-import { SPAC_STATUS_LABELS, SPAC_PHASE_LABELS, DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '@/lib/constants';
+import { Table, TableHead, TableBody, TableRow, TableCell, TableHeaderCell } from '@/components/ui/Table';
+import { SPAC_STATUS_LABELS, DEFAULT_PAGE_SIZE, PAGE_SIZE_OPTIONS } from '@/lib/constants';
 import { trpc } from '@/lib/trpc/client';
+import { formatLargeNumber, formatDate, daysUntil, cn } from '@/lib/utils';
 import type { SpacStatus } from '@/schemas';
 
 // All SPAC statuses from schema
@@ -51,16 +52,16 @@ const ALL_STATUSES: SpacStatus[] = [
   'TERMINATED',
 ];
 
-// Sort options
-type SortField = 'name' | 'status' | 'trustBalance' | 'ipoDate' | 'deadline' | 'updatedAt';
+// Sort options - must match SpacListSchema in spac.ts router
+type SortField = 'name' | 'status' | 'trustAmount' | 'ipoDate' | 'deadlineDate' | 'updatedAt';
 type SortOrder = 'asc' | 'desc';
 
 const SORT_OPTIONS: { value: SortField; label: string }[] = [
   { value: 'name', label: 'Name' },
   { value: 'status', label: 'Status' },
-  { value: 'trustBalance', label: 'Trust Value' },
+  { value: 'trustAmount', label: 'Trust Value' },
   { value: 'ipoDate', label: 'IPO Date' },
-  { value: 'deadline', label: 'Deadline' },
+  { value: 'deadlineDate', label: 'Deadline' },
   { value: 'updatedAt', label: 'Last Updated' },
 ];
 
@@ -73,7 +74,7 @@ export default function SPACsPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<SpacStatus[]>([]);
   const [viewMode, setViewMode] = useState<ViewMode>('table');
-  const [showFilters, setShowFilters] = useState(false);
+  const [_showFilters, _setShowFilters] = useState(false);
 
   // Pagination state
   const [page, setPage] = useState(1);
@@ -96,9 +97,9 @@ export default function SPACsPage() {
     refetch,
   } = trpc.spac.list.useQuery({
     search: searchQuery || undefined,
-    status: statusFilter.length > 0 ? statusFilter : undefined,
+    status: statusFilter.length > 0 ? statusFilter[0] : undefined,
     page,
-    pageSize,
+    limit: pageSize,
     sortBy,
     sortOrder,
   }, {
@@ -182,7 +183,7 @@ export default function SPACsPage() {
   const items = data?.items ?? [];
 
   const getSortIcon = (field: SortField) => {
-    if (sortBy !== field) return <ArrowUpDown className="h-4 w-4 text-slate-400" />;
+    if (sortBy !== field) {return <ArrowUpDown className="h-4 w-4 text-slate-400" />;}
     return sortOrder === 'asc'
       ? <ArrowUp className="h-4 w-4 text-primary-600" />
       : <ArrowDown className="h-4 w-4 text-primary-600" />;
@@ -409,10 +410,9 @@ export default function SPACsPage() {
                 ticker: spac.ticker || '',
                 status: spac.status,
                 phase: spac.phase,
-                ipoDate: spac.ipoDate,
-                ipoSize: spac.ipoSize || 0,
-                trustBalance: spac.trustAccounts?.[0]?.currentBalance || spac.trustBalance || 0,
-                deadline: spac.deadline,
+                ipoSize: spac.ipoSize ? Number(spac.ipoSize) : 0,
+                trustBalance: spac.trustAmount ? Number(spac.trustAmount) : 0,
+                deadline: spac.deadlineDate,
                 targetSectors: spac.targetSectors || [],
                 activeTargets: spac._count?.targets || 0,
               }}
@@ -447,8 +447,8 @@ export default function SPACsPage() {
                   </TableHeaderCell>
                   <TableHeaderCell
                     sortable
-                    sorted={sortBy === 'trustBalance' ? sortOrder : null}
-                    onSort={() => handleSort('trustBalance')}
+                    sorted={sortBy === 'trustAmount' ? sortOrder : null}
+                    onSort={() => handleSort('trustAmount')}
                     className="hidden md:table-cell"
                   >
                     Trust Value
@@ -463,8 +463,8 @@ export default function SPACsPage() {
                   </TableHeaderCell>
                   <TableHeaderCell
                     sortable
-                    sorted={sortBy === 'deadline' ? sortOrder : null}
-                    onSort={() => handleSort('deadline')}
+                    sorted={sortBy === 'deadlineDate' ? sortOrder : null}
+                    onSort={() => handleSort('deadlineDate')}
                     className="hidden sm:table-cell"
                   >
                     Deadline
@@ -476,8 +476,8 @@ export default function SPACsPage() {
               </TableHead>
               <TableBody>
                 {items.map((spac) => {
-                  const trustValue = spac.trustAccounts?.[0]?.currentBalance || spac.trustBalance || 0;
-                  const days = daysUntil(spac.deadline);
+                  const trustValue = spac.trustAmount ? Number(spac.trustAmount) : 0;
+                  const days = daysUntil(spac.deadlineDate);
                   const isUrgent = days !== null && days <= 30 && days > 0;
                   const isExpired = days !== null && days <= 0;
 

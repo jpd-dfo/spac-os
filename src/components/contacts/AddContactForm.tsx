@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   User,
   Building,
@@ -15,10 +16,12 @@ import {
   Plus,
   Check,
 } from 'lucide-react';
+
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
-import { Badge } from '@/components/ui/Badge';
 import { cn } from '@/lib/utils';
+
 import type { ContactCategory, ExtendedContact } from './mockContactsData';
 
 interface AddContactFormProps {
@@ -103,14 +106,14 @@ export function AddContactForm({
     const newErrors: Record<string, string> = {};
 
     if (stepNum === 1) {
-      if (!formData.firstName.trim()) newErrors.firstName = 'First name is required';
-      if (!formData.lastName.trim()) newErrors.lastName = 'Last name is required';
-      if (!formData.category) newErrors.category = 'Please select a category';
+      if (!formData.firstName.trim()) {newErrors['firstName'] = 'First name is required';}
+      if (!formData.lastName.trim()) {newErrors['lastName'] = 'Last name is required';}
+      if (!formData.category) {newErrors['category'] = 'Please select a category';}
     }
 
     if (stepNum === 2) {
       if (formData.email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
-        newErrors.email = 'Please enter a valid email address';
+        newErrors['email'] = 'Please enter a valid email address';
       }
     }
 
@@ -243,7 +246,7 @@ export function AddContactForm({
                   value={formData.firstName}
                   onChange={(e) => updateField('firstName', e.target.value)}
                   placeholder="John"
-                  error={errors.firstName}
+                  error={errors['firstName']}
                 />
               </div>
               <div>
@@ -252,7 +255,7 @@ export function AddContactForm({
                   value={formData.lastName}
                   onChange={(e) => updateField('lastName', e.target.value)}
                   placeholder="Doe"
-                  error={errors.lastName}
+                  error={errors['lastName']}
                 />
               </div>
             </div>
@@ -267,10 +270,11 @@ export function AddContactForm({
 
             {/* Company */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Company</label>
+              <label htmlFor="company-input" className="block text-sm font-medium text-slate-700 mb-1.5">Company</label>
               <div className="relative">
                 <Building className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
+                  id="company-input"
                   type="text"
                   value={formData.company}
                   onChange={(e) => updateField('company', e.target.value)}
@@ -288,8 +292,8 @@ export function AddContactForm({
 
             {/* Category Selection */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Category *</label>
-              {errors.category && <p className="text-sm text-danger-600 mb-2">{errors.category}</p>}
+              <span className="block text-sm font-medium text-slate-700 mb-2">Category *</span>
+              {errors['category'] && <p className="text-sm text-danger-600 mb-2">{errors['category']}</p>}
               <div className="grid grid-cols-4 gap-2">
                 {categories.map((cat) => (
                   <button
@@ -316,27 +320,29 @@ export function AddContactForm({
           <div className="space-y-6">
             {/* Email */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
+              <label htmlFor="email-input" className="block text-sm font-medium text-slate-700 mb-1.5">Email</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
+                  id="email-input"
                   type="email"
                   value={formData.email}
                   onChange={(e) => updateField('email', e.target.value)}
                   placeholder="john.doe@company.com"
-                  className={cn('input pl-10', errors.email && 'border-danger-300')}
+                  className={cn('input pl-10', errors['email'] && 'border-danger-300')}
                 />
               </div>
-              {errors.email && <p className="text-sm text-danger-600 mt-1">{errors.email}</p>}
+              {errors['email'] && <p className="text-sm text-danger-600 mt-1">{errors['email']}</p>}
             </div>
 
             {/* Phone Numbers */}
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Phone</label>
+                <label htmlFor="phone-input" className="block text-sm font-medium text-slate-700 mb-1.5">Phone</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input
+                    id="phone-input"
                     type="tel"
                     value={formData.phone}
                     onChange={(e) => updateField('phone', e.target.value)}
@@ -346,10 +352,11 @@ export function AddContactForm({
                 </div>
               </div>
               <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1.5">Mobile</label>
+                <label htmlFor="mobile-input" className="block text-sm font-medium text-slate-700 mb-1.5">Mobile</label>
                 <div className="relative">
                   <Phone className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                   <input
+                    id="mobile-input"
                     type="tel"
                     value={formData.mobile}
                     onChange={(e) => updateField('mobile', e.target.value)}
@@ -362,10 +369,11 @@ export function AddContactForm({
 
             {/* LinkedIn */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">LinkedIn Profile</label>
+              <label htmlFor="linkedin-input" className="block text-sm font-medium text-slate-700 mb-1.5">LinkedIn Profile</label>
               <div className="relative">
                 <Linkedin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" />
                 <input
+                  id="linkedin-input"
                   type="url"
                   value={formData.linkedIn}
                   onChange={(e) => updateField('linkedIn', e.target.value)}
@@ -377,7 +385,7 @@ export function AddContactForm({
 
             {/* Location */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">Location</label>
+              <span className="block text-sm font-medium text-slate-700 mb-1.5">Location</span>
               <div className="grid grid-cols-3 gap-3">
                 <div className="relative">
                   <input
@@ -421,7 +429,7 @@ export function AddContactForm({
           <div className="space-y-6">
             {/* Tags */}
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">Tags</label>
+              <span className="block text-sm font-medium text-slate-700 mb-2">Tags</span>
 
               {/* Selected Tags */}
               {formData.tags.length > 0 && (

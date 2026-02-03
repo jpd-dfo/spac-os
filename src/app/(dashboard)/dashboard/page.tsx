@@ -1,37 +1,21 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useCallback } from 'react';
+
 import {
   Building2,
   Target,
   FileText,
   Clock,
   TrendingUp,
-  DollarSign,
   Users,
   BarChart3,
   AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Badge } from '@/components/ui/Badge';
-import { trpc } from '@/lib/trpc';
+
 
 // Import dashboard widgets
-import {
-  SpacStatusCard,
-  mockSpacStatusData,
-} from '@/components/dashboard/SpacStatusCard';
-import {
-  TrustAccountWidget,
-  mockTrustAccountData,
-} from '@/components/dashboard/TrustAccountWidget';
-import {
-  DealPipelineWidget,
-} from '@/components/dashboard/DealPipelineWidget';
-import {
-  ComplianceCalendarWidget,
-  mockComplianceData,
-} from '@/components/dashboard/ComplianceCalendarWidget';
 import {
   ActivityFeed,
   mockActivityData,
@@ -40,25 +24,44 @@ import {
   AIInsightsWidget,
   mockAIInsightsData,
 } from '@/components/dashboard/AIInsightsWidget';
-
-// Import new dashboard components
+import {
+  ComplianceCalendarWidget,
+  mockComplianceData,
+} from '@/components/dashboard/ComplianceCalendarWidget';
+import {
+  DealPipelineWidget,
+} from '@/components/dashboard/DealPipelineWidget';
+import {
+  QuickActions,
+  defaultQuickActions,
+} from '@/components/dashboard/QuickActions';
+import {
+  RecentActivity,
+  type ActivityItem,
+} from '@/components/dashboard/RecentActivity';
+import {
+  SpacStatusCard,
+  mockSpacStatusData,
+} from '@/components/dashboard/SpacStatusCard';
 import {
   StatsCard,
   StatsCardGroup,
   StatsCardSkeleton,
 } from '@/components/dashboard/StatsCard';
 import {
-  RecentActivity,
-  mockRecentActivities,
-} from '@/components/dashboard/RecentActivity';
+  TrustAccountWidget,
+  mockTrustAccountData,
+} from '@/components/dashboard/TrustAccountWidget';
+
+// Import new dashboard components
 import {
   UpcomingDeadlines,
-  mockUpcomingDeadlines,
+  type DeadlineItem,
 } from '@/components/dashboard/UpcomingDeadlines';
-import {
-  QuickActions,
-  defaultQuickActions,
-} from '@/components/dashboard/QuickActions';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { trpc } from '@/lib/trpc';
 
 // ============================================================================
 // TYPES FOR PIPELINE DATA TRANSFORMATION
@@ -151,11 +154,11 @@ function formatLastActivity(updatedAt: Date | string): string {
   const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
 
-  if (diffHours < 1) return 'Just now';
-  if (diffHours < 24) return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;
-  if (diffDays === 1) return '1 day ago';
-  if (diffDays < 7) return `${diffDays} days ago`;
-  if (diffDays < 30) return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;
+  if (diffHours < 1) {return 'Just now';}
+  if (diffHours < 24) {return `${diffHours} hour${diffHours > 1 ? 's' : ''} ago`;}
+  if (diffDays === 1) {return '1 day ago';}
+  if (diffDays < 7) {return `${diffDays} days ago`;}
+  if (diffDays < 30) {return `${Math.floor(diffDays / 7)} week${Math.floor(diffDays / 7) > 1 ? 's' : ''} ago`;}
   return `${Math.floor(diffDays / 30)} month${Math.floor(diffDays / 30) > 1 ? 's' : ''} ago`;
 }
 
@@ -173,7 +176,17 @@ const currentUser = {
 // ERROR STATE COMPONENT
 // ============================================================================
 
-function ErrorCard({ title, message, onRetry }: { title: string; message: string; onRetry?: () => void }) {
+function ErrorCard({
+  title,
+  message,
+  onRetry,
+  isRetrying = false,
+}: {
+  title: string;
+  message: string;
+  onRetry?: () => void;
+  isRetrying?: boolean;
+}) {
   return (
     <Card className="border-danger-200">
       <CardContent className="flex flex-col items-center justify-center py-8">
@@ -181,13 +194,51 @@ function ErrorCard({ title, message, onRetry }: { title: string; message: string
         <p className="mt-3 text-sm font-medium text-danger-700">{title}</p>
         <p className="mt-1 text-xs text-danger-500">{message}</p>
         {onRetry && (
-          <button
+          <Button
             onClick={onRetry}
-            className="mt-4 rounded-lg bg-danger-100 px-4 py-2 text-sm font-medium text-danger-700 hover:bg-danger-200"
+            variant="secondary"
+            size="sm"
+            disabled={isRetrying}
+            className="mt-4 border-danger-200 text-danger-700 hover:bg-danger-50"
           >
-            Retry
-          </button>
+            {isRetrying ? (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                Retrying...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Retry
+              </>
+            )}
+          </Button>
         )}
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
+// EMPTY STATE COMPONENT
+// ============================================================================
+
+// Unused for now, but available for future empty states
+function _EmptyStateCard({
+  icon: Icon,
+  title,
+  description
+}: {
+  icon: React.ElementType;
+  title: string;
+  description: string;
+}) {
+  return (
+    <Card>
+      <CardContent className="flex flex-col items-center justify-center py-12">
+        <Icon className="h-12 w-12 text-slate-300" />
+        <p className="mt-4 text-sm font-medium text-slate-600">{title}</p>
+        <p className="mt-1 text-xs text-slate-400">{description}</p>
       </CardContent>
     </Card>
   );
@@ -199,37 +250,77 @@ function ErrorCard({ title, message, onRetry }: { title: string; message: string
 
 export default function DashboardPage() {
   // ============================================================================
-  // tRPC QUERIES
+  // tRPC QUERIES WITH ERROR HANDLING
   // ============================================================================
 
   // Fetch SPAC stats for quick stats cards
-  const spacStatsQuery = trpc.spac.getStats.useQuery();
+  const spacStatsQuery = trpc.spac.getStats.useQuery(undefined, {
+    refetchOnWindowFocus: false,
+    retry: 2,
+    retryDelay: 1000,
+  });
 
   // Fetch SPACs list for SPAC status card and trust account
-  const spacsQuery = trpc.spac.list.useQuery({
-    page: 1,
-    limit: 10,
-    sortBy: 'updatedAt',
-    sortOrder: 'desc',
-  });
+  const spacsQuery = trpc.spac.list.useQuery(
+    {
+      page: 1,
+      limit: 10,
+      sortBy: 'updatedAt',
+      sortOrder: 'desc',
+    },
+    {
+      refetchOnWindowFocus: false,
+      retry: 2,
+      retryDelay: 1000,
+    }
+  );
 
   // Fetch targets for pipeline widget
-  const targetsQuery = trpc.target.list.useQuery({
-    page: 1,
-    pageSize: 50,
-    sortBy: 'priority',
-    sortOrder: 'asc',
-  });
+  const targetsQuery = trpc.target.list.useQuery(
+    {
+      page: 1,
+      pageSize: 50,
+      sortBy: 'priority',
+      sortOrder: 'asc',
+    },
+    {
+      refetchOnWindowFocus: false,
+      retry: 2,
+      retryDelay: 1000,
+    }
+  );
+
+  // ============================================================================
+  // RETRY HANDLERS
+  // ============================================================================
+
+  const handleRetryStats = useCallback(() => {
+    spacStatsQuery.refetch();
+  }, [spacStatsQuery]);
+
+  const handleRetrySpacs = useCallback(() => {
+    spacsQuery.refetch();
+  }, [spacsQuery]);
+
+  const handleRetryTargets = useCallback(() => {
+    targetsQuery.refetch();
+  }, [targetsQuery]);
+
+  const handleRetryAll = useCallback(() => {
+    spacStatsQuery.refetch();
+    spacsQuery.refetch();
+    targetsQuery.refetch();
+  }, [spacStatsQuery, spacsQuery, targetsQuery]);
 
   // ============================================================================
   // DERIVED DATA: PRIMARY SPAC
   // ============================================================================
 
   const primarySpac = useMemo(() => {
-    if (!spacsQuery.data?.items?.length) return null;
+    if (!spacsQuery.data?.items?.length) {return null;}
     // Return the first active SPAC (not liquidated or completed)
     return spacsQuery.data.items.find(
-      (s) => s.status !== 'LIQUIDATED' && s.status !== 'DE_SPAC_COMPLETE'
+      (s) => s.status !== 'LIQUIDATED' && s.status !== 'COMPLETED'
     ) || spacsQuery.data.items[0];
   }, [spacsQuery.data]);
 
@@ -238,17 +329,21 @@ export default function DashboardPage() {
   // ============================================================================
 
   const spacStatusData = useMemo(() => {
-    if (!primarySpac) return null;
+    if (!primarySpac) {return null;}
 
     // Map SPAC status to phase
+    // Valid statuses: SEARCHING, LOI_SIGNED, DA_ANNOUNCED, SEC_REVIEW, SHAREHOLDER_VOTE, CLOSING, COMPLETED, LIQUIDATING, LIQUIDATED, TERMINATED
     const statusToPhase: Record<string, 'FORMATION' | 'PRE_IPO' | 'IPO' | 'TARGET_SEARCH' | 'DE_SPAC' | 'POST_MERGER'> = {
-      'PRE_IPO': 'PRE_IPO',
       'SEARCHING': 'TARGET_SEARCH',
       'LOI_SIGNED': 'DE_SPAC',
-      'DEFINITIVE_AGREEMENT': 'DE_SPAC',
-      'VOTE_PENDING': 'DE_SPAC',
-      'DE_SPAC_COMPLETE': 'POST_MERGER',
+      'DA_ANNOUNCED': 'DE_SPAC',
+      'SEC_REVIEW': 'DE_SPAC',
+      'SHAREHOLDER_VOTE': 'DE_SPAC',
+      'CLOSING': 'DE_SPAC',
+      'COMPLETED': 'POST_MERGER',
+      'LIQUIDATING': 'POST_MERGER',
       'LIQUIDATED': 'POST_MERGER',
+      'TERMINATED': 'POST_MERGER',
     };
 
     const currentPhase = statusToPhase[primarySpac.status] || 'TARGET_SEARCH';
@@ -278,7 +373,7 @@ export default function DashboardPage() {
   // ============================================================================
 
   const trustAccountData = useMemo(() => {
-    if (!primarySpac) return null;
+    if (!primarySpac) {return null;}
 
     // Convert Decimal to number (Prisma Decimal fields need explicit conversion)
     const trustAmount = primarySpac.trustAmount ? Number(primarySpac.trustAmount) : 0;
@@ -308,7 +403,7 @@ export default function DashboardPage() {
   // ============================================================================
 
   const pipelineData = useMemo((): DealPipelineData | null => {
-    if (!targetsQuery.data?.items) return null;
+    if (!targetsQuery.data?.items) {return null;}
 
     const targets = targetsQuery.data.items;
     // Use actual TargetStatus values from the schema
@@ -383,7 +478,7 @@ export default function DashboardPage() {
           ? { value: Math.round((stats.active / stats.total) * 100), direction: 'up' as const, label: 'active' }
           : undefined,
         colorVariant: 'primary' as const,
-        description: `${stats?.active || 0} active, ${stats?.byStatus?.DE_SPAC_COMPLETE || 0} completed`,
+        description: `${stats?.active || 0} active, ${stats?.byStatus?.COMPLETED || 0} completed`,
       },
       {
         title: 'Active Targets',
@@ -414,6 +509,155 @@ export default function DashboardPage() {
   }, [spacStatsQuery.data, targetsQuery.data, pipelineData, primarySpac]);
 
   // ============================================================================
+  // DERIVED DATA: UPCOMING DEADLINES FROM REAL DATA
+  // ============================================================================
+
+  const upcomingDeadlines = useMemo((): DeadlineItem[] => {
+    const deadlines: DeadlineItem[] = [];
+
+    // Add SPAC business combination deadlines
+    if (spacsQuery.data?.items) {
+      spacsQuery.data.items.forEach((spac) => {
+        if (spac.deadlineDate) {
+          const deadline = new Date(spac.deadlineDate);
+          const now = new Date();
+          const daysUntilDeadline = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+          // Only show if deadline is within next 24 months or past due
+          if (daysUntilDeadline <= 730 || daysUntilDeadline < 0) {
+            let status: DeadlineItem['status'] = 'UPCOMING';
+            if (daysUntilDeadline < 0) {
+              status = 'OVERDUE';
+            } else if (daysUntilDeadline <= 14) {
+              status = 'DUE_SOON';
+            }
+
+            deadlines.push({
+              id: `spac-deadline-${spac.id}`,
+              title: `${spac.name} Business Combination Deadline`,
+              type: 'BUSINESS_COMBINATION',
+              dueDate: deadline,
+              status,
+              description: spac.ticker ? `Ticker: ${spac.ticker}` : undefined,
+              relatedSpac: {
+                id: spac.id,
+                name: spac.name,
+                href: `/spacs/${spac.id}`,
+              },
+              priority: daysUntilDeadline <= 90 ? 'critical' : daysUntilDeadline <= 180 ? 'high' : 'medium',
+            });
+          }
+        }
+      });
+    }
+
+    // Add target-related deadlines (due diligence, LOI dates, etc.)
+    // Note: We only use fields that are returned by the list endpoint
+    // The full Target model has more fields but they may not be in the list response
+    if (targetsQuery.data?.items) {
+      targetsQuery.data.items.forEach((target) => {
+        // Cast to access additional fields that may be in the full model
+        const fullTarget = target as typeof target & {
+          expectedCloseDate?: Date | string | null;
+          sector?: string | null;
+          priority?: number;
+        };
+
+        // Expected close date as a deadline
+        if (fullTarget.expectedCloseDate) {
+          const closeDate = new Date(fullTarget.expectedCloseDate);
+          const now = new Date();
+          const daysUntilClose = Math.ceil((closeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+          if (daysUntilClose > -30 && daysUntilClose <= 180) {
+            let status: DeadlineItem['status'] = 'UPCOMING';
+            if (daysUntilClose < 0) {
+              status = 'OVERDUE';
+            } else if (daysUntilClose <= 14) {
+              status = 'DUE_SOON';
+            }
+
+            deadlines.push({
+              id: `target-close-${target.id}`,
+              title: `${target.name} Expected Close`,
+              type: 'CONTRACT_DEADLINE',
+              dueDate: closeDate,
+              status,
+              description: `Target in ${target.status?.replace(/_/g, ' ').toLowerCase() || 'evaluation'}`,
+              priority: daysUntilClose <= 30 ? 'high' : 'medium',
+            });
+          }
+        }
+      });
+    }
+
+    // Sort by due date
+    return deadlines.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
+  }, [spacsQuery.data, targetsQuery.data]);
+
+  // ============================================================================
+  // DERIVED DATA: RECENT ACTIVITY FROM REAL DATA
+  // ============================================================================
+
+  const recentActivities = useMemo((): ActivityItem[] => {
+    const activities: ActivityItem[] = [];
+
+    // Generate activities from recently updated SPACs
+    if (spacsQuery.data?.items) {
+      spacsQuery.data.items.slice(0, 3).forEach((spac) => {
+        activities.push({
+          id: `spac-update-${spac.id}`,
+          type: 'DEAL_UPDATE',
+          title: `${spac.name} status: ${spac.status?.replace(/_/g, ' ')}`,
+          description: spac.ticker ? `Ticker: ${spac.ticker}` : 'SPAC updated',
+          timestamp: spac.updatedAt,
+          relatedItem: {
+            type: 'spac',
+            id: spac.id,
+            name: spac.name,
+            href: `/spacs/${spac.id}`,
+          },
+        });
+      });
+    }
+
+    // Generate activities from recently updated targets
+    if (targetsQuery.data?.items) {
+      targetsQuery.data.items.slice(0, 5).forEach((target) => {
+        // Cast to access additional fields that may be in the full model
+        const fullTarget = target as typeof target & {
+          sector?: string | null;
+          priority?: number;
+        };
+
+        const isNew = new Date(target.createdAt).getTime() > Date.now() - 24 * 60 * 60 * 1000;
+        const targetPriority = fullTarget.priority ?? 5;
+
+        activities.push({
+          id: `target-${isNew ? 'add' : 'update'}-${target.id}`,
+          type: isNew ? 'TARGET_ADDED' : 'TARGET_UPDATE',
+          title: isNew
+            ? `New target added: ${target.name}`
+            : `${target.name} moved to ${target.status?.replace(/_/g, ' ')}`,
+          description: target.industry || fullTarget.sector || 'Target company',
+          timestamp: target.updatedAt,
+          relatedItem: {
+            type: 'target',
+            id: target.id,
+            name: target.name,
+            href: `/targets/${target.id}`,
+          },
+          isNew,
+          priority: targetPriority <= 2 ? 'high' : undefined,
+        });
+      });
+    }
+
+    // Sort by timestamp (most recent first)
+    return activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }, [spacsQuery.data, targetsQuery.data]);
+
+  // ============================================================================
   // DERIVED DATA: DEAL SUMMARY
   // ============================================================================
 
@@ -429,9 +673,9 @@ export default function DashboardPage() {
     }
 
     const formatValue = (value: number) => {
-      if (value >= 1000000000) return `$${(value / 1000000000).toFixed(2)}B`;
-      if (value >= 1000000) return `$${(value / 1000000).toFixed(0)}M`;
-      if (value >= 1000) return `$${(value / 1000).toFixed(0)}K`;
+      if (value >= 1000000000) {return `$${(value / 1000000000).toFixed(2)}B`;}
+      if (value >= 1000000) {return `$${(value / 1000000).toFixed(0)}M`;}
+      if (value >= 1000) {return `$${(value / 1000).toFixed(0)}K`;}
       return `$${value.toFixed(0)}`;
     };
 
@@ -480,8 +724,8 @@ export default function DashboardPage() {
 
   const getGreeting = () => {
     const hour = new Date().getHours();
-    if (hour < 12) return 'Good morning';
-    if (hour < 18) return 'Good afternoon';
+    if (hour < 12) {return 'Good morning';}
+    if (hour < 18) {return 'Good afternoon';}
     return 'Good evening';
   };
 
@@ -497,7 +741,7 @@ export default function DashboardPage() {
     // TODO: Navigate to pipeline
   };
 
-  const handleTargetClick = (targetId: string) => {
+  const handleTargetClick = (_targetId: string) => {
     // TODO: Navigate to target
   };
 
@@ -505,7 +749,7 @@ export default function DashboardPage() {
     // TODO: Navigate to compliance calendar
   };
 
-  const handleDeadlineClick = (deadlineId: string) => {
+  const handleDeadlineClick = (_deadlineId: string) => {
     // TODO: Navigate to deadline
   };
 
@@ -513,7 +757,7 @@ export default function DashboardPage() {
     // TODO: Navigate to activity feed
   };
 
-  const handleActivityClick = (activityId: string) => {
+  const handleActivityClick = (_activityId: string) => {
     // TODO: Navigate to activity
   };
 
@@ -521,7 +765,7 @@ export default function DashboardPage() {
     // TODO: Navigate to AI insights
   };
 
-  const handleInsightAction = (insightId: string, action: 'acknowledge' | 'dismiss' | 'resolve') => {
+  const handleInsightAction = (_insightId: string, _action: 'acknowledge' | 'dismiss' | 'resolve') => {
     // TODO: Handle insight action
   };
 
@@ -529,7 +773,7 @@ export default function DashboardPage() {
     // TODO: Refresh AI insights
   };
 
-  const handleRecentActivityClick = (activity: any) => {
+  const handleRecentActivityClick = (_activity: any) => {
     // TODO: Navigate to activity
   };
 
@@ -537,7 +781,7 @@ export default function DashboardPage() {
     // TODO: View all recent activity
   };
 
-  const handleUpcomingDeadlineClick = (deadline: any) => {
+  const handleUpcomingDeadlineClick = (_deadline: any) => {
     // TODO: Navigate to deadline
   };
 
@@ -546,12 +790,27 @@ export default function DashboardPage() {
   };
 
   // ============================================================================
-  // LOADING STATE HELPERS
+  // LOADING AND ERROR STATE HELPERS
   // ============================================================================
 
   const isLoadingStats = spacStatsQuery.isLoading;
   const isLoadingSpacs = spacsQuery.isLoading;
   const isLoadingTargets = targetsQuery.isLoading;
+
+  const isRefetchingStats = spacStatsQuery.isFetching && !spacStatsQuery.isLoading;
+  const isRefetchingSpacs = spacsQuery.isFetching && !spacsQuery.isLoading;
+  const isRefetchingTargets = targetsQuery.isFetching && !targetsQuery.isLoading;
+
+  const hasStatsError = spacStatsQuery.isError;
+  const hasSpacError = spacsQuery.isError;
+  const hasTargetError = targetsQuery.isError;
+  const hasAnyError = hasStatsError || hasSpacError || hasTargetError;
+
+  // Determine if we have enough data to show the dashboard
+  const _hasSpacData = spacsQuery.data?.items && spacsQuery.data.items.length > 0;
+  const _hasTargetData = targetsQuery.data?.items && targetsQuery.data.items.length > 0;
+  const hasDeadlines = upcomingDeadlines.length > 0;
+  const hasRecentActivity = recentActivities.length > 0;
 
   // ============================================================================
   // RENDER
@@ -559,6 +818,51 @@ export default function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {/* Global Error Banner */}
+      {hasAnyError && (
+        <div className="rounded-lg border border-danger-200 bg-danger-50 p-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <AlertCircle className="h-5 w-5 text-danger-500" />
+              <div>
+                <p className="text-sm font-medium text-danger-800">
+                  Some dashboard data failed to load
+                </p>
+                <p className="text-xs text-danger-600">
+                  {[
+                    hasStatsError && 'Statistics',
+                    hasSpacError && 'SPAC data',
+                    hasTargetError && 'Target data',
+                  ]
+                    .filter(Boolean)
+                    .join(', ')}{' '}
+                  could not be retrieved
+                </p>
+              </div>
+            </div>
+            <Button
+              variant="secondary"
+              size="sm"
+              onClick={handleRetryAll}
+              disabled={isRefetchingStats || isRefetchingSpacs || isRefetchingTargets}
+              className="border-danger-200 text-danger-700 hover:bg-danger-100"
+            >
+              {isRefetchingStats || isRefetchingSpacs || isRefetchingTargets ? (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                  Retrying...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="mr-2 h-4 w-4" />
+                  Retry All
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+      )}
+
       {/* Welcome Header */}
       <div className="page-header">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -584,7 +888,7 @@ export default function DashboardPage() {
                     ? 'Target Search Phase'
                     : primarySpac.status === 'LOI_SIGNED'
                       ? 'LOI Phase'
-                      : primarySpac.status === 'DEFINITIVE_AGREEMENT'
+                      : primarySpac.status === 'DA_ANNOUNCED'
                         ? 'DA Phase'
                         : primarySpac.status.replace(/_/g, ' ')}
                 </Badge>
@@ -604,7 +908,7 @@ export default function DashboardPage() {
 
       {/* Quick Stats Row */}
       <StatsCardGroup columns={4}>
-        {isLoadingStats || isLoadingSpacs ? (
+        {isLoadingStats || isLoadingSpacs || isLoadingTargets ? (
           // Loading skeleton for stats
           <>
             <StatsCardSkeleton />
@@ -612,13 +916,14 @@ export default function DashboardPage() {
             <StatsCardSkeleton />
             <StatsCardSkeleton />
           </>
-        ) : spacStatsQuery.isError ? (
-          // Error state
+        ) : hasStatsError ? (
+          // Error state for stats
           <div className="col-span-4">
             <ErrorCard
               title="Failed to load statistics"
-              message={spacStatsQuery.error?.message || 'An error occurred'}
-              onRetry={() => spacStatsQuery.refetch()}
+              message={spacStatsQuery.error?.message || 'Unable to retrieve dashboard statistics'}
+              onRetry={handleRetryStats}
+              isRetrying={isRefetchingStats}
             />
           </div>
         ) : (
@@ -641,45 +946,92 @@ export default function DashboardPage() {
       <div className="grid gap-6 lg:grid-cols-3">
         {/* Left Column - SPAC Status and Trust Account */}
         <div className="space-y-6 lg:col-span-1">
-          <SpacStatusCard
-            data={spacStatusData}
-            isLoading={isLoadingSpacs}
-            onViewDetails={handleViewSpacDetails}
-          />
-          <TrustAccountWidget
-            data={trustAccountData}
-            isLoading={isLoadingSpacs}
-            showInterestAccrual={true}
-            showMiniChart={true}
-            error={spacsQuery.isError ? spacsQuery.error?.message : null}
-            onRefresh={() => spacsQuery.refetch()}
-          />
+          {hasSpacError ? (
+            <ErrorCard
+              title="Failed to load SPAC status"
+              message={spacsQuery.error?.message || 'Unable to retrieve SPAC information'}
+              onRetry={handleRetrySpacs}
+              isRetrying={isRefetchingSpacs}
+            />
+          ) : (
+            <SpacStatusCard
+              data={spacStatusData}
+              isLoading={isLoadingSpacs}
+              onViewDetails={handleViewSpacDetails}
+            />
+          )}
+          {hasSpacError ? (
+            <ErrorCard
+              title="Failed to load trust data"
+              message={spacsQuery.error?.message || 'Unable to retrieve trust account information'}
+              onRetry={handleRetrySpacs}
+              isRetrying={isRefetchingSpacs}
+            />
+          ) : (
+            <TrustAccountWidget
+              data={trustAccountData}
+              isLoading={isLoadingSpacs}
+              showInterestAccrual={true}
+              showMiniChart={true}
+              error={null}
+              onRefresh={handleRetrySpacs}
+            />
+          )}
         </div>
 
         {/* Middle Column - Deal Pipeline and Upcoming Deadlines */}
         <div className="space-y-6 lg:col-span-1">
-          <DealPipelineWidget
-            data={pipelineData}
-            isLoading={isLoadingTargets}
-            onViewPipeline={handleViewPipeline}
-            onTargetClick={handleTargetClick}
-          />
-          <UpcomingDeadlines
-            deadlines={mockUpcomingDeadlines}
-            maxItems={4}
-            onViewAll={handleViewAllDeadlines}
-            onDeadlineClick={handleUpcomingDeadlineClick}
-          />
+          {hasTargetError ? (
+            <ErrorCard
+              title="Failed to load pipeline"
+              message={targetsQuery.error?.message || 'Unable to retrieve target pipeline'}
+              onRetry={handleRetryTargets}
+              isRetrying={isRefetchingTargets}
+            />
+          ) : (
+            <DealPipelineWidget
+              data={pipelineData}
+              isLoading={isLoadingTargets}
+              onViewPipeline={handleViewPipeline}
+              onTargetClick={handleTargetClick}
+            />
+          )}
+          {hasSpacError && hasTargetError ? (
+            <ErrorCard
+              title="Failed to load deadlines"
+              message="Unable to retrieve deadline information"
+              onRetry={handleRetryAll}
+              isRetrying={isRefetchingSpacs || isRefetchingTargets}
+            />
+          ) : (
+            <UpcomingDeadlines
+              deadlines={hasDeadlines ? upcomingDeadlines : undefined}
+              isLoading={isLoadingSpacs || isLoadingTargets}
+              maxItems={4}
+              onViewAll={handleViewAllDeadlines}
+              onDeadlineClick={handleUpcomingDeadlineClick}
+            />
+          )}
         </div>
 
         {/* Right Column - Recent Activity and Compliance */}
         <div className="space-y-6 lg:col-span-1">
-          <RecentActivity
-            activities={mockRecentActivities}
-            maxItems={5}
-            onViewAll={handleViewAllRecentActivity}
-            onActivityClick={handleRecentActivityClick}
-          />
+          {hasSpacError && hasTargetError ? (
+            <ErrorCard
+              title="Failed to load activity"
+              message="Unable to retrieve recent activity"
+              onRetry={handleRetryAll}
+              isRetrying={isRefetchingSpacs || isRefetchingTargets}
+            />
+          ) : (
+            <RecentActivity
+              activities={hasRecentActivity ? recentActivities : undefined}
+              isLoading={isLoadingSpacs || isLoadingTargets}
+              maxItems={5}
+              onViewAll={handleViewAllRecentActivity}
+              onActivityClick={handleRecentActivityClick}
+            />
+          )}
           <ComplianceCalendarWidget
             data={mockComplianceData}
             onViewCalendar={handleViewCalendar}

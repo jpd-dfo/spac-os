@@ -5,6 +5,7 @@
 // ============================================================================
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+
 import { cn } from '@/lib/utils';
 
 // ============================================================================
@@ -193,7 +194,7 @@ export function AIAssistant({
 
   // Handle sending message
   const handleSendMessage = useCallback(async (content: string) => {
-    if (!content.trim() || isLoading) return;
+    if (!content.trim() || isLoading) {return;}
 
     const userMessage: Message = {
       id: generateId(),

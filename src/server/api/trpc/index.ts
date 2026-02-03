@@ -7,9 +7,10 @@ import { initTRPC, TRPCError } from '@trpc/server';
 import { type CreateNextContextOptions } from '@trpc/server/adapters/next';
 import superjson from 'superjson';
 import { ZodError } from 'zod';
-import { db } from '@/server/db';
-import { getServerAuthSession } from '@/lib/auth';
+
+import { getServerSession, authOptions } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { db } from '@/server/db';
 
 /**
  * Context creation for tRPC
@@ -17,7 +18,7 @@ import { logger } from '@/lib/logger';
  */
 export const createTRPCContext = async (opts: CreateNextContextOptions) => {
   const { req, res } = opts;
-  const session = await getServerAuthSession({ req, res });
+  const session = await getServerSession(req, res, authOptions);
 
   return {
     db,
@@ -137,15 +138,14 @@ const auditMiddleware = t.middleware(async ({ ctx, path, type, rawInput, next })
       const input = rawInput as Record<string, unknown>;
       await ctx.db.auditLog.create({
         data: {
-          organizationId: (input?.organizationId as string) || ctx.session.user.organizationId || '',
+          organizationId: ((input?.['organizationId'] as string | undefined) ?? ctx.session.user.organizationId) || '',
           userId: ctx.session.user.id,
           action: path.includes('create') ? 'CREATE' :
                   path.includes('update') ? 'UPDATE' :
                   path.includes('delete') ? 'DELETE' : 'UPDATE',
-          entityType: path.split('.')[0],
-          entityId: (input?.id as string) || null,
-          newValues: input,
-          metadata: { path, type },
+          entityType: path.split('.')[0] ?? 'unknown',
+          entityId: (input?.['id'] as string) || 'unknown',
+          metadata: { path, type, input: JSON.parse(JSON.stringify(input)) },
         },
       });
     } catch (error) {

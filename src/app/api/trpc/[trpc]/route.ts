@@ -3,8 +3,10 @@
  * Next.js App Router integration for tRPC with Clerk authentication
  */
 
-import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
 import { type NextRequest } from 'next/server';
+
+import { fetchRequestHandler } from '@trpc/server/adapters/fetch';
+
 import { appRouter } from '@/server/api/root';
 import { createTRPCContext } from '@/server/api/trpc';
 

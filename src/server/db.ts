@@ -4,6 +4,7 @@
  */
 
 import { PrismaClient } from '@prisma/client';
+
 import { logger } from '@/lib/logger';
 
 // Declare global type for Prisma client singleton

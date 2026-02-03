@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+
 import {
   LayoutGrid,
   List,
@@ -17,17 +18,19 @@ import {
   Settings,
   HardDrive,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
+
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn, formatFileSize } from '@/lib/utils';
-import { FolderTree, defaultFolders, type FolderItem } from './FolderTree';
+
+import { AIAnalysisPanel } from './AIAnalysisPanel';
 import { DocumentCard, type DocumentData } from './DocumentCard';
 import { DocumentSearch } from './DocumentSearch';
 import { DocumentViewer } from './DocumentViewer';
+import { FolderTree, defaultFolders, type FolderItem } from './FolderTree';
 import { UploadModal } from './UploadModal';
-import { AIAnalysisPanel } from './AIAnalysisPanel';
 
 type SortField = 'name' | 'date' | 'type' | 'size';
 type SortOrder = 'asc' | 'desc';
@@ -390,7 +393,7 @@ export function DocumentBrowser({ className }: DocumentBrowserProps) {
 
   // Build breadcrumb path
   const breadcrumbPath = useMemo(() => {
-    if (!selectedFolder) return [{ id: 'all', name: 'All Documents' }];
+    if (!selectedFolder) {return [{ id: 'all', name: 'All Documents' }];}
 
     const path: { id: string; name: string }[] = [{ id: 'all', name: 'All Documents' }];
 
@@ -401,7 +404,7 @@ export function DocumentBrowser({ className }: DocumentBrowserProps) {
         }
         if (folder.children) {
           const result = findPath(folder.children, targetId, [...currentPath, { id: folder.id, name: folder.name }]);
-          if (result) return result;
+          if (result) {return result;}
         }
       }
       return null;

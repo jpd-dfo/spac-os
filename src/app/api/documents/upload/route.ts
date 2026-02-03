@@ -3,14 +3,18 @@
  * Handles file uploads for documents
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
-import { authOptions } from '@/lib/auth';
-import { DocumentCreateSchema } from '@/schemas';
-import { z } from 'zod';
+import { type NextRequest, NextResponse } from 'next/server';
+
 import crypto from 'crypto';
+
+import { getServerSession } from 'next-auth';
+import { z } from 'zod';
+
+import { authOptions } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { prisma } from '@/lib/prisma';
+
+
 
 // Max file size: 50MB
 const MAX_FILE_SIZE = 50 * 1024 * 1024;
@@ -32,21 +36,18 @@ const ALLOWED_MIME_TYPES = [
   'application/zip',
 ];
 
+// Document types must match Prisma DocumentType enum
 const UploadMetadataSchema = z.object({
   spacId: z.string().uuid(),
   type: z.enum([
-    'LOI', 'NDA', 'TERM_SHEET', 'DEFINITIVE_AGREEMENT', 'PROXY_STATEMENT',
-    'PROSPECTUS', 'S1', 'S4', 'FORM_8K', 'FORM_10K', 'FORM_10Q',
-    'FINANCIAL_STATEMENTS', 'DUE_DILIGENCE', 'BOARD_PRESENTATION',
-    'INVESTOR_PRESENTATION', 'FAIRNESS_OPINION', 'LEGAL_OPINION',
-    'TAX_OPINION', 'AUDIT_REPORT', 'CONTRACT', 'CORRESPONDENCE', 'OTHER',
+    'NDA', 'LOI', 'DEFINITIVE_AGREEMENT', 'FINANCIAL_STATEMENT', 'DUE_DILIGENCE',
+    'BOARD_PRESENTATION', 'SEC_FILING', 'INVESTOR_PRESENTATION', 'PRESS_RELEASE',
+    'LEGAL', 'TAX', 'INSURANCE', 'ENVIRONMENTAL', 'TECHNICAL', 'OTHER',
   ]),
-  title: z.string().min(1).max(255),
-  description: z.string().max(2000).optional(),
+  name: z.string().min(1).max(255),
+  category: z.string().optional(),
+  status: z.enum(['DRAFT', 'PENDING_REVIEW', 'APPROVED', 'REJECTED', 'ARCHIVED']).optional(),
   targetId: z.string().uuid().optional(),
-  filingId: z.string().uuid().optional(),
-  accessLevel: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'RESTRICTED']).default('INTERNAL'),
-  tags: z.array(z.string()).optional(),
 });
 
 export async function POST(request: NextRequest) {
@@ -119,10 +120,18 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const organizationId = spac.organizationId;
+    if (!organizationId) {
+      return NextResponse.json(
+        { error: 'SPAC is not associated with an organization' },
+        { status: 400 }
+      );
+    }
+
     const membership = await prisma.organizationUser.findUnique({
       where: {
         organizationId_userId: {
-          organizationId: spac.organizationId,
+          organizationId,
           userId: session.user.id,
         },
       },
@@ -135,18 +144,9 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Read file buffer
-    const buffer = Buffer.from(await file.arrayBuffer());
-
-    // Generate file hash for deduplication
-    const fileHash = crypto
-      .createHash('sha256')
-      .update(buffer)
-      .digest('hex');
-
-    // Generate unique storage path
+    // Generate unique file URL path
     const fileExtension = file.name.split('.').pop() || '';
-    const storagePath = `documents/${metadata.spacId}/${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${fileExtension}`;
+    const fileUrl = `documents/${metadata.spacId}/${Date.now()}-${crypto.randomBytes(8).toString('hex')}.${fileExtension}`;
 
     // In production, upload to cloud storage (S3, GCS, etc.)
     // For now, we'll store the path and simulate upload
@@ -157,37 +157,13 @@ export async function POST(request: NextRequest) {
       data: {
         spacId: metadata.spacId,
         type: metadata.type,
-        title: metadata.title,
-        description: metadata.description,
+        name: metadata.name,
+        category: metadata.category,
+        status: metadata.status || 'DRAFT',
         targetId: metadata.targetId,
-        filingId: metadata.filingId,
-        accessLevel: metadata.accessLevel,
-        tags: metadata.tags || [],
-        uploadedById: session.user.id,
-        fileName: file.name,
         fileSize: file.size,
         mimeType: file.type,
-        storagePath,
-        fileHash,
-        currentVersion: 1,
-      },
-      include: {
-        uploadedBy: {
-          select: { id: true, name: true, email: true },
-        },
-      },
-    });
-
-    // Create initial version record
-    await prisma.documentVersion.create({
-      data: {
-        documentId: document.id,
-        version: 1,
-        fileName: file.name,
-        fileSize: file.size,
-        storagePath,
-        uploadedById: session.user.id,
-        changeNotes: 'Initial upload',
+        fileUrl,
       },
     });
 
@@ -198,7 +174,7 @@ export async function POST(request: NextRequest) {
         entityType: 'Document',
         entityId: document.id,
         userId: session.user.id,
-        organizationId: spac.organizationId,
+        organizationId,
         metadata: {
           fileName: file.name,
           fileSize: file.size,
@@ -211,13 +187,11 @@ export async function POST(request: NextRequest) {
       success: true,
       document: {
         id: document.id,
-        title: document.title,
+        name: document.name,
         type: document.type,
-        fileName: document.fileName,
         fileSize: document.fileSize,
         mimeType: document.mimeType,
-        version: document.currentVersion,
-        uploadedBy: document.uploadedBy,
+        fileUrl: document.fileUrl,
         createdAt: document.createdAt,
       },
     });

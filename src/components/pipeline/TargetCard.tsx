@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   MoreHorizontal,
   TrendingUp,
@@ -14,10 +15,11 @@ import {
   Star,
   AlertTriangle,
 } from 'lucide-react';
-import { Badge } from '@/components/ui/Badge';
+
 import { Avatar } from '@/components/ui/Avatar';
-import { Tooltip } from '@/components/ui/Tooltip';
+import { Badge } from '@/components/ui/Badge';
 import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel } from '@/components/ui/Dropdown';
+import { Tooltip } from '@/components/ui/Tooltip';
 import { cn, formatLargeNumber } from '@/lib/utils';
 
 // ============================================================================
@@ -46,10 +48,15 @@ export interface Target {
   description?: string;
   headquarters?: string;
   revenue?: number;
+  revenueGrowth?: number;
   ebitda?: number;
+  ebitdaMargin?: number;
+  grossMargin?: number;
   employeeCount?: number;
   source?: 'inbound' | 'referral' | 'research' | 'banker';
   tags?: string[];
+  investmentHighlights?: string[];
+  keyRisks?: string[];
   lastActivityDate?: Date;
   createdAt: Date;
   updatedAt: Date;
@@ -79,16 +86,16 @@ interface TargetCardProps {
 
 function ScoreIndicator({ score }: { score: number }) {
   const getColor = (value: number) => {
-    if (value >= 80) return 'bg-success-500';
-    if (value >= 60) return 'bg-primary-500';
-    if (value >= 40) return 'bg-warning-500';
+    if (value >= 80) {return 'bg-success-500';}
+    if (value >= 60) {return 'bg-primary-500';}
+    if (value >= 40) {return 'bg-warning-500';}
     return 'bg-danger-500';
   };
 
   const getLabel = (value: number) => {
-    if (value >= 80) return 'Excellent';
-    if (value >= 60) return 'Good';
-    if (value >= 40) return 'Fair';
+    if (value >= 80) {return 'Excellent';}
+    if (value >= 60) {return 'Good';}
+    if (value >= 40) {return 'Fair';}
     return 'Poor';
   };
 
@@ -108,7 +115,7 @@ function ScoreIndicator({ score }: { score: number }) {
 }
 
 function PriorityIndicator({ priority }: { priority: Target['priority'] }) {
-  if (!priority || priority === 'medium') return null;
+  if (!priority || priority === 'medium') {return null;}
 
   const config = {
     low: { color: 'text-slate-400', icon: null, label: 'Low Priority' },
@@ -118,7 +125,7 @@ function PriorityIndicator({ priority }: { priority: Target['priority'] }) {
 
   const { color, icon: Icon, label } = config[priority] || {};
 
-  if (!Icon) return null;
+  if (!Icon) {return null;}
 
   return (
     <Tooltip content={label}>
@@ -129,9 +136,9 @@ function PriorityIndicator({ priority }: { priority: Target['priority'] }) {
 
 function DaysInStageBadge({ days }: { days: number }) {
   const getVariant = (d: number) => {
-    if (d <= 7) return 'success';
-    if (d <= 21) return 'secondary';
-    if (d <= 45) return 'warning';
+    if (d <= 7) {return 'success';}
+    if (d <= 21) {return 'secondary';}
+    if (d <= 45) {return 'warning';}
     return 'danger';
   };
 
@@ -273,7 +280,7 @@ export function TargetCard({
               <DropdownItem
                 icon={<Archive className="h-4 w-4" />}
                 onClick={() => handleQuickAction('archive')}
-                danger
+                variant="danger"
               >
                 Archive
               </DropdownItem>

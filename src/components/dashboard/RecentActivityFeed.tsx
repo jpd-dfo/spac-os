@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo, useCallback } from 'react';
+
 import {
   Activity,
   Target,
@@ -20,10 +21,11 @@ import {
   Clock,
   ExternalLink,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+
+import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Avatar } from '@/components/ui/Avatar';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { cn, formatRelativeTime, formatDateTime, getInitials } from '@/lib/utils';
 
 // ============================================================================
@@ -340,7 +342,10 @@ export function RecentActivityFeed({
       if (!groups[groupKey]) {
         groups[groupKey] = [];
       }
-      groups[groupKey].push(activity);
+      const groupArray = groups[groupKey];
+      if (groupArray) {
+        groupArray.push(activity);
+      }
     });
 
     return groups;
@@ -519,7 +524,7 @@ export function ActivityCompact({
         <div className="space-y-3">
           {displayedActivities.map((activity) => {
             const Icon = ACTIVITY_ICONS[activity.type] || Activity;
-            const colors = ACTIVITY_COLORS[activity.type];
+            const colors = ACTIVITY_COLORS[activity.type] || { bg: 'bg-slate-100', text: 'text-slate-600' };
 
             return (
               <div key={activity.id} className="flex items-center gap-3">

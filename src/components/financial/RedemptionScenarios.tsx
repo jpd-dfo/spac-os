@@ -1,6 +1,20 @@
 'use client';
 
 import { useMemo, useState, useCallback } from 'react';
+
+import {
+  TrendingDown,
+  AlertTriangle,
+  Info,
+  DollarSign,
+  Users,
+  Building2,
+  ChevronRight,
+  Sliders,
+  CheckCircle,
+  XCircle,
+  Calculator,
+} from 'lucide-react';
 import {
   LineChart,
   Line,
@@ -16,22 +30,10 @@ import {
   Bar,
   Legend,
 } from 'recharts';
-import {
-  TrendingDown,
-  AlertTriangle,
-  Info,
-  DollarSign,
-  Users,
-  Building2,
-  ChevronRight,
-  Sliders,
-  CheckCircle,
-  XCircle,
-  Calculator,
-} from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { Tooltip as UITooltip } from '@/components/ui/Tooltip';
 import { cn, formatLargeNumber, formatPercent, formatCurrency } from '@/lib/utils';
 
@@ -179,9 +181,12 @@ interface ChartTooltipProps {
 }
 
 function ChartTooltip({ active, payload }: ChartTooltipProps) {
-  if (!active || !payload || !payload.length) return null;
+  if (!active || !payload || !payload.length) {return null;}
 
-  const data = payload[0].payload;
+  const firstPayload = payload[0];
+  if (!firstPayload) {return null;}
+
+  const data = firstPayload.payload;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-4 shadow-lg">
@@ -432,7 +437,7 @@ export function RedemptionScenarios({
   const maxViableRedemption = useMemo(() => {
     for (let rate = 100; rate >= 0; rate--) {
       const scenario = calculateScenario(inputs, rate);
-      if (scenario.meetsMinimumCash) return rate;
+      if (scenario.meetsMinimumCash) {return rate;}
     }
     return 0;
   }, [inputs]);

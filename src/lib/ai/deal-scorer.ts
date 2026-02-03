@@ -4,6 +4,7 @@
 
 import { getClaudeClient } from './claude';
 import { SYSTEM_PROMPTS, USER_PROMPTS, AI_CONFIG } from './prompts';
+
 import type { AIResponse, AIResponseMetadata, AIError } from './types';
 
 // ============================================================================
@@ -679,31 +680,31 @@ function formatTargetInfo(target: TargetInfo): string {
   lines.push(`**Industry:** ${target.industry}${target.sector ? ` / ${target.sector}` : ''}`);
   lines.push(`**Description:** ${target.description}`);
 
-  if (target.founded) lines.push(`**Founded:** ${target.founded}`);
-  if (target.headquarters) lines.push(`**Headquarters:** ${target.headquarters}`);
-  if (target.employees) lines.push(`**Employees:** ${target.employees.toLocaleString()}`);
+  if (target.founded) {lines.push(`**Founded:** ${target.founded}`);}
+  if (target.headquarters) {lines.push(`**Headquarters:** ${target.headquarters}`);}
+  if (target.employees) {lines.push(`**Employees:** ${target.employees.toLocaleString()}`);}
 
   if (target.revenue || target.ebitda) {
     lines.push('\n**Financial Metrics:**');
-    if (target.revenue) lines.push(`- Revenue: $${(target.revenue / 1e6).toFixed(1)}M`);
-    if (target.revenueGrowth) lines.push(`- Revenue Growth: ${target.revenueGrowth}%`);
-    if (target.ebitda) lines.push(`- EBITDA: $${(target.ebitda / 1e6).toFixed(1)}M`);
-    if (target.ebitdaMargin) lines.push(`- EBITDA Margin: ${target.ebitdaMargin}%`);
-    if (target.grossMargin) lines.push(`- Gross Margin: ${target.grossMargin}%`);
+    if (target.revenue) {lines.push(`- Revenue: $${(target.revenue / 1e6).toFixed(1)}M`);}
+    if (target.revenueGrowth) {lines.push(`- Revenue Growth: ${target.revenueGrowth}%`);}
+    if (target.ebitda) {lines.push(`- EBITDA: $${(target.ebitda / 1e6).toFixed(1)}M`);}
+    if (target.ebitdaMargin) {lines.push(`- EBITDA Margin: ${target.ebitdaMargin}%`);}
+    if (target.grossMargin) {lines.push(`- Gross Margin: ${target.grossMargin}%`);}
   }
 
   if (target.enterpriseValue || target.evRevenue) {
     lines.push('\n**Valuation:**');
-    if (target.enterpriseValue) lines.push(`- Enterprise Value: $${(target.enterpriseValue / 1e6).toFixed(1)}M`);
-    if (target.evRevenue) lines.push(`- EV/Revenue: ${target.evRevenue.toFixed(1)}x`);
-    if (target.evEbitda) lines.push(`- EV/EBITDA: ${target.evEbitda.toFixed(1)}x`);
+    if (target.enterpriseValue) {lines.push(`- Enterprise Value: $${(target.enterpriseValue / 1e6).toFixed(1)}M`);}
+    if (target.evRevenue) {lines.push(`- EV/Revenue: ${target.evRevenue.toFixed(1)}x`);}
+    if (target.evEbitda) {lines.push(`- EV/EBITDA: ${target.evEbitda.toFixed(1)}x`);}
   }
 
   if (target.tam || target.marketGrowth) {
     lines.push('\n**Market:**');
-    if (target.tam) lines.push(`- TAM: $${(target.tam / 1e9).toFixed(1)}B`);
-    if (target.sam) lines.push(`- SAM: $${(target.sam / 1e9).toFixed(1)}B`);
-    if (target.marketGrowth) lines.push(`- Market Growth: ${target.marketGrowth}%`);
+    if (target.tam) {lines.push(`- TAM: $${(target.tam / 1e9).toFixed(1)}B`);}
+    if (target.sam) {lines.push(`- SAM: $${(target.sam / 1e9).toFixed(1)}B`);}
+    if (target.marketGrowth) {lines.push(`- Market Growth: ${target.marketGrowth}%`);}
   }
 
   if (target.managementTeam?.length) {
@@ -817,10 +818,10 @@ function calculateOverallScore(
  * Calculate letter grade from score
  */
 function calculateGrade(score: number): 'A' | 'B' | 'C' | 'D' | 'F' {
-  if (score >= 85) return 'A';
-  if (score >= 70) return 'B';
-  if (score >= 55) return 'C';
-  if (score >= 40) return 'D';
+  if (score >= 85) {return 'A';}
+  if (score >= 70) {return 'B';}
+  if (score >= 55) {return 'C';}
+  if (score >= 40) {return 'D';}
   return 'F';
 }
 

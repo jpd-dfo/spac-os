@@ -1,6 +1,8 @@
 'use client';
 
 import { useState } from 'react';
+
+import { format, differenceInDays, startOfDay } from 'date-fns';
 import {
   X,
   FileText,
@@ -19,13 +21,13 @@ import {
   History,
   Send,
 } from 'lucide-react';
-import { format, differenceInDays, startOfDay } from 'date-fns';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { FILING_DEFINITIONS } from '@/lib/compliance/complianceRules';
+import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
 import type { FilingType, FilingStatus } from '@/types';
-import { FILING_TYPE_LABELS } from '@/lib/constants';
-import { FILING_DEFINITIONS } from '@/lib/compliance/complianceRules';
 
 // ============================================================================
 // TYPES
@@ -142,7 +144,7 @@ function getPriorityConfig(priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'): { 
 }
 
 function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) {return '0 B';}
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -164,7 +166,7 @@ export function FilingDetailModal({
   const [activeTab, setActiveTab] = useState<'overview' | 'documents' | 'comments' | 'history'>('overview');
   const [newComment, setNewComment] = useState('');
 
-  if (!isOpen || !filing) return null;
+  if (!isOpen || !filing) {return null;}
 
   const statusConfig = getStatusConfig(filing.status);
   const priorityConfig = getPriorityConfig(filing.priority);

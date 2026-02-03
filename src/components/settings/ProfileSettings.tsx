@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   User,
   Mail,
@@ -14,10 +15,11 @@ import {
   Linkedin,
   AlertCircle,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 
 interface ProfileData {
@@ -81,18 +83,18 @@ export function ProfileSettings() {
     const newErrors: Record<string, string> = {};
 
     if (!profile.firstName.trim()) {
-      newErrors.firstName = 'First name is required';
+      newErrors['firstName'] = 'First name is required';
     }
     if (!profile.lastName.trim()) {
-      newErrors.lastName = 'Last name is required';
+      newErrors['lastName'] = 'Last name is required';
     }
     if (!profile.email.trim()) {
-      newErrors.email = 'Email is required';
+      newErrors['email'] = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(profile.email)) {
-      newErrors.email = 'Invalid email format';
+      newErrors['email'] = 'Invalid email format';
     }
     if (profile.phone && !/^[\d\s+()-]+$/.test(profile.phone)) {
-      newErrors.phone = 'Invalid phone number format';
+      newErrors['phone'] = 'Invalid phone number format';
     }
 
     setErrors(newErrors);
@@ -100,7 +102,7 @@ export function ProfileSettings() {
   };
 
   const handleSave = async () => {
-    if (!validateProfile()) return;
+    if (!validateProfile()) {return;}
 
     setIsSaving(true);
     // Simulate API call
@@ -201,14 +203,14 @@ export function ProfileSettings() {
                 value={profile.firstName}
                 onChange={(e) => setProfile({ ...profile, firstName: e.target.value })}
                 disabled={!isEditing}
-                error={errors.firstName}
+                error={errors['firstName']}
               />
               <Input
                 label="Last Name"
                 value={profile.lastName}
                 onChange={(e) => setProfile({ ...profile, lastName: e.target.value })}
                 disabled={!isEditing}
-                error={errors.lastName}
+                error={errors['lastName']}
               />
               <Input
                 label="Email"
@@ -216,7 +218,7 @@ export function ProfileSettings() {
                 value={profile.email}
                 onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                 disabled={!isEditing}
-                error={errors.email}
+                error={errors['email']}
               />
               <Input
                 label="Phone"
@@ -224,7 +226,7 @@ export function ProfileSettings() {
                 value={profile.phone}
                 onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
                 disabled={!isEditing}
-                error={errors.phone}
+                error={errors['phone']}
               />
               <Input
                 label="Job Title"

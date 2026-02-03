@@ -1,8 +1,11 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+
 import Link from 'next/link';
+import { useParams, useRouter } from 'next/navigation';
+
+import { differenceInDays, startOfDay, subDays, addDays } from 'date-fns';
 import {
   ArrowLeft,
   FileText,
@@ -10,8 +13,6 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
-  User,
-  Users,
   Paperclip,
   MessageSquare,
   ExternalLink,
@@ -24,18 +25,17 @@ import {
   Trash2,
   MoreHorizontal,
   Copy,
-  Flag,
 } from 'lucide-react';
-import { format, differenceInDays, startOfDay, subDays, addDays } from 'date-fns';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Dropdown, DropdownItem } from '@/components/ui/Dropdown';
+import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
+import { FILING_DEFINITIONS } from '@/lib/compliance/complianceRules';
+import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
 import type { FilingType, FilingStatus } from '@/types';
-import { FILING_TYPE_LABELS } from '@/lib/constants';
-import { FILING_DEFINITIONS } from '@/lib/compliance/complianceRules';
 
 // ============================================================================
 // MOCK DATA
@@ -377,7 +377,7 @@ function getPriorityConfig(priority: 'CRITICAL' | 'HIGH' | 'MEDIUM' | 'LOW'): { 
 }
 
 function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) {return '0 B';}
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -391,7 +391,7 @@ function formatFileSize(bytes: number): string {
 export default function FilingDetailPage() {
   const params = useParams();
   const router = useRouter();
-  const filingId = params.id as string;
+  const filingId = params['id'] as string;
 
   const [activeTab, setActiveTab] = useState<'overview' | 'documents' | 'comments' | 'checklist' | 'history'>('overview');
   const [newComment, setNewComment] = useState('');

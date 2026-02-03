@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+
 import {
   Search,
   Filter,
@@ -21,15 +22,17 @@ import {
   X,
   Download,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/Card';
+
+import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
-import { Avatar } from '@/components/ui/Avatar';
 import { cn, formatRelativeTime } from '@/lib/utils';
+
+import { AddContactForm } from './AddContactForm';
 import { ContactCard } from './ContactCard';
 import { ContactDetailModal } from './ContactDetailModal';
-import { AddContactForm } from './AddContactForm';
 import {
   mockContacts,
   mockCompanies,
@@ -57,16 +60,16 @@ function getCategoryColor(category: ContactCategory): string {
 }
 
 function getRelationshipColor(score: number): string {
-  if (score >= 80) return 'text-green-600';
-  if (score >= 60) return 'text-amber-600';
-  if (score >= 40) return 'text-orange-600';
+  if (score >= 80) {return 'text-green-600';}
+  if (score >= 60) {return 'text-amber-600';}
+  if (score >= 40) {return 'text-orange-600';}
   return 'text-red-600';
 }
 
 function getRelationshipBgColor(score: number): string {
-  if (score >= 80) return 'bg-green-500';
-  if (score >= 60) return 'bg-amber-500';
-  if (score >= 40) return 'bg-orange-500';
+  if (score >= 80) {return 'bg-green-500';}
+  if (score >= 60) {return 'bg-amber-500';}
+  if (score >= 40) {return 'bg-orange-500';}
   return 'bg-red-500';
 }
 

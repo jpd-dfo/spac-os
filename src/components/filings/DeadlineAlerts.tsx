@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+
+import { format, differenceInDays, startOfDay, addDays, isBefore, isAfter } from 'date-fns';
 import {
   AlertTriangle,
   Bell,
@@ -16,13 +18,13 @@ import {
   AlertCircle,
   Timer,
 } from 'lucide-react';
-import { format, differenceInDays, startOfDay, addDays, isBefore, isAfter } from 'date-fns';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn, formatDate } from '@/lib/utils';
 import type { FilingType, FilingStatus } from '@/types';
-import { FILING_TYPE_LABELS } from '@/lib/constants';
 
 // ============================================================================
 // TYPES
@@ -133,11 +135,11 @@ function calculateAlertType(dueDate: Date, status: FilingStatus): DeadlineAlert[
   const due = startOfDay(dueDate);
   const days = differenceInDays(due, today);
 
-  if (days < 0) return 'OVERDUE';
-  if (days <= 3) return '3_DAYS';
-  if (days <= 7) return '7_DAYS';
-  if (days <= 14) return '14_DAYS';
-  if (days <= 30) return '30_DAYS';
+  if (days < 0) {return 'OVERDUE';}
+  if (days <= 3) {return '3_DAYS';}
+  if (days <= 7) {return '7_DAYS';}
+  if (days <= 14) {return '14_DAYS';}
+  if (days <= 30) {return '30_DAYS';}
   return null;
 }
 

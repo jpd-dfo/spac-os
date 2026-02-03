@@ -1,13 +1,15 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+
 import { Plus, ChevronDown, ChevronRight, MoreVertical, Settings, Archive } from 'lucide-react';
+
 import { Badge } from '@/components/ui/Badge';
 import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { TARGET_STATUS_LABELS } from '@/lib/constants';
 import { cn, formatLargeNumber } from '@/lib/utils';
 import type { TargetStatus } from '@/types';
-import { TARGET_STATUS_LABELS } from '@/lib/constants';
 
 // ============================================================================
 // Types
@@ -66,10 +68,10 @@ interface DefaultTargetCardProps {
 
 function DefaultTargetCard({ target, onClick, onDragStart }: DefaultTargetCardProps) {
   const scoreColor = useMemo(() => {
-    if (target.overallScore === null) return 'bg-slate-100 text-slate-500';
-    if (target.overallScore >= 80) return 'bg-success-100 text-success-700';
-    if (target.overallScore >= 60) return 'bg-primary-100 text-primary-700';
-    if (target.overallScore >= 40) return 'bg-warning-100 text-warning-700';
+    if (target.overallScore === null) {return 'bg-slate-100 text-slate-500';}
+    if (target.overallScore >= 80) {return 'bg-success-100 text-success-700';}
+    if (target.overallScore >= 60) {return 'bg-primary-100 text-primary-700';}
+    if (target.overallScore >= 40) {return 'bg-warning-100 text-warning-700';}
     return 'bg-danger-100 text-danger-700';
   }, [target.overallScore]);
 

@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+
+import { TrendingDown, Info, AlertTriangle, ChevronDown, Settings } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -15,10 +17,10 @@ import {
   ComposedChart,
   Line,
 } from 'recharts';
-import { TrendingDown, Info, AlertTriangle, ChevronDown, Settings } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { Tooltip as UITooltip } from '@/components/ui/Tooltip';
 import { cn, formatPercent, formatLargeNumber } from '@/lib/utils';
 
@@ -118,9 +120,10 @@ interface CustomTooltipProps {
 }
 
 function CustomTooltip({ active, payload }: CustomTooltipProps) {
-  if (!active || !payload || !payload.length) return null;
+  const firstPayload = payload?.[0];
+  if (!active || !firstPayload) { return null; }
 
-  const data = payload[0].payload;
+  const data = firstPayload.payload;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">

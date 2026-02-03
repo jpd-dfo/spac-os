@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   X,
   Building2,
@@ -30,12 +31,14 @@ import {
   Shield,
   Activity,
 } from 'lucide-react';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
+
 import { Avatar, AvatarGroup } from '@/components/ui/Avatar';
-import { Tooltip } from '@/components/ui/Tooltip';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
 import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
+import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Tooltip } from '@/components/ui/Tooltip';
+import { TARGET_STATUS_LABELS, DEAL_STAGE_LABELS, TASK_PRIORITY_LABELS } from '@/lib/constants';
 import {
   cn,
   formatLargeNumber,
@@ -44,7 +47,7 @@ import {
   formatPercent,
   formatMultiple,
 } from '@/lib/utils';
-import { TARGET_STATUS_LABELS, DEAL_STAGE_LABELS, TASK_PRIORITY_LABELS } from '@/lib/constants';
+
 import type { Deal, DealActivity, DueDiligenceItem, QuickActionType } from './types';
 
 // ============================================================================
@@ -76,12 +79,12 @@ interface ScoreDisplayProps {
 }
 
 function ScoreDisplay({ label, score, icon }: ScoreDisplayProps) {
-  if (score === undefined) return null;
+  if (score === undefined) {return null;}
 
   const getColor = (value: number) => {
-    if (value >= 80) return 'text-success-600 bg-success-100';
-    if (value >= 60) return 'text-primary-600 bg-primary-100';
-    if (value >= 40) return 'text-warning-600 bg-warning-100';
+    if (value >= 80) {return 'text-success-600 bg-success-100';}
+    if (value >= 60) {return 'text-primary-600 bg-primary-100';}
+    if (value >= 40) {return 'text-warning-600 bg-warning-100';}
     return 'text-danger-600 bg-danger-100';
   };
 
@@ -614,7 +617,7 @@ export function DealDetailModal({
 }: DealDetailModalProps) {
   const [activeTab, setActiveTab] = useState<TabType>('overview');
 
-  if (!deal) return null;
+  if (!deal) {return null;}
 
   const tabs: { key: TabType; label: string; icon: React.ReactNode }[] = [
     { key: 'overview', label: 'Overview', icon: <Building2 className="h-4 w-4" /> },
@@ -700,7 +703,7 @@ export function DealDetailModal({
             <DropdownItem
               icon={<Trash2 className="h-4 w-4" />}
               onClick={() => onDelete?.(deal)}
-              danger
+              variant="danger"
             >
               Delete Deal
             </DropdownItem>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+
 import {
   Building2,
   TrendingUp,
@@ -18,9 +19,10 @@ import {
   Tooltip,
   ResponsiveContainer,
 } from 'recharts';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { LoadingSpinner } from '@/components/ui/LoadingSpinner';
 import { cn, formatCurrency, formatLargeNumber, formatDate, formatPercent } from '@/lib/utils';
 
@@ -150,11 +152,13 @@ function MiniTrustChart({ data }: MiniChartProps) {
 
   const CustomTooltip = ({ active, payload }: { active?: boolean; payload?: Array<{ value: number; payload: TrustBalanceHistory }> }) => {
     if (active && payload && payload.length) {
+      const firstPayload = payload[0];
+      if (!firstPayload) {return null;}
       return (
         <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 shadow-lg">
-          <p className="text-xs text-slate-500">{payload[0].payload.date}</p>
+          <p className="text-xs text-slate-500">{firstPayload.payload.date}</p>
           <p className="text-sm font-semibold text-slate-900">
-            {formatLargeNumber(payload[0].value)}
+            {formatLargeNumber(firstPayload.value)}
           </p>
         </div>
       );
@@ -243,13 +247,13 @@ export function TrustAccountWidget({
 
   // Calculate daily interest rate
   const dailyInterestRate = useMemo(() => {
-    if (!data?.interestRate) return 0;
+    if (!data?.interestRate) {return 0;}
     return data.interestRate / 365;
   }, [data?.interestRate]);
 
   // Calculate real-time accrued interest
   const calculateRealTimeInterest = useCallback(() => {
-    if (!data || !showInterestAccrual) return 0;
+    if (!data || !showInterestAccrual) {return 0;}
 
     const lastInterestDate = new Date(data.lastInterestDate);
     const now = new Date();
@@ -263,7 +267,7 @@ export function TrustAccountWidget({
 
   // Update real-time interest every second when showing accrual
   useEffect(() => {
-    if (!showInterestAccrual || !data) return;
+    if (!showInterestAccrual || !data) {return;}
 
     const updateInterest = () => {
       setRealTimeInterest(calculateRealTimeInterest());
@@ -278,7 +282,7 @@ export function TrustAccountWidget({
 
   // Auto-refresh data
   useEffect(() => {
-    if (!autoRefreshInterval || !onRefresh) return;
+    if (!autoRefreshInterval || !onRefresh) {return;}
 
     const intervalId = setInterval(onRefresh, autoRefreshInterval);
     return () => clearInterval(intervalId);
@@ -286,7 +290,7 @@ export function TrustAccountWidget({
 
   // Calculate derived values
   const calculations = useMemo(() => {
-    if (!data) return null;
+    if (!data) {return null;}
 
     const totalTrustValue = data.currentTrustValue + realTimeInterest;
     const pricePerShare = totalTrustValue / data.sharesOutstanding;

@@ -3,12 +3,14 @@
  * Handles bulk operations across multiple entities
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
+
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
-import { authOptions } from '@/lib/auth';
 import { z } from 'zod';
+
+import { authOptions } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { prisma } from '@/lib/prisma';
 
 const BatchOperationSchema = z.object({
   organizationId: z.string().uuid(),
@@ -163,6 +165,7 @@ export async function POST(request: NextRequest) {
       data: {
         action: 'BATCH_OPERATION',
         entityType: 'Batch',
+        entityId: params.organizationId, // Use organizationId as entity reference for batch ops
         userId: session.user.id,
         organizationId: params.organizationId,
         metadata: {
@@ -202,9 +205,9 @@ async function handleCreate(
   switch (entityType) {
     case 'task':
       // Verify SPAC belongs to organization
-      if (data.spacId) {
+      if (data['spacId']) {
         const spac = await prisma.spac.findFirst({
-          where: { id: data.spacId, organizationId },
+          where: { id: data['spacId'], organizationId },
         });
         if (!spac) {
           return { id: '', success: false, entityType, error: 'Invalid spacId' };
@@ -213,25 +216,25 @@ async function handleCreate(
       entity = await prisma.task.create({
         data: {
           ...data,
-          createdById: userId,
-        },
+          creatorId: userId,
+        } as any,
       });
       break;
 
     case 'milestone':
-      if (data.spacId) {
+      if (data['spacId']) {
         const spac = await prisma.spac.findFirst({
-          where: { id: data.spacId, organizationId },
+          where: { id: data['spacId'], organizationId },
         });
         if (!spac) {
           return { id: '', success: false, entityType, error: 'Invalid spacId' };
         }
       }
-      entity = await prisma.milestone.create({ data });
+      entity = await prisma.milestone.create({ data: data as any });
       break;
 
     case 'contact':
-      entity = await prisma.contact.create({ data });
+      entity = await prisma.contact.create({ data: data as any });
       break;
 
     default:
@@ -254,7 +257,7 @@ async function handleUpdate(
   let entity: any;
 
   switch (entityType) {
-    case 'task':
+    case 'task': {
       const task = await prisma.task.findFirst({
         where: { id: entityId, spac: { organizationId } },
       });
@@ -266,8 +269,9 @@ async function handleUpdate(
         data,
       });
       break;
+    }
 
-    case 'target':
+    case 'target': {
       const target = await prisma.target.findFirst({
         where: { id: entityId, spac: { organizationId } },
       });
@@ -279,8 +283,9 @@ async function handleUpdate(
         data,
       });
       break;
+    }
 
-    case 'milestone':
+    case 'milestone': {
       const milestone = await prisma.milestone.findFirst({
         where: { id: entityId, spac: { organizationId } },
       });
@@ -292,8 +297,9 @@ async function handleUpdate(
         data,
       });
       break;
+    }
 
-    case 'document':
+    case 'document': {
       const document = await prisma.document.findFirst({
         where: { id: entityId, spac: { organizationId } },
       });
@@ -305,6 +311,7 @@ async function handleUpdate(
         data,
       });
       break;
+    }
 
     default:
       return { id: '', success: false, entityType, entityId, error: 'Update not supported for this entity' };
@@ -323,7 +330,7 @@ async function handleDelete(
   userId: string
 ): Promise<BatchResult> {
   switch (entityType) {
-    case 'task':
+    case 'task': {
       const task = await prisma.task.findFirst({
         where: { id: entityId, spac: { organizationId } },
       });
@@ -332,11 +339,12 @@ async function handleDelete(
       }
       await prisma.task.update({
         where: { id: entityId },
-        data: { deletedAt: new Date(), deletedById: userId },
+        data: { deletedAt: new Date() },
       });
       break;
+    }
 
-    case 'target':
+    case 'target': {
       const target = await prisma.target.findFirst({
         where: { id: entityId, spac: { organizationId } },
       });
@@ -345,11 +353,12 @@ async function handleDelete(
       }
       await prisma.target.update({
         where: { id: entityId },
-        data: { deletedAt: new Date(), deletedById: userId },
+        data: { deletedAt: new Date(),  },
       });
       break;
+    }
 
-    case 'document':
+    case 'document': {
       const document = await prisma.document.findFirst({
         where: { id: entityId, spac: { organizationId } },
       });
@@ -358,11 +367,12 @@ async function handleDelete(
       }
       await prisma.document.update({
         where: { id: entityId },
-        data: { deletedAt: new Date(), deletedById: userId },
+        data: { deletedAt: new Date(),  },
       });
       break;
+    }
 
-    case 'milestone':
+    case 'milestone': {
       const milestone = await prisma.milestone.findFirst({
         where: { id: entityId, spac: { organizationId } },
       });
@@ -371,6 +381,7 @@ async function handleDelete(
       }
       await prisma.milestone.delete({ where: { id: entityId } });
       break;
+    }
 
     default:
       return { id: '', success: false, entityType, entityId, error: 'Delete not supported for this entity' };

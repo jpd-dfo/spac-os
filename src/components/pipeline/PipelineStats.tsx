@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+
 import {
   TrendingUp,
   TrendingDown,
@@ -13,10 +14,12 @@ import {
   DollarSign,
   Percent,
 } from 'lucide-react';
-import { Card, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
+import { Card, CardContent } from '@/components/ui/Card';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn, formatLargeNumber } from '@/lib/utils';
+
 import type { Target as TargetType, PipelineStage } from './TargetCard';
 
 // ============================================================================
@@ -174,12 +177,15 @@ function ConversionFunnel({ stageStats }: ConversionFunnelProps) {
   const conversionRates: { from: string; to: string; rate: number }[] = [];
 
   for (let i = 0; i < stageStats.length - 1; i++) {
-    const fromCount = stageStats[i].count;
-    const toCount = stageStats[i + 1].count;
+    const currentStage = stageStats[i];
+    const nextStage = stageStats[i + 1];
+    if (!currentStage || !nextStage) {continue;}
+    const fromCount = currentStage.count;
+    const toCount = nextStage.count;
     if (fromCount > 0) {
       conversionRates.push({
-        from: stageStats[i].label,
-        to: stageStats[i + 1].label,
+        from: currentStage.label,
+        to: nextStage.label,
         rate: Math.round((toCount / fromCount) * 100),
       });
     }

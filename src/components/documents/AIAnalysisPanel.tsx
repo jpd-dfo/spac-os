@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
 import {
   X,
   Sparkles,
@@ -19,9 +20,11 @@ import {
   Clock,
   BookOpen,
 } from 'lucide-react';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { cn, formatDate } from '@/lib/utils';
+
 import type { DocumentData } from './DocumentCard';
 
 interface AIAnalysis {
@@ -186,6 +189,7 @@ export function AIAnalysisPanel({ document, isOpen, onClose }: AIAnalysisPanelPr
       }, 2000);
       return () => clearTimeout(timer);
     }
+    return undefined;
   }, [isOpen]);
 
   const toggleSection = (section: string) => {
@@ -224,7 +228,7 @@ export function AIAnalysisPanel({ document, isOpen, onClose }: AIAnalysisPanelPr
     low: 'secondary',
   } as const;
 
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   return (
     <div className="fixed inset-y-0 right-0 z-50 w-[500px] border-l border-slate-200 bg-white shadow-xl">

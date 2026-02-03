@@ -1,6 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+
+import Link from 'next/link';
+
 import { useUser } from '@clerk/nextjs';
 import {
   User,
@@ -11,13 +14,12 @@ import {
   Check,
   ArrowLeft,
 } from 'lucide-react';
-import Link from 'next/link';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
+
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
-import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
 
 interface ProfileFormData {
   displayName: string;
@@ -52,7 +54,7 @@ export default function ProfileSettingsPage() {
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         email: user.primaryEmailAddress?.emailAddress || '',
-        jobTitle: (user.publicMetadata?.jobTitle as string) || '',
+        jobTitle: (user.publicMetadata?.['jobTitle'] as string) || '',
         phoneNumber: user.primaryPhoneNumber?.phoneNumber || '',
       });
     }
@@ -84,7 +86,7 @@ export default function ProfileSettingsPage() {
   };
 
   const handleSave = async () => {
-    if (!validateForm()) return;
+    if (!validateForm()) {return;}
 
     setIsSaving(true);
     try {
@@ -115,7 +117,7 @@ export default function ProfileSettingsPage() {
         firstName: user.firstName || '',
         lastName: user.lastName || '',
         email: user.primaryEmailAddress?.emailAddress || '',
-        jobTitle: (user.publicMetadata?.jobTitle as string) || '',
+        jobTitle: (user.publicMetadata?.['jobTitle'] as string) || '',
         phoneNumber: user.primaryPhoneNumber?.phoneNumber || '',
       });
     }

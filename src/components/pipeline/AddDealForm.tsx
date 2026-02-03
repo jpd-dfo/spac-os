@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+
 import {
   Building2,
   Globe,
@@ -15,16 +15,22 @@ import {
   AlertCircle,
   Info,
 } from 'lucide-react';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { useForm, Controller } from 'react-hook-form';
+
+import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
+import { Modal, ModalFooter, ModalHeader, ModalTitle } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { Badge } from '@/components/ui/Badge';
-import { cn } from '@/lib/utils';
 import { SECTORS } from '@/lib/constants';
-import type { Deal, PipelineStage, DealAssignee } from './types';
+import { cn } from '@/lib/utils';
+import { type DealStage, type TargetStatus, type TaskPriority } from '@/types';
+
 import { DEFAULT_PIPELINE_STAGES } from './types';
-import { DealStage, TargetStatus, TaskPriority } from '@/types';
+
+import type { Deal, PipelineStage, DealAssignee } from './types';
+
+
 
 // ============================================================================
 // Types
@@ -362,15 +368,17 @@ export function AddDealForm({
 
   const handleNextStep = () => {
     const currentIndex = steps.findIndex((s) => s.key === currentStep);
-    if (currentIndex < steps.length - 1) {
-      handleStepChange(steps[currentIndex + 1].key);
+    const nextStep = steps[currentIndex + 1];
+    if (currentIndex < steps.length - 1 && nextStep) {
+      handleStepChange(nextStep.key);
     }
   };
 
   const handlePrevStep = () => {
     const currentIndex = steps.findIndex((s) => s.key === currentStep);
-    if (currentIndex > 0) {
-      handleStepChange(steps[currentIndex - 1].key);
+    const prevStep = steps[currentIndex - 1];
+    if (currentIndex > 0 && prevStep) {
+      handleStepChange(prevStep.key);
     }
   };
 
@@ -413,10 +421,12 @@ export function AddDealForm({
     <Modal
       isOpen={isOpen}
       onClose={handleClose}
-      title={isEditing ? 'Edit Deal' : 'Add New Deal'}
-      description={isEditing ? 'Update deal information' : 'Enter the target company details'}
       size="full"
     >
+      <ModalHeader>
+        <ModalTitle>{isEditing ? 'Edit Deal' : 'Add New Deal'}</ModalTitle>
+        <p className="mt-1 text-sm text-slate-500">{isEditing ? 'Update deal information' : 'Enter the target company details'}</p>
+      </ModalHeader>
       <form onSubmit={handleSubmit(onFormSubmit)} className="space-y-6">
         {/* Step Indicator */}
         <StepIndicator
@@ -588,9 +598,9 @@ export function AddDealForm({
                       {...register('leadAssigneeId')}
                     />
                     <div className="space-y-2">
-                      <label className="block text-sm font-medium text-slate-700">
+                      <span className="block text-sm font-medium text-slate-700">
                         Team Members
-                      </label>
+                      </span>
                       <div className="grid gap-2 sm:grid-cols-2">
                         {availableAssignees.map((assignee) => (
                           <Controller
@@ -599,6 +609,8 @@ export function AddDealForm({
                             control={control}
                             render={({ field }) => (
                               <label
+                                htmlFor={`assignee-${assignee.id}`}
+                                aria-label={`Select ${assignee.name}`}
                                 className={cn(
                                   'flex cursor-pointer items-center gap-3 rounded-lg border p-3 transition-colors',
                                   field.value?.includes(assignee.id)
@@ -607,6 +619,7 @@ export function AddDealForm({
                                 )}
                               >
                                 <input
+                                  id={`assignee-${assignee.id}`}
                                   type="checkbox"
                                   checked={field.value?.includes(assignee.id)}
                                   onChange={(e) => {
@@ -620,12 +633,12 @@ export function AddDealForm({
                                   }}
                                   className="rounded border-slate-300 text-primary-600 focus:ring-primary-500"
                                 />
-                                <div>
-                                  <p className="text-sm font-medium text-slate-900">
+                                <span>
+                                  <span className="block text-sm font-medium text-slate-900">
                                     {assignee.name}
-                                  </p>
-                                  <p className="text-xs text-slate-500">{assignee.email}</p>
-                                </div>
+                                  </span>
+                                  <span className="block text-xs text-slate-500">{assignee.email}</span>
+                                </span>
                               </label>
                             )}
                           />

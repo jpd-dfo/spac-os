@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+
 import {
   Sparkles,
   AlertTriangle,
@@ -16,9 +17,10 @@ import {
   XCircle,
   Clock,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatRelativeTime } from '@/lib/utils';
 
 // ============================================================================
@@ -443,7 +445,7 @@ export function AIInsightsWidget({
   }, [data?.insights]);
 
   const sortedInsights = useMemo(() => {
-    if (!data?.insights) return [];
+    if (!data?.insights) {return [];}
     return [...data.insights]
       .sort((a, b) => {
         // Sort by status (NEW first), then priority, then timestamp
@@ -451,10 +453,10 @@ export function AIInsightsWidget({
         const priorityOrder = { CRITICAL: 0, HIGH: 1, MEDIUM: 2, LOW: 3 };
 
         const statusDiff = statusPriority[a.status] - statusPriority[b.status];
-        if (statusDiff !== 0) return statusDiff;
+        if (statusDiff !== 0) {return statusDiff;}
 
         const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-        if (priorityDiff !== 0) return priorityDiff;
+        if (priorityDiff !== 0) {return priorityDiff;}
 
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
       })

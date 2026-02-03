@@ -1,6 +1,21 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+
+import {
+  format,
+  differenceInDays,
+  startOfDay,
+  addMonths,
+  subMonths,
+  isBefore,
+  isAfter,
+  isSameMonth,
+  startOfMonth,
+  endOfMonth,
+  eachMonthOfInterval,
+  isSameDay,
+} from 'date-fns';
 import {
   Calendar,
   FileText,
@@ -20,26 +35,13 @@ import {
   Vote,
   Building2,
 } from 'lucide-react';
-import {
-  format,
-  differenceInDays,
-  startOfDay,
-  addMonths,
-  subMonths,
-  isBefore,
-  isAfter,
-  isSameMonth,
-  startOfMonth,
-  endOfMonth,
-  eachMonthOfInterval,
-  isSameDay,
-} from 'date-fns';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { FILING_TYPE_LABELS, SPAC_PHASE_LABELS } from '@/lib/constants';
 import { cn, formatDate } from '@/lib/utils';
 import type { FilingType, FilingStatus, SPACPhase } from '@/types';
-import { FILING_TYPE_LABELS, SPAC_PHASE_LABELS } from '@/lib/constants';
 
 // ============================================================================
 // TYPES
@@ -106,21 +108,21 @@ function getFilingTypeColor(type: FilingType): string {
     SUPER_8K: 'border-red-500 bg-red-50',
     OTHER: 'border-slate-500 bg-slate-50',
   };
-  return colors[type] || colors.OTHER;
+  return colors[type] ?? 'border-slate-500 bg-slate-50';
 }
 
 function getMilestoneIcon(phase: SPACPhase) {
   const icons: Record<string, React.ElementType> = {
-    FORMATION: Building2,
-    IPO: Rocket,
-    TARGET_SEARCH: Target,
-    DUE_DILIGENCE: FileText,
-    NEGOTIATION: Users,
-    DEFINITIVE_AGREEMENT: CheckCircle2,
+    SEARCHING: Target,
+    LOI_SIGNED: FileText,
+    DA_ANNOUNCED: CheckCircle2,
     SEC_REVIEW: AlertTriangle,
     SHAREHOLDER_VOTE: Vote,
     CLOSING: Flag,
-    DE_SPAC: TrendingUp,
+    COMPLETED: TrendingUp,
+    LIQUIDATING: Clock,
+    LIQUIDATED: Building2,
+    TERMINATED: AlertTriangle,
   };
   return icons[phase] || Flag;
 }
@@ -187,7 +189,7 @@ export function FilingTimeline({
 
   // Filter milestones
   const filteredMilestones = useMemo(() => {
-    if (!showMilestones) return [];
+    if (!showMilestones) {return [];}
     return milestones.filter((milestone) =>
       isAfter(milestone.date, viewRange.start) &&
       isBefore(milestone.date, viewRange.end)

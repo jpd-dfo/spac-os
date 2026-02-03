@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+
+import { TrendingUp, Filter, ChevronDown, Target } from 'lucide-react';
 import {
   BarChart,
   Bar,
@@ -17,12 +19,12 @@ import {
   Pie,
   Legend,
 } from 'recharts';
-import { TrendingUp, Filter, ChevronDown, Target } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { cn, formatLargeNumber } from '@/lib/utils';
+import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
 import { DEAL_STAGE_LABELS } from '@/lib/constants';
+import { cn, formatLargeNumber } from '@/lib/utils';
 
 // ============================================================================
 // TYPES
@@ -106,9 +108,12 @@ interface CustomTooltipProps {
 }
 
 function CustomTooltip({ active, payload, showValue }: CustomTooltipProps) {
-  if (!active || !payload || !payload.length) return null;
+  if (!active || !payload || !payload.length) {return null;}
 
-  const data = payload[0].payload;
+  const firstPayload = payload[0];
+  if (!firstPayload) {return null;}
+
+  const data = firstPayload.payload;
 
   return (
     <div className="rounded-lg border border-slate-200 bg-white p-3 shadow-lg">
@@ -181,7 +186,8 @@ export function PipelineChart({
     // Calculate conversion rates
     if (showConversionRates) {
       return activeData.map((item, index) => {
-        const prevCount = index === 0 ? item.count : activeData[index - 1].count;
+        const prevItem = activeData[index - 1];
+        const prevCount = index === 0 ? item.count : (prevItem?.count ?? item.count);
         const conversionRate = prevCount > 0 ? (item.count / prevCount) * 100 : 0;
         return {
           ...item,
@@ -465,7 +471,7 @@ export function PipelineCompact({ data, className }: PipelineCompactProps) {
         <div className="flex h-4 overflow-hidden rounded-full">
           {activeData.map((stage) => {
             const width = total > 0 ? (stage.count / total) * 100 : 0;
-            if (width === 0) return null;
+            if (width === 0) {return null;}
             return (
               <div
                 key={stage.stage}

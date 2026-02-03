@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useMemo } from 'react';
+
 import {
   Building2,
   Clock,
@@ -12,8 +13,9 @@ import {
   Flag,
   ChevronRight,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatDate, daysUntil } from '@/lib/utils';
 
 // ============================================================================
@@ -416,7 +418,7 @@ export function SpacStatusCard({
   }, []);
 
   const currentPhaseConfig = useMemo(() => {
-    if (!data) return null;
+    if (!data) {return null;}
     return phaseConfig[data.currentPhase];
   }, [data]);
 

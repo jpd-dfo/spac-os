@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo } from 'react';
+
 import {
   Calendar,
   Clock,
@@ -12,9 +13,10 @@ import {
   ExternalLink,
   Bell,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatDate, daysUntil } from '@/lib/utils';
 
 // ============================================================================
@@ -363,14 +365,14 @@ export function ComplianceCalendarWidget({
 }: ComplianceCalendarWidgetProps) {
   // Sort deadlines by due date, prioritizing overdue and due soon
   const sortedDeadlines = useMemo(() => {
-    if (!data?.deadlines) return [];
+    if (!data?.deadlines) {return [];}
     return [...data.deadlines]
       .filter(d => d.status !== 'COMPLETED')
       .sort((a, b) => {
         // Overdue first, then due soon, then by date
         const statusPriority = { OVERDUE: 0, DUE_SOON: 1, ON_TRACK: 2, COMPLETED: 3 };
         const statusDiff = statusPriority[a.status] - statusPriority[b.status];
-        if (statusDiff !== 0) return statusDiff;
+        if (statusDiff !== 0) {return statusDiff;}
         return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
       })
       .slice(0, 5);

@@ -1,6 +1,8 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+
+import { format, differenceInBusinessDays, addBusinessDays, isBefore, startOfDay } from 'date-fns';
 import {
   MessageSquare,
   AlertTriangle,
@@ -19,13 +21,13 @@ import {
   User,
   AlertCircle,
 } from 'lucide-react';
-import { format, differenceInBusinessDays, addBusinessDays, isBefore, startOfDay } from 'date-fns';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn, formatDate } from '@/lib/utils';
 import type { FilingType } from '@/types';
-import { FILING_TYPE_LABELS } from '@/lib/constants';
 
 // ============================================================================
 // TYPES
@@ -186,7 +188,7 @@ export function CommentLetterTracker({
 
   // Filter letters
   const filteredLetters = useMemo(() => {
-    if (filterStatus === 'all') return commentLetters;
+    if (filterStatus === 'all') {return commentLetters;}
     return commentLetters.filter((letter) => letter.status === filterStatus);
   }, [commentLetters, filterStatus]);
 

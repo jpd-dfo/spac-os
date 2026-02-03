@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useCallback } from 'react';
+
 import {
   Upload,
   X,
@@ -15,9 +16,10 @@ import {
   Tag,
   ChevronDown,
 } from 'lucide-react';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
-import { Button } from '@/components/ui/Button';
+
 import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Modal, ModalHeader, ModalTitle, ModalFooter } from '@/components/ui/Modal';
 import { cn, formatFileSize } from '@/lib/utils';
 
 interface UploadFile {
@@ -143,7 +145,7 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
   };
 
   const handleUpload = async () => {
-    if (files.length === 0 || !selectedCategory) return;
+    if (files.length === 0 || !selectedCategory) {return;}
 
     setIsUploading(true);
 
@@ -201,10 +203,12 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
     <Modal
       isOpen={isOpen}
       onClose={onClose}
-      title="Upload Documents"
-      description="Upload one or more documents to the repository"
       size="full"
     >
+      <ModalHeader>
+        <ModalTitle>Upload Documents</ModalTitle>
+        <p className="mt-1 text-sm text-slate-500">Upload one or more documents to the repository</p>
+      </ModalHeader>
       <div className="space-y-6">
         {/* Drop Zone */}
         <div
@@ -310,9 +314,9 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
         <div className="grid gap-4 sm:grid-cols-2">
           {/* Category */}
           <div className="relative">
-            <label className="block text-sm font-medium text-slate-700">
+            <span className="block text-sm font-medium text-slate-700">
               Category <span className="text-danger-500">*</span>
-            </label>
+            </span>
             <button
               type="button"
               onClick={() => setShowCategoryDropdown(!showCategoryDropdown)}
@@ -350,8 +354,9 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
 
           {/* Subcategory */}
           <div>
-            <label className="block text-sm font-medium text-slate-700">Subcategory</label>
+            <label htmlFor="subcategory-select" className="block text-sm font-medium text-slate-700">Subcategory</label>
             <select
+              id="subcategory-select"
               value={selectedSubcategory}
               onChange={(e) => setSelectedSubcategory(e.target.value)}
               disabled={!selectedCategory}
@@ -369,7 +374,7 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
 
         {/* Tags */}
         <div>
-          <label className="block text-sm font-medium text-slate-700">Tags</label>
+          <span className="block text-sm font-medium text-slate-700">Tags</span>
           <div className="mt-2 flex flex-wrap gap-2">
             {suggestedTags.slice(0, 12).map((tag) => (
               <button
@@ -418,8 +423,9 @@ export function UploadModal({ isOpen, onClose, onUpload }: UploadModalProps) {
 
         {/* Description */}
         <div>
-          <label className="block text-sm font-medium text-slate-700">Description</label>
+          <label htmlFor="description-textarea" className="block text-sm font-medium text-slate-700">Description</label>
           <textarea
+            id="description-textarea"
             value={description}
             onChange={(e) => setDescription(e.target.value)}
             placeholder="Add a description for these documents..."

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useRef, useEffect, useCallback } from 'react';
+
 import {
   ZoomIn,
   ZoomOut,
@@ -10,10 +11,12 @@ import {
   RefreshCw,
   Info,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
+
 import type { ExtendedContact, ContactCategory } from './mockContactsData';
 
 interface RelationshipGraphProps {
@@ -68,12 +71,16 @@ function generateLinks(contacts: ExtendedContact[]): Link[] {
   companyGroups.forEach((ids) => {
     for (let i = 0; i < ids.length; i++) {
       for (let j = i + 1; j < ids.length; j++) {
-        links.push({
-          source: ids[i],
-          target: ids[j],
-          strength: 0.8,
-          type: 'company',
-        });
+        const sourceId = ids[i];
+        const targetId = ids[j];
+        if (sourceId && targetId) {
+          links.push({
+            source: sourceId,
+            target: targetId,
+            strength: 0.8,
+            type: 'company',
+          });
+        }
       }
     }
   });
@@ -91,19 +98,23 @@ function generateLinks(contacts: ExtendedContact[]): Link[] {
   dealGroups.forEach((ids) => {
     for (let i = 0; i < ids.length; i++) {
       for (let j = i + 1; j < ids.length; j++) {
-        // Check if link already exists
-        const exists = links.some(
-          (l) =>
-            (l.source === ids[i] && l.target === ids[j]) ||
-            (l.source === ids[j] && l.target === ids[i])
-        );
-        if (!exists) {
-          links.push({
-            source: ids[i],
-            target: ids[j],
-            strength: 0.9,
-            type: 'deal',
-          });
+        const sourceId = ids[i];
+        const targetId = ids[j];
+        if (sourceId && targetId) {
+          // Check if link already exists
+          const exists = links.some(
+            (l) =>
+              (l.source === sourceId && l.target === targetId) ||
+              (l.source === targetId && l.target === sourceId)
+          );
+          if (!exists) {
+            links.push({
+              source: sourceId,
+              target: targetId,
+              strength: 0.9,
+              type: 'deal',
+            });
+          }
         }
       }
     }
@@ -202,7 +213,7 @@ export function RelationshipGraph({
 
   // Force simulation
   useEffect(() => {
-    if (nodes.length === 0) return;
+    if (nodes.length === 0) {return;}
 
     const simulate = () => {
       setNodes((currentNodes) => {
@@ -220,7 +231,7 @@ export function RelationshipGraph({
 
           // Repulsion between nodes
           newNodes.forEach((other) => {
-            if (node.id === other.id) return;
+            if (node.id === other.id) {return;}
             const ddx = node.x - other.x;
             const ddy = node.y - other.y;
             const dist = Math.sqrt(ddx * ddx + ddy * ddy) || 1;
@@ -237,7 +248,7 @@ export function RelationshipGraph({
         links.forEach((link) => {
           const source = newNodes.find((n) => n.id === link.source);
           const target = newNodes.find((n) => n.id === link.target);
-          if (!source || !target) return;
+          if (!source || !target) {return;}
 
           const dx = target.x - source.x;
           const dy = target.y - source.y;
@@ -281,10 +292,10 @@ export function RelationshipGraph({
   // Draw on canvas
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas) return;
+    if (!canvas) {return;}
 
     const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    if (!ctx) {return;}
 
     const width = canvas.width;
     const height = canvas.height;
@@ -307,11 +318,11 @@ export function RelationshipGraph({
 
     // Draw links
     links.forEach((link) => {
-      if (!visibleNodeIds.has(link.source) || !visibleNodeIds.has(link.target)) return;
+      if (!visibleNodeIds.has(link.source) || !visibleNodeIds.has(link.target)) {return;}
 
       const source = nodes.find((n) => n.id === link.source);
       const target = nodes.find((n) => n.id === link.target);
-      if (!source || !target) return;
+      if (!source || !target) {return;}
 
       const isHighlighted =
         highlightPath?.includes(link.source) && highlightPath?.includes(link.target);
@@ -446,7 +457,7 @@ export function RelationshipGraph({
   const handleMouseMove = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      if (!canvas) {return;}
 
       const rect = canvas.getBoundingClientRect();
       const x = (e.clientX - rect.left - pan.x) / zoom;
@@ -476,7 +487,7 @@ export function RelationshipGraph({
   const handleMouseDown = useCallback(
     (e: React.MouseEvent<HTMLCanvasElement>) => {
       const canvas = canvasRef.current;
-      if (!canvas) return;
+      if (!canvas) {return;}
 
       const rect = canvas.getBoundingClientRect();
 

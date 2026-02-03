@@ -1,12 +1,13 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useRouter, useParams } from 'next/navigation';
+
 import Link from 'next/link';
+import { useRouter, useParams } from 'next/navigation';
+
 import {
   ArrowLeft,
   Building2,
-  Calendar,
   Clock,
   DollarSign,
   Edit,
@@ -18,31 +19,26 @@ import {
   AlertTriangle,
   CheckCircle2,
   ExternalLink,
-  MoreHorizontal,
   Download,
   Eye,
-  Landmark,
   PiggyBank,
   BarChart3,
   Milestone,
   Circle,
-  User,
-  Mail,
-  Phone,
-  Briefcase,
   RefreshCw,
   AlertCircle,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Avatar, AvatarGroup } from '@/components/ui/Avatar';
-import { Tabs, TabsList, TabTrigger, TabContent } from '@/components/ui/Tabs';
-import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
-import { EmptyState } from '@/components/ui/EmptyState';
-import { PageLoader, LoadingSpinner } from '@/components/ui/LoadingSpinner';
-import { SpacStatusBadge } from '@/components/spacs';
+
 import { StatusTransition, type SpacStatus as StatusTransitionStatus } from '@/components/spac';
+import { SpacStatusBadge } from '@/components/spacs';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import { EmptyState } from '@/components/ui/EmptyState';
+import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
+import { Tabs, TabsList, TabTrigger, TabContent } from '@/components/ui/Tabs';
+import { TARGET_STATUS_LABELS } from '@/lib/constants';
+import { trpc } from '@/lib/trpc/client';
 import {
   formatLargeNumber,
   formatDate,
@@ -53,15 +49,6 @@ import {
   formatFileSize,
   cn,
 } from '@/lib/utils';
-import {
-  SPAC_PHASE_LABELS,
-  TARGET_STATUS_LABELS,
-  DOCUMENT_CATEGORY_LABELS,
-  FILING_TYPE_LABELS,
-  CONTACT_TYPE_LABELS,
-} from '@/lib/constants';
-import { trpc } from '@/lib/trpc/client';
-import type { SPACStatus, SPACPhase, DocumentCategory, FilingType, ContactType } from '@/types';
 
 // ============================================================================
 // TAB TYPES
@@ -298,15 +285,15 @@ function NotFoundState({ id }: { id: string }) {
 export default function SPACDetailPage() {
   const router = useRouter();
   const params = useParams();
-  const id = params.id as string;
-  const [activeTab, setActiveTab] = useState<TabType>('overview');
+  const id = params['id'] as string;
+  const [_activeTab, setActiveTab] = useState<TabType>('overview');
 
   // ============================================================================
   // DATA FETCHING - Connected to tRPC
   // ============================================================================
 
   const {
-    data: spac,
+    data: spacData,
     isLoading,
     isError,
     error,
@@ -319,6 +306,17 @@ export default function SPACDetailPage() {
     }
   );
 
+  // Type assertion for relations included by the router but not in base Prisma type
+  type SpacRelations = {
+    targets?: Array<{ id: string; name: string; status: string; enterpriseValue: number | null; evaluationScore: number | null; industry: string | null }>;
+    documents?: Array<{ id: string; name: string; status: string; fileUrl: string | null; createdAt: Date; category?: string | null; mimeType?: string | null; fileSize?: number | null; type?: string | null }>;
+    filings?: Array<{ id: string; formType: string; filedDate: Date; dueDate: Date | null; description: string | null; edgarUrl: string | null; status: string | null }>;
+    financials?: Array<{ id: string; type: string; period: string | null; periodEnd?: Date; revenue?: number | null; netIncome?: number | null; totalAssets?: number | null; totalLiabilities?: number | null; createdAt: Date; updatedAt: Date; data?: unknown }>;
+    tasks?: Array<{ id: string; dueDate: Date | null; createdAt: Date; status: string; title: string; description: string | null; priority?: string | null }>;
+    _count?: { documents?: number; financials?: number; targets?: number; filings?: number; tasks?: number; milestones?: number };
+  };
+  const spac = spacData as (typeof spacData & SpacRelations) | undefined;
+
   // ============================================================================
   // COMPUTED VALUES
   // ============================================================================
@@ -329,7 +327,7 @@ export default function SPACDetailPage() {
 
   // Convert trust amount from Decimal to number
   const trustBalance = useMemo(() => {
-    if (!spac?.trustAmount) return 0;
+    if (!spac?.trustAmount) {return 0;}
     return Number(spac.trustAmount);
   }, [spac?.trustAmount]);
 
@@ -347,7 +345,7 @@ export default function SPACDetailPage() {
       status: 'completed' | 'upcoming' | 'current';
     }> = [];
 
-    if (!spac) return events;
+    if (!spac) {return events;}
 
     // Add IPO date if available
     if (spac.ipoDate) {
@@ -362,8 +360,8 @@ export default function SPACDetailPage() {
     }
 
     // Add tasks as timeline events
-    if (spac.tasks) {
-      spac.tasks.forEach((task) => {
+    if ('tasks' in spac && spac.tasks) {
+      (spac.tasks as Array<{ id: string; dueDate: Date | null; createdAt: Date; status: string; title: string; description: string | null }>).forEach((task) => {
         const taskDate = task.dueDate ? new Date(task.dueDate) : new Date(task.createdAt);
         const isCompleted = task.status === 'COMPLETED';
         const isPast = taskDate < new Date();
@@ -430,9 +428,9 @@ export default function SPACDetailPage() {
   const tabs: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }[] = [
     { id: 'overview', label: 'Overview', icon: Building2 },
     { id: 'timeline', label: 'Timeline', icon: Milestone, count: timelineEvents.length },
-    { id: 'documents', label: 'Documents', icon: FileText, count: spac._count?.documents || 0 },
+    { id: 'documents', label: 'Documents', icon: FileText, count: spac?._count?.documents || 0 },
     { id: 'team', label: 'Team', icon: Users },
-    { id: 'financials', label: 'Financials', icon: DollarSign, count: spac._count?.financials || 0 },
+    { id: 'financials', label: 'Financials', icon: DollarSign, count: spac?._count?.financials || 0 },
   ];
 
   // ============================================================================
@@ -596,7 +594,7 @@ export default function SPACDetailPage() {
               <div>
                 <p className="text-sm text-slate-500">Active Targets</p>
                 <p className="text-xl font-bold text-slate-900">
-                  {spac._count?.targets || 0}
+                  {spac?._count?.targets || 0}
                 </p>
                 <p className="text-xs text-slate-500">
                   acquisition candidates
@@ -616,10 +614,10 @@ export default function SPACDetailPage() {
               <div>
                 <p className="text-sm text-slate-500">Documents</p>
                 <p className="text-xl font-bold text-slate-900">
-                  {spac._count?.documents || 0}
+                  {spac?._count?.documents || 0}
                 </p>
                 <p className="text-xs text-slate-500">
-                  {spac._count?.filings || 0} SEC filings
+                  {spac?._count?.filings || 0} SEC filings
                 </p>
               </div>
             </div>
@@ -758,7 +756,7 @@ export default function SPACDetailPage() {
                             </TableCell>
                             <TableCell>
                               <span className="text-sm text-slate-900">
-                                {target.valuation ? formatLargeNumber(Number(target.valuation)) : '-'}
+                                {target.enterpriseValue ? formatLargeNumber(Number(target.enterpriseValue)) : '-'}
                               </span>
                             </TableCell>
                           </TableRow>
@@ -820,25 +818,25 @@ export default function SPACDetailPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Targets</span>
                       <span className="font-medium text-slate-900">
-                        {spac._count?.targets || 0}
+                        {spac?._count?.targets || 0}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Documents</span>
                       <span className="font-medium text-slate-900">
-                        {spac._count?.documents || 0}
+                        {spac?._count?.documents || 0}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">SEC Filings</span>
                       <span className="font-medium text-slate-900">
-                        {spac._count?.filings || 0}
+                        {spac?._count?.filings || 0}
                       </span>
                     </div>
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-slate-500">Active Tasks</span>
                       <span className="font-medium text-slate-900">
-                        {spac._count?.tasks || 0}
+                        {spac?._count?.tasks || 0}
                       </span>
                     </div>
                   </div>
@@ -975,7 +973,7 @@ export default function SPACDetailPage() {
                           </div>
                         </TableCell>
                         <TableCell>
-                          {getTaskPriorityBadge(task.priority)}
+                          {getTaskPriorityBadge(task.priority || 'MEDIUM')}
                         </TableCell>
                         <TableCell>
                           {getTaskStatusBadge(task.status)}
@@ -1103,14 +1101,14 @@ export default function SPACDetailPage() {
                       {spac.filings.map((filing) => (
                         <TableRow key={filing.id}>
                           <TableCell>
-                            <span className="font-medium text-slate-900">{filing.formType}</span>
+                            <span className="font-medium text-slate-900">{filing.type}</span>
                           </TableCell>
                           <TableCell>
-                            {getDocumentStatusBadge(filing.status)}
+                            {getDocumentStatusBadge(filing.status || 'PENDING')}
                           </TableCell>
                           <TableCell>
                             <span className="text-sm text-slate-600">
-                              {formatDate(filing.filingDate) || '-'}
+                              {formatDate(filing.filedDate) || '-'}
                             </span>
                           </TableCell>
                           <TableCell>
@@ -1120,11 +1118,14 @@ export default function SPACDetailPage() {
                           </TableCell>
                           <TableCell>
                             {filing.edgarUrl && (
-                              <Button variant="ghost" size="icon-sm" asChild>
-                                <a href={filing.edgarUrl} target="_blank" rel="noopener noreferrer">
-                                  <ExternalLink className="h-4 w-4" />
-                                </a>
-                              </Button>
+                              <a
+                                href={filing.edgarUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center justify-center h-8 w-8 rounded-md text-slate-600 hover:bg-slate-100 hover:text-slate-900 transition-colors"
+                              >
+                                <ExternalLink className="h-4 w-4" />
+                              </a>
                             )}
                           </TableCell>
                         </TableRow>

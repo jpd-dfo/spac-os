@@ -1,34 +1,31 @@
 'use client';
 
 import { useState } from 'react';
+
 import Link from 'next/link';
+
 import {
   ArrowLeft,
   Users,
   UserPlus,
   Mail,
-  MoreHorizontal,
-  Shield,
-  Eye,
   Edit2,
-  Trash2,
   Search,
-  Filter,
   Clock,
   CheckCircle,
   XCircle,
-  Activity,
   AlertTriangle,
   Copy,
   RefreshCw,
   Download,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
+
 import { Badge } from '@/components/ui/Badge';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { Card, CardContent } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Modal, ModalHeader, ModalTitle, ModalDescription, ModalBody, ModalFooter } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
 import { cn } from '@/lib/utils';
 
 type UserRole = 'Admin' | 'Manager' | 'Analyst' | 'Viewer';
@@ -45,16 +42,6 @@ interface TeamMember {
   lastActive: string;
   joinedDate: string;
   department: string;
-}
-
-interface ActivityLogEntry {
-  id: string;
-  userId: string;
-  userName: string;
-  action: string;
-  target: string;
-  timestamp: string;
-  ip: string;
 }
 
 const mockTeamMembers: TeamMember[] = [
@@ -184,22 +171,23 @@ export default function TeamManagementPage() {
   const handleInvite = async () => {
     const errors: Record<string, string> = {};
     if (!inviteEmail.trim()) {
-      errors.email = 'Email is required';
+      errors['email'] = 'Email is required';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(inviteEmail)) {
-      errors.email = 'Invalid email format';
+      errors['email'] = 'Invalid email format';
     } else if (teamMembers.some((m) => m.email === inviteEmail)) {
-      errors.email = 'User already exists';
+      errors['email'] = 'User already exists';
     }
 
     setInviteErrors(errors);
-    if (Object.keys(errors).length > 0) return;
+    if (Object.keys(errors).length > 0) {return;}
 
     setIsInviting(true);
     await new Promise((resolve) => setTimeout(resolve, 1000));
 
+    const emailName = inviteEmail.split('@')[0] ?? '';
     const newMember: TeamMember = {
       id: Date.now().toString(),
-      name: inviteEmail.split('@')[0].replace('.', ' '),
+      name: emailName.replace('.', ' '),
       email: inviteEmail,
       role: inviteRole,
       status: 'pending',
@@ -225,7 +213,7 @@ export default function TeamManagementPage() {
   };
 
   const handleDeactivate = async () => {
-    if (!selectedMember) return;
+    if (!selectedMember) {return;}
 
     setTeamMembers(
       teamMembers.map((m) =>
@@ -524,103 +512,111 @@ export default function TeamManagementPage() {
           setInviteErrors({});
           setInviteLink('');
         }}
-        title="Invite Team Member"
-        description="Send an invitation to join your team"
         size="md"
       >
-        {inviteLink ? (
-          <div className="space-y-4">
-            <div className="rounded-lg bg-success-50 border border-success-200 p-4">
-              <div className="flex items-center gap-2 text-success-700">
-                <CheckCircle className="h-5 w-5" />
-                <span className="font-medium">Invitation sent successfully</span>
+        <ModalHeader>
+          <ModalTitle>Invite Team Member</ModalTitle>
+          <ModalDescription>Send an invitation to join your team</ModalDescription>
+        </ModalHeader>
+        <ModalBody>
+          {inviteLink ? (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-success-50 border border-success-200 p-4">
+                <div className="flex items-center gap-2 text-success-700">
+                  <CheckCircle className="h-5 w-5" />
+                  <span className="font-medium">Invitation sent successfully</span>
+                </div>
+              </div>
+              <div>
+                <label htmlFor="invite-link" className="block text-sm font-medium text-slate-700 mb-1.5">
+                  Invitation Link
+                </label>
+                <div className="flex gap-2">
+                  <input
+                    id="invite-link"
+                    type="text"
+                    value={inviteLink}
+                    readOnly
+                    className="flex-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
+                  />
+                  <Button
+                    variant="secondary"
+                    onClick={() => navigator.clipboard.writeText(inviteLink)}
+                  >
+                    <Copy className="h-4 w-4" />
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-slate-500">
+                  Share this link with the invitee. It expires in 7 days.
+                </p>
               </div>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-700 mb-1.5">
-                Invitation Link
-              </label>
-              <div className="flex gap-2">
-                <input
-                  type="text"
-                  value={inviteLink}
-                  readOnly
-                  className="flex-1 rounded-md border border-slate-200 bg-slate-50 px-3 py-2 text-sm"
-                />
-                <Button
-                  variant="secondary"
-                  onClick={() => navigator.clipboard.writeText(inviteLink)}
-                >
-                  <Copy className="h-4 w-4" />
-                </Button>
+          ) : (
+            <div className="space-y-4">
+              <Input
+                label="Email Address"
+                type="email"
+                placeholder="colleague@company.com"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                error={inviteErrors['email']}
+              />
+              <Select
+                label="Role"
+                options={roleOptions}
+                value={inviteRole}
+                onChange={(e) => setInviteRole(e.target.value as UserRole)}
+              />
+              <div className="rounded-lg bg-slate-50 p-4">
+                <h4 className="text-sm font-medium text-slate-900">Role Permissions</h4>
+                <ul className="mt-2 space-y-1 text-sm text-slate-600">
+                  {inviteRole === 'Admin' && (
+                    <>
+                      <li>Full access to all features</li>
+                      <li>Manage team members and settings</li>
+                      <li>Access audit logs</li>
+                    </>
+                  )}
+                  {inviteRole === 'Manager' && (
+                    <>
+                      <li>Manage deals and filings</li>
+                      <li>Configure integrations</li>
+                      <li>Export data</li>
+                    </>
+                  )}
+                  {inviteRole === 'Analyst' && (
+                    <>
+                      <li>View and manage deals</li>
+                      <li>View financial data</li>
+                      <li>Export data</li>
+                    </>
+                  )}
+                  {inviteRole === 'Viewer' && (
+                    <>
+                      <li>View dashboard and metrics</li>
+                      <li>View financial data</li>
+                      <li>Read-only access</li>
+                    </>
+                  )}
+                </ul>
               </div>
-              <p className="mt-2 text-xs text-slate-500">
-                Share this link with the invitee. It expires in 7 days.
-              </p>
             </div>
-            <ModalFooter className="px-0 pb-0">
-              <Button
-                variant="primary"
-                onClick={() => {
-                  setIsInviteModalOpen(false);
-                  setInviteLink('');
-                  setInviteEmail('');
-                }}
-              >
-                Done
-              </Button>
-            </ModalFooter>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <Input
-              label="Email Address"
-              type="email"
-              placeholder="colleague@company.com"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              error={inviteErrors.email}
-            />
-            <Select
-              label="Role"
-              options={roleOptions}
-              value={inviteRole}
-              onChange={(e) => setInviteRole(e.target.value as UserRole)}
-            />
-            <div className="rounded-lg bg-slate-50 p-4">
-              <h4 className="text-sm font-medium text-slate-900">Role Permissions</h4>
-              <ul className="mt-2 space-y-1 text-sm text-slate-600">
-                {inviteRole === 'Admin' && (
-                  <>
-                    <li>Full access to all features</li>
-                    <li>Manage team members and settings</li>
-                    <li>Access audit logs</li>
-                  </>
-                )}
-                {inviteRole === 'Manager' && (
-                  <>
-                    <li>Manage deals and filings</li>
-                    <li>Configure integrations</li>
-                    <li>Export data</li>
-                  </>
-                )}
-                {inviteRole === 'Analyst' && (
-                  <>
-                    <li>View and manage deals</li>
-                    <li>View financial data</li>
-                    <li>Export data</li>
-                  </>
-                )}
-                {inviteRole === 'Viewer' && (
-                  <>
-                    <li>View dashboard and metrics</li>
-                    <li>View financial data</li>
-                    <li>Read-only access</li>
-                  </>
-                )}
-              </ul>
-            </div>
-            <ModalFooter className="px-0 pb-0">
+          )}
+        </ModalBody>
+        <ModalFooter>
+          {inviteLink ? (
+            <Button
+              variant="primary"
+              onClick={() => {
+                setIsInviteModalOpen(false);
+                setInviteLink('');
+                setInviteEmail('');
+              }}
+            >
+              Done
+            </Button>
+          ) : (
+            <>
               <Button variant="secondary" onClick={() => setIsInviteModalOpen(false)}>
                 Cancel
               </Button>
@@ -628,9 +624,9 @@ export default function TeamManagementPage() {
                 <Mail className="mr-2 h-4 w-4" />
                 Send Invitation
               </Button>
-            </ModalFooter>
-          </div>
-        )}
+            </>
+          )}
+        </ModalFooter>
       </Modal>
 
       {/* Edit Member Modal */}
@@ -640,46 +636,52 @@ export default function TeamManagementPage() {
           setIsEditModalOpen(false);
           setSelectedMember(null);
         }}
-        title="Edit Team Member"
-        description={`Update role for ${selectedMember?.name}`}
         size="md"
       >
-        {selectedMember && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-4 rounded-lg bg-slate-50 p-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-lg font-medium text-primary-700">
-                {selectedMember.initials}
+        <ModalHeader>
+          <ModalTitle>Edit Team Member</ModalTitle>
+          <ModalDescription>Update role for {selectedMember?.name}</ModalDescription>
+        </ModalHeader>
+        <ModalBody>
+          {selectedMember && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-4 rounded-lg bg-slate-50 p-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-lg font-medium text-primary-700">
+                  {selectedMember.initials}
+                </div>
+                <div>
+                  <p className="font-medium text-slate-900">{selectedMember.name}</p>
+                  <p className="text-sm text-slate-500">{selectedMember.email}</p>
+                </div>
               </div>
-              <div>
-                <p className="font-medium text-slate-900">{selectedMember.name}</p>
-                <p className="text-sm text-slate-500">{selectedMember.email}</p>
-              </div>
-            </div>
-            <Select
-              label="Role"
-              options={roleOptions}
-              value={selectedMember.role}
-              onChange={(e) => {
-                setSelectedMember({ ...selectedMember, role: e.target.value as UserRole });
-              }}
-            />
-            <ModalFooter className="px-0 pb-0">
-              <Button variant="secondary" onClick={() => setIsEditModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button
-                variant="primary"
-                onClick={() => {
-                  handleUpdateRole(selectedMember.id, selectedMember.role);
-                  setIsEditModalOpen(false);
-                  setSelectedMember(null);
+              <Select
+                label="Role"
+                options={roleOptions}
+                value={selectedMember.role}
+                onChange={(e) => {
+                  setSelectedMember({ ...selectedMember, role: e.target.value as UserRole });
                 }}
-              >
-                Save Changes
-              </Button>
-            </ModalFooter>
-          </div>
-        )}
+              />
+            </div>
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setIsEditModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button
+            variant="primary"
+            onClick={() => {
+              if (selectedMember) {
+                handleUpdateRole(selectedMember.id, selectedMember.role);
+              }
+              setIsEditModalOpen(false);
+              setSelectedMember(null);
+            }}
+          >
+            Save Changes
+          </Button>
+        </ModalFooter>
       </Modal>
 
       {/* Deactivate Modal */}
@@ -689,40 +691,44 @@ export default function TeamManagementPage() {
           setIsDeactivateModalOpen(false);
           setSelectedMember(null);
         }}
-        title="Deactivate Team Member"
         size="md"
       >
-        {selectedMember && (
-          <div className="space-y-4">
-            <div className="flex items-center gap-3 rounded-lg bg-warning-50 border border-warning-200 p-4">
-              <AlertTriangle className="h-5 w-5 text-warning-600" />
-              <p className="text-sm text-warning-700">
-                This action will revoke access for this team member.
+        <ModalHeader>
+          <ModalTitle>Deactivate Team Member</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          {selectedMember && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-3 rounded-lg bg-warning-50 border border-warning-200 p-4">
+                <AlertTriangle className="h-5 w-5 text-warning-600" />
+                <p className="text-sm text-warning-700">
+                  This action will revoke access for this team member.
+                </p>
+              </div>
+              <div className="flex items-center gap-4 rounded-lg border border-slate-200 p-4">
+                <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-lg font-medium text-primary-700">
+                  {selectedMember.initials}
+                </div>
+                <div>
+                  <p className="font-medium text-slate-900">{selectedMember.name}</p>
+                  <p className="text-sm text-slate-500">{selectedMember.email}</p>
+                </div>
+              </div>
+              <p className="text-sm text-slate-600">
+                The user will lose access immediately but their data and activity history will be
+                preserved. You can reactivate this account at any time.
               </p>
             </div>
-            <div className="flex items-center gap-4 rounded-lg border border-slate-200 p-4">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary-100 text-lg font-medium text-primary-700">
-                {selectedMember.initials}
-              </div>
-              <div>
-                <p className="font-medium text-slate-900">{selectedMember.name}</p>
-                <p className="text-sm text-slate-500">{selectedMember.email}</p>
-              </div>
-            </div>
-            <p className="text-sm text-slate-600">
-              The user will lose access immediately but their data and activity history will be
-              preserved. You can reactivate this account at any time.
-            </p>
-            <ModalFooter className="px-0 pb-0">
-              <Button variant="secondary" onClick={() => setIsDeactivateModalOpen(false)}>
-                Cancel
-              </Button>
-              <Button variant="danger" onClick={handleDeactivate}>
-                Deactivate User
-              </Button>
-            </ModalFooter>
-          </div>
-        )}
+          )}
+        </ModalBody>
+        <ModalFooter>
+          <Button variant="secondary" onClick={() => setIsDeactivateModalOpen(false)}>
+            Cancel
+          </Button>
+          <Button variant="danger" onClick={handleDeactivate}>
+            Deactivate User
+          </Button>
+        </ModalFooter>
       </Modal>
     </div>
   );

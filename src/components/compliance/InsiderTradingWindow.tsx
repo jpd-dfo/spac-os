@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   Lock,
   Unlock,
@@ -16,11 +17,12 @@ import {
   Download,
   ChevronRight,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Input, Textarea } from '@/components/ui/Input';
+import { Modal, ModalHeader, ModalTitle, ModalFooter } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
 import { cn, formatDate, formatDateTime, daysUntil } from '@/lib/utils';
@@ -694,9 +696,11 @@ export function InsiderTradingWindow() {
       <Modal
         isOpen={isRequestModalOpen}
         onClose={() => setIsRequestModalOpen(false)}
-        title="New Pre-Clearance Request"
         size="lg"
       >
+        <ModalHeader>
+          <ModalTitle>New Pre-Clearance Request</ModalTitle>
+        </ModalHeader>
         <div className="space-y-4">
           <Select
             label="Insider"

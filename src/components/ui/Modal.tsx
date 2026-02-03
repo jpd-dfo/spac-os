@@ -1,9 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useCallback, useId } from 'react';
-import { X } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { useEffect, useRef, useCallback, useId , createContext, useContext } from 'react';
+
 import { cva, type VariantProps } from 'class-variance-authority';
+import { X } from 'lucide-react';
+
+import { cn } from '@/lib/utils';
 
 // ============================================================================
 // MODAL VARIANTS
@@ -74,7 +76,7 @@ export function Modal({
 
   // Focus trap
   const handleFocusTrap = useCallback((e: KeyboardEvent) => {
-    if (e.key !== 'Tab' || !modalRef.current) return;
+    if (e.key !== 'Tab' || !modalRef.current) {return;}
 
     const focusableElements = modalRef.current.querySelectorAll(
       'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
@@ -119,7 +121,7 @@ export function Modal({
     };
   }, [isOpen, handleEscape, handleFocusTrap]);
 
-  if (!isOpen) return null;
+  if (!isOpen) {return null;}
 
   const handleOverlayClick = (e: React.MouseEvent) => {
     if (e.target === overlayRef.current && closeOnOverlayClick) {
@@ -166,7 +168,6 @@ export function Modal({
 // MODAL CONTEXT
 // ============================================================================
 
-import { createContext, useContext } from 'react';
 
 interface ModalContextValue {
   onClose: () => void;

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   Mail,
   Calendar,
@@ -23,12 +24,13 @@ import {
   Shield,
   Zap,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Button } from '@/components/ui/Button';
-import { Input } from '@/components/ui/Input';
-import { Select } from '@/components/ui/Select';
+
 import { Badge } from '@/components/ui/Badge';
-import { Modal, ModalFooter } from '@/components/ui/Modal';
+import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
+import { Input } from '@/components/ui/Input';
+import { Modal, ModalFooter, ModalHeader, ModalTitle } from '@/components/ui/Modal';
+import { Select } from '@/components/ui/Select';
 import { cn } from '@/lib/utils';
 
 interface Integration {
@@ -272,7 +274,7 @@ export function IntegrationSettings() {
       id: Date.now().toString(),
       name: newKeyName,
       key: `spac_api_${Math.random().toString(36).substring(2, 34)}`,
-      createdAt: new Date().toISOString().split('T')[0],
+      createdAt: new Date().toISOString().split('T')[0] ?? new Date().toISOString().substring(0, 10),
       lastUsed: 'Never',
       permissions: newKeyPermissions,
       status: 'active',
@@ -693,9 +695,11 @@ export function IntegrationSettings() {
           setIsConfigModalOpen(false);
           setSelectedIntegration(null);
         }}
-        title={`Configure ${selectedIntegration?.name}`}
         size="md"
       >
+        <ModalHeader>
+          <ModalTitle>Configure {selectedIntegration?.name}</ModalTitle>
+        </ModalHeader>
         {selectedIntegration && (
           <div className="space-y-4">
             <div className="rounded-lg bg-slate-50 p-4">
@@ -708,9 +712,9 @@ export function IntegrationSettings() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-700 mb-2">
+              <span className="block text-sm font-medium text-slate-700 mb-2">
                 Sync Settings
-              </label>
+              </span>
               <div className="space-y-2">
                 <label className="flex items-center gap-2">
                   <input type="checkbox" defaultChecked className="rounded" />
@@ -747,10 +751,12 @@ export function IntegrationSettings() {
           setNewKeyName('');
           setNewKeyPermissions(['read']);
         }}
-        title="Create API Key"
-        description="Generate a new API key for programmatic access"
         size="md"
       >
+        <ModalHeader>
+          <ModalTitle>Create API Key</ModalTitle>
+          <p className="mt-1 text-sm text-slate-500">Generate a new API key for programmatic access</p>
+        </ModalHeader>
         <div className="space-y-4">
           <Input
             label="Key Name"
@@ -760,7 +766,7 @@ export function IntegrationSettings() {
           />
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Permissions</label>
+            <span className="block text-sm font-medium text-slate-700 mb-2">Permissions</span>
             <div className="space-y-2">
               {['read', 'write', 'delete'].map((perm) => (
                 <label key={perm} className="flex items-center gap-2">
@@ -812,10 +818,12 @@ export function IntegrationSettings() {
           setNewWebhookUrl('');
           setNewWebhookEvents([]);
         }}
-        title="Create Webhook"
-        description="Configure a webhook endpoint to receive events"
         size="md"
       >
+        <ModalHeader>
+          <ModalTitle>Create Webhook</ModalTitle>
+          <p className="mt-1 text-sm text-slate-500">Configure a webhook endpoint to receive events</p>
+        </ModalHeader>
         <div className="space-y-4">
           <Input
             label="Webhook Name"
@@ -832,7 +840,7 @@ export function IntegrationSettings() {
           />
 
           <div>
-            <label className="block text-sm font-medium text-slate-700 mb-2">Events</label>
+            <span className="block text-sm font-medium text-slate-700 mb-2">Events</span>
             <div className="max-h-48 overflow-y-auto rounded-lg border border-slate-200 p-3 space-y-2">
               {webhookEvents.map((event) => (
                 <label key={event.value} className="flex items-center gap-2">

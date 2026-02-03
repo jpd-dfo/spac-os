@@ -1,38 +1,38 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
+
 import {
   Plus,
   Filter,
   Download,
   LayoutGrid,
   List,
-  RefreshCw,
   ChevronDown,
   BarChart3,
-  Settings,
 } from 'lucide-react';
-import { Button } from '@/components/ui/Button';
-import { Badge } from '@/components/ui/Badge';
-import { Dropdown, DropdownItem, DropdownDivider, DropdownLabel } from '@/components/ui/Dropdown';
-import { cn } from '@/lib/utils';
+
+import { AddTargetForm, type NewTargetData } from '@/components/pipeline/AddTargetForm';
 import { KanbanBoard, DEFAULT_COLUMNS } from '@/components/pipeline/KanbanBoard';
-import { TargetCard, TargetCardCompact, type Target, type PipelineStage, type QuickAction } from '@/components/pipeline/TargetCard';
-import { TargetDetailModal, type TargetDetails } from '@/components/pipeline/TargetDetailModal';
 import { PipelineFilters, DEFAULT_FILTERS, type PipelineFiltersState } from '@/components/pipeline/PipelineFilters';
 import { PipelineStats, PipelineStatsBar } from '@/components/pipeline/PipelineStats';
-import { AddTargetForm, type NewTargetData } from '@/components/pipeline/AddTargetForm';
+import { TargetCardCompact, type Target, type PipelineStage, type QuickAction } from '@/components/pipeline/TargetCard';
+import { TargetDetailModal, type TargetDetails } from '@/components/pipeline/TargetDetailModal';
+import { Badge } from '@/components/ui/Badge';
+import { Button } from '@/components/ui/Button';
+import { Dropdown, DropdownItem, DropdownLabel } from '@/components/ui/Dropdown';
+import { cn } from '@/lib/utils';
 
 // ============================================================================
 // Mock Data - Healthcare Targets for Soren Acquisition Corporation
 // ============================================================================
 
-const MOCK_TEAM_MEMBERS = [
-  { id: '1', name: 'Sarah Chen', avatar: null, role: 'Managing Director' },
-  { id: '2', name: 'Michael Torres', avatar: null, role: 'Vice President' },
-  { id: '3', name: 'Emily Watson', avatar: null, role: 'Associate' },
-  { id: '4', name: 'David Park', avatar: null, role: 'Analyst' },
-  { id: '5', name: 'Jessica Liu', avatar: null, role: 'Principal' },
+const MOCK_TEAM_MEMBERS: { id: string; name: string; avatar: string | undefined; role: string }[] = [
+  { id: '1', name: 'Sarah Chen', avatar: undefined, role: 'Managing Director' },
+  { id: '2', name: 'Michael Torres', avatar: undefined, role: 'Vice President' },
+  { id: '3', name: 'Emily Watson', avatar: undefined, role: 'Associate' },
+  { id: '4', name: 'David Park', avatar: undefined, role: 'Analyst' },
+  { id: '5', name: 'Jessica Liu', avatar: undefined, role: 'Principal' },
 ];
 
 const MOCK_TARGETS: Target[] = [
@@ -465,7 +465,7 @@ function applyFilters(targets: Target[], filters: PipelineFiltersState): Target[
         target.industry.toLowerCase().includes(searchLower) ||
         target.description?.toLowerCase().includes(searchLower) ||
         target.tags?.some((tag) => tag.toLowerCase().includes(searchLower));
-      if (!matchesSearch) return false;
+      if (!matchesSearch) {return false;}
     }
 
     // Industry filter
@@ -473,7 +473,7 @@ function applyFilters(targets: Target[], filters: PipelineFiltersState): Target[
       const industryMatch = filters.industries.some(
         (ind) => target.industry.toLowerCase().includes(ind.toLowerCase())
       );
-      if (!industryMatch) return false;
+      if (!industryMatch) {return false;}
     }
 
     // Stage filter
@@ -533,7 +533,7 @@ export default function PipelinePage() {
 
   // Filtered and sorted targets
   const filteredTargets = useMemo(() => {
-    let result = applyFilters(targets, filters);
+    const result = applyFilters(targets, filters);
 
     // Apply sorting
     result.sort((a, b) => {
@@ -561,13 +561,13 @@ export default function PipelinePage() {
   // Count active filters
   const activeFilterCount = useMemo(() => {
     let count = 0;
-    if (filters.search) count++;
-    if (filters.industries.length > 0) count++;
-    if (filters.stages.length > 0) count++;
-    if (filters.assignees.length > 0) count++;
-    if (filters.valueRange.min !== null || filters.valueRange.max !== null) count++;
-    if (filters.scoreRange.min !== null || filters.scoreRange.max !== null) count++;
-    if (filters.sources.length > 0) count++;
+    if (filters.search) {count++;}
+    if (filters.industries.length > 0) {count++;}
+    if (filters.stages.length > 0) {count++;}
+    if (filters.assignees.length > 0) {count++;}
+    if (filters.valueRange.min !== null || filters.valueRange.max !== null) {count++;}
+    if (filters.scoreRange.min !== null || filters.scoreRange.max !== null) {count++;}
+    if (filters.sources.length > 0) {count++;}
     return count;
   }, [filters]);
 
@@ -623,7 +623,7 @@ export default function PipelinePage() {
     const newTarget: Target = {
       id: `new-${Date.now()}`,
       name: data.name,
-      industry: MOCK_TARGETS[0].industry, // Map from data.industry
+      industry: data.industry,
       subIndustry: data.subIndustry,
       enterpriseValue: data.estimatedValuation,
       evaluationScore: 50, // Initial score
@@ -651,8 +651,8 @@ export default function PipelinePage() {
       'closed_passed',
     ];
     const currentIndex = stageOrder.indexOf(target.stage);
-    if (currentIndex < stageOrder.length - 1) {
-      const nextStage = stageOrder[currentIndex + 1];
+    const nextStage = stageOrder[currentIndex + 1];
+    if (currentIndex < stageOrder.length - 1 && nextStage) {
       handleTargetMove(target.id, target.stage, nextStage);
       setIsDetailModalOpen(false);
     }

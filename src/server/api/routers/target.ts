@@ -3,8 +3,10 @@
  * Full CRUD operations for acquisition targets with status management
  */
 
-import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { z } from 'zod';
+import { Prisma } from '@prisma/client';
+
 import {
   createTRPCRouter,
   protectedProcedure,
@@ -138,14 +140,14 @@ export const targetRouter = createTRPCRouter({
         deletedAt: null,
       };
 
-      if (spacId) where.spacId = spacId;
-      if (status?.length) where.status = { in: status };
-      if (stage?.length) where.stage = { in: stage };
-      if (industry) where.industry = { contains: industry, mode: 'insensitive' };
-      if (sector) where.sector = { contains: sector, mode: 'insensitive' };
+      if (spacId) {where['spacId'] = spacId;}
+      if (status?.length) {where['status'] = { in: status };}
+      if (stage?.length) {where['stage'] = { in: stage };}
+      if (industry) {where['industry'] = { contains: industry, mode: 'insensitive' };}
+      if (sector) {where['sector'] = { contains: sector, mode: 'insensitive' };}
 
       if (search) {
-        where.OR = [
+        where['OR'] = [
           { name: { contains: search, mode: 'insensitive' } },
           { description: { contains: search, mode: 'insensitive' } },
           { industry: { contains: search, mode: 'insensitive' } },
@@ -154,15 +156,15 @@ export const targetRouter = createTRPCRouter({
       }
 
       if (priorityMin !== undefined || priorityMax !== undefined) {
-        where.priority = {};
-        if (priorityMin !== undefined) (where.priority as Record<string, unknown>).gte = priorityMin;
-        if (priorityMax !== undefined) (where.priority as Record<string, unknown>).lte = priorityMax;
+        where['priority'] = {};
+        if (priorityMin !== undefined) {(where['priority'] as Record<string, unknown>)['gte'] = priorityMin;}
+        if (priorityMax !== undefined) {(where['priority'] as Record<string, unknown>)['lte'] = priorityMax;}
       }
 
       if (evMin !== undefined || evMax !== undefined) {
-        where.enterpriseValue = {};
-        if (evMin !== undefined) (where.enterpriseValue as Record<string, unknown>).gte = evMin;
-        if (evMax !== undefined) (where.enterpriseValue as Record<string, unknown>).lte = evMax;
+        where['enterpriseValue'] = {};
+        if (evMin !== undefined) {(where['enterpriseValue'] as Record<string, unknown>)['gte'] = evMin;}
+        if (evMax !== undefined) {(where['enterpriseValue'] as Record<string, unknown>)['lte'] = evMax;}
       }
 
       // Execute query with pagination
@@ -261,10 +263,51 @@ export const targetRouter = createTRPCRouter({
         }
       }
 
+      // Map stage to valid Prisma TargetStage values
+      const stageMapping: Record<string, 'SOURCING' | 'SCREENING' | 'PRELIMINARY_DD' | 'FULL_DD' | 'NEGOTIATION' | 'DOCUMENTATION' | 'CLOSING'> = {
+        'ORIGINATION': 'SOURCING',
+        'PRELIMINARY_REVIEW': 'SCREENING',
+        'DEEP_DIVE': 'FULL_DD',
+        'NEGOTIATION': 'NEGOTIATION',
+        'DOCUMENTATION': 'DOCUMENTATION',
+        'CLOSING': 'CLOSING',
+      };
+
       const target = await ctx.db.target.create({
         data: {
-          ...input,
+          name: input.name,
+          description: input.description,
+          industry: input.industry,
+          sector: input.sector,
+          status: input.status,
+          stage: input.stage ? stageMapping[input.stage] ?? null : null,
+          valuation: input.enterpriseValue,
+          enterpriseValue: input.enterpriseValue,
+          revenue: input.revenue,
+          ebitda: input.ebitda,
+          evRevenue: input.evRevenue,
+          evEbitda: input.evEbitda,
+          aiScore: input.overallScore,
+          overallScore: input.overallScore,
+          managementScore: input.managementScore,
+          marketScore: input.marketScore,
+          financialScore: input.financialScore,
+          operationalScore: input.operationalScore,
+          riskScore: input.riskScore,
+          priority: input.priority,
+          probability: input.probability,
+          dueDiligenceStatus: input.dueDiligenceStatus ? { status: input.dueDiligenceStatus } : undefined,
+          keyRisks: input.keyRisks,
+          keyOpportunities: input.keyOpportunities,
           identifiedDate: input.identifiedDate || new Date(),
+          ndaDate: input.ndaDate,
+          ndaSignedDate: input.ndaDate,
+          loiDate: input.loiDate,
+          loiSignedDate: input.loiDate,
+          daDate: input.daDate,
+          daSignedDate: input.daDate,
+          expectedCloseDate: input.expectedCloseDate,
+          ...(input.spacId && { spac: { connect: { id: input.spacId } } }),
         },
         include: {
           spac: true,
@@ -294,9 +337,72 @@ export const targetRouter = createTRPCRouter({
         });
       }
 
+      // Map stage to valid Prisma TargetStage values
+      const stageMappingUpdate: Record<string, 'SOURCING' | 'SCREENING' | 'PRELIMINARY_DD' | 'FULL_DD' | 'NEGOTIATION' | 'DOCUMENTATION' | 'CLOSING'> = {
+        'ORIGINATION': 'SOURCING',
+        'PRELIMINARY_REVIEW': 'SCREENING',
+        'DEEP_DIVE': 'FULL_DD',
+        'NEGOTIATION': 'NEGOTIATION',
+        'DOCUMENTATION': 'DOCUMENTATION',
+        'CLOSING': 'CLOSING',
+      };
+
+      // Build update data with only valid Prisma fields
+      const updateData: Parameters<typeof ctx.db.target.update>[0]['data'] = {};
+
+      if (input.data.name !== undefined) { updateData.name = input.data.name; }
+      if (input.data.description !== undefined) { updateData.description = input.data.description; }
+      if (input.data.industry !== undefined) { updateData.industry = input.data.industry; }
+      if (input.data.sector !== undefined) { updateData.sector = input.data.sector; }
+      if (input.data.status !== undefined) { updateData.status = input.data.status; }
+      if (input.data.stage !== undefined) { updateData.stage = input.data.stage ? stageMappingUpdate[input.data.stage] ?? null : null; }
+      if (input.data.enterpriseValue !== undefined) {
+        updateData.enterpriseValue = input.data.enterpriseValue;
+        updateData.valuation = input.data.enterpriseValue;
+      }
+      if (input.data.revenue !== undefined) { updateData.revenue = input.data.revenue; }
+      if (input.data.ebitda !== undefined) { updateData.ebitda = input.data.ebitda; }
+      if (input.data.evRevenue !== undefined) { updateData.evRevenue = input.data.evRevenue; }
+      if (input.data.evEbitda !== undefined) { updateData.evEbitda = input.data.evEbitda; }
+      if (input.data.overallScore !== undefined) {
+        updateData.overallScore = input.data.overallScore;
+        updateData.aiScore = input.data.overallScore;
+      }
+      if (input.data.managementScore !== undefined) { updateData.managementScore = input.data.managementScore; }
+      if (input.data.marketScore !== undefined) { updateData.marketScore = input.data.marketScore; }
+      if (input.data.financialScore !== undefined) { updateData.financialScore = input.data.financialScore; }
+      if (input.data.operationalScore !== undefined) { updateData.operationalScore = input.data.operationalScore; }
+      if (input.data.riskScore !== undefined) { updateData.riskScore = input.data.riskScore; }
+      if (input.data.priority !== undefined) { updateData.priority = input.data.priority; }
+      if (input.data.probability !== undefined) { updateData.probability = input.data.probability; }
+      if (input.data.dueDiligenceStatus !== undefined) { updateData.dueDiligenceStatus = input.data.dueDiligenceStatus ? { status: input.data.dueDiligenceStatus } : Prisma.JsonNull; }
+      if (input.data.keyRisks !== undefined) { updateData.keyRisks = input.data.keyRisks; }
+      if (input.data.keyOpportunities !== undefined) { updateData.keyOpportunities = input.data.keyOpportunities; }
+      if (input.data.identifiedDate !== undefined) { updateData.identifiedDate = input.data.identifiedDate; }
+      if (input.data.ndaDate !== undefined) {
+        updateData.ndaDate = input.data.ndaDate;
+        updateData.ndaSignedDate = input.data.ndaDate;
+      }
+      if (input.data.loiDate !== undefined) {
+        updateData.loiDate = input.data.loiDate;
+        updateData.loiSignedDate = input.data.loiDate;
+      }
+      if (input.data.daDate !== undefined) {
+        updateData.daDate = input.data.daDate;
+        updateData.daSignedDate = input.data.daDate;
+      }
+      if (input.data.expectedCloseDate !== undefined) { updateData.expectedCloseDate = input.data.expectedCloseDate; }
+      if (input.data.spacId !== undefined) {
+        if (input.data.spacId) {
+          updateData.spac = { connect: { id: input.data.spacId } };
+        } else {
+          updateData.spac = { disconnect: true };
+        }
+      }
+
       const target = await ctx.db.target.update({
         where: { id: input.id },
-        data: input.data,
+        data: updateData,
         include: {
           spac: true,
           contacts: { include: { contact: true } },
@@ -357,19 +463,19 @@ export const targetRouter = createTRPCRouter({
 
       switch (input.status) {
         case 'NDA_SIGNED':
-          updateData.ndaDate = new Date();
-          updateData.ndaSignedDate = new Date();
+          updateData['ndaDate'] = new Date();
+          updateData['ndaSignedDate'] = new Date();
           break;
         case 'LOI':
-          updateData.loiDate = new Date();
-          updateData.loiSignedDate = new Date();
+          updateData['loiDate'] = new Date();
+          updateData['loiSignedDate'] = new Date();
           break;
         case 'DEFINITIVE':
-          updateData.daDate = new Date();
-          updateData.daSignedDate = new Date();
+          updateData['daDate'] = new Date();
+          updateData['daSignedDate'] = new Date();
           break;
         case 'CLOSED':
-          updateData.actualCloseDate = new Date();
+          updateData['actualCloseDate'] = new Date();
           break;
       }
 

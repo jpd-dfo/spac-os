@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+
 import {
   Shield,
   AlertTriangle,
@@ -18,9 +19,10 @@ import {
   Activity,
   BarChart3,
 } from 'lucide-react';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatDate, daysUntil } from '@/lib/utils';
 
 // Types
@@ -209,14 +211,14 @@ const quickStats = {
 };
 
 function getScoreColor(score: number) {
-  if (score >= 90) return 'text-success-600';
-  if (score >= 70) return 'text-warning-600';
+  if (score >= 90) {return 'text-success-600';}
+  if (score >= 70) {return 'text-warning-600';}
   return 'text-danger-600';
 }
 
 function getScoreBackground(score: number) {
-  if (score >= 90) return 'bg-success-500';
-  if (score >= 70) return 'bg-warning-500';
+  if (score >= 90) {return 'bg-success-500';}
+  if (score >= 70) {return 'bg-warning-500';}
   return 'bg-danger-500';
 }
 

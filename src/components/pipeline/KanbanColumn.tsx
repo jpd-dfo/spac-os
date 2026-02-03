@@ -1,17 +1,21 @@
 'use client';
 
 import { useMemo } from 'react';
+
 import { useDroppable } from '@dnd-kit/core';
 import {
   SortableContext,
   verticalListSortingStrategy,
 } from '@dnd-kit/sortable';
 import { Plus, MoreVertical, Settings, Archive, TrendingUp } from 'lucide-react';
+
 import { Badge } from '@/components/ui/Badge';
 import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn, formatLargeNumber } from '@/lib/utils';
+
 import { DealCard, DealCardSkeleton } from './DealCard';
+
 import type { Deal, PipelineStage, QuickActionType } from './types';
 
 // ============================================================================

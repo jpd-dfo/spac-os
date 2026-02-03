@@ -1,5 +1,7 @@
 'use client';
 
+import { useState, useRef, useEffect } from 'react';
+
 import {
   FileText,
   FileSpreadsheet,
@@ -18,10 +20,10 @@ import {
   Star,
   History,
 } from 'lucide-react';
+
 import { Badge } from '@/components/ui/Badge';
 import { Tooltip } from '@/components/ui/Tooltip';
 import { cn, formatFileSize, formatRelativeTime } from '@/lib/utils';
-import { useState, useRef, useEffect } from 'react';
 
 export interface DocumentData {
   id: string;
@@ -97,21 +99,22 @@ const statusConfig: Record<string, { label: string; variant: 'success' | 'warnin
 
 function getFileExtension(fileName: string): string {
   const parts = fileName.split('.');
-  return parts.length > 1 ? parts[parts.length - 1].toLowerCase() : 'default';
+  const lastPart = parts[parts.length - 1];
+  return parts.length > 1 && lastPart ? lastPart.toLowerCase() : 'default';
 }
 
-function getFileIcon(fileName: string) {
+function getFileIcon(fileName: string): React.ComponentType<{ className?: string }> {
   const ext = getFileExtension(fileName);
-  return fileTypeIcons[ext] || fileTypeIcons.default;
+  return fileTypeIcons[ext] ?? fileTypeIcons['default']!;
 }
 
 function getFileColor(fileName: string) {
   const ext = getFileExtension(fileName);
-  return fileTypeColors[ext] || fileTypeColors.default;
+  return fileTypeColors[ext] || fileTypeColors['default'];
 }
 
 export function DocumentCard({
-  document,
+  document: doc,
   viewMode = 'grid',
   isSelected = false,
   onSelect,
@@ -124,9 +127,9 @@ export function DocumentCard({
   const [showMenu, setShowMenu] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
-  const FileIcon = getFileIcon(document.fileName);
-  const fileColor = getFileColor(document.fileName);
-  const status = statusConfig[document.status];
+  const FileIcon = getFileIcon(doc.fileName);
+  const fileColor = getFileColor(doc.fileName);
+  const status = statusConfig[doc.status] ?? { label: 'Unknown', variant: 'secondary' as const };
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -135,19 +138,19 @@ export function DocumentCard({
       }
     }
 
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
+    window.document.addEventListener('mousedown', handleClickOutside);
+    return () => window.document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
   const menuItems = [
-    { icon: Eye, label: 'View', onClick: () => onView?.(document) },
-    { icon: Download, label: 'Download', onClick: () => onDownload?.(document) },
-    { icon: Share2, label: 'Share', onClick: () => onShare?.(document) },
+    { icon: Eye, label: 'View', onClick: () => onView?.(doc) },
+    { icon: Download, label: 'Download', onClick: () => onDownload?.(doc) },
+    { icon: Share2, label: 'Share', onClick: () => onShare?.(doc) },
     { icon: Copy, label: 'Copy Link', onClick: () => {} },
     { icon: Edit, label: 'Rename', onClick: () => {} },
     { icon: History, label: 'Version History', onClick: () => {} },
     { type: 'divider' as const },
-    { icon: Trash2, label: 'Delete', onClick: () => onDelete?.(document), danger: true },
+    { icon: Trash2, label: 'Delete', onClick: () => onDelete?.(doc), danger: true },
   ];
 
   if (viewMode === 'list') {
@@ -157,7 +160,7 @@ export function DocumentCard({
           'group flex items-center gap-4 rounded-lg border px-4 py-3 transition-all hover:border-primary-200 hover:bg-slate-50',
           isSelected ? 'border-primary-500 bg-primary-50' : 'border-slate-200 bg-white'
         )}
-        onClick={() => onSelect?.(document)}
+        onClick={() => onSelect?.(doc)}
       >
         {/* File Icon */}
         <div className={cn('flex h-10 w-10 items-center justify-center rounded-lg', fileColor)}>
@@ -167,18 +170,18 @@ export function DocumentCard({
         {/* File Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
-            <h4 className="font-medium text-slate-900 truncate">{document.name}</h4>
-            {document.isConfidential && (
+            <h4 className="font-medium text-slate-900 truncate">{doc.name}</h4>
+            {doc.isConfidential && (
               <Tooltip content="Confidential">
                 <Lock className="h-3.5 w-3.5 text-slate-400" />
               </Tooltip>
             )}
-            {document.isFavorite && (
+            {doc.isFavorite && (
               <Star className="h-3.5 w-3.5 text-yellow-400 fill-yellow-400" />
             )}
           </div>
           <p className="text-sm text-slate-500 truncate">
-            {document.fileName} | v{document.version}
+            {doc.fileName} | v{doc.version}
           </p>
         </div>
 
@@ -189,28 +192,28 @@ export function DocumentCard({
 
         {/* Size */}
         <div className="hidden sm:block text-sm text-slate-500 w-20 text-right">
-          {formatFileSize(document.fileSize)}
+          {formatFileSize(doc.fileSize)}
         </div>
 
         {/* Updated */}
         <div className="hidden lg:flex items-center gap-1 text-sm text-slate-500 w-32">
           <Clock className="h-3.5 w-3.5" />
-          <span>{formatRelativeTime(document.updatedAt)}</span>
+          <span>{formatRelativeTime(doc.updatedAt)}</span>
         </div>
 
         {/* Owner */}
         <div className="hidden xl:flex items-center gap-2 w-32">
           <div className="h-6 w-6 rounded-full bg-primary-100 flex items-center justify-center text-xs font-medium text-primary-700">
-            {document.uploadedBy.split(' ').map(n => n[0]).join('')}
+            {doc.uploadedBy.split(' ').map(n => n[0]).join('')}
           </div>
-          <span className="text-sm text-slate-600 truncate">{document.uploadedBy}</span>
+          <span className="text-sm text-slate-600 truncate">{doc.uploadedBy}</span>
         </div>
 
         {/* Quick Actions */}
         <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
           <Tooltip content="View">
             <button
-              onClick={(e) => { e.stopPropagation(); onView?.(document); }}
+              onClick={(e) => { e.stopPropagation(); onView?.(doc); }}
               className="rounded p-1.5 hover:bg-slate-100"
             >
               <Eye className="h-4 w-4 text-slate-400" />
@@ -218,7 +221,7 @@ export function DocumentCard({
           </Tooltip>
           <Tooltip content="Download">
             <button
-              onClick={(e) => { e.stopPropagation(); onDownload?.(document); }}
+              onClick={(e) => { e.stopPropagation(); onDownload?.(doc); }}
               className="rounded p-1.5 hover:bg-slate-100"
             >
               <Download className="h-4 w-4 text-slate-400" />
@@ -265,20 +268,20 @@ export function DocumentCard({
         'group relative rounded-lg border p-4 transition-all hover:border-primary-200 hover:shadow-md cursor-pointer',
         isSelected ? 'border-primary-500 bg-primary-50 shadow-md' : 'border-slate-200 bg-white'
       )}
-      onClick={() => onSelect?.(document)}
+      onClick={() => onSelect?.(doc)}
     >
       {/* Favorite Star */}
       <button
-        onClick={(e) => { e.stopPropagation(); onToggleFavorite?.(document); }}
+        onClick={(e) => { e.stopPropagation(); onToggleFavorite?.(doc); }}
         className={cn(
           'absolute right-3 top-3 rounded p-1 transition-opacity',
-          document.isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 hover:bg-slate-100'
+          doc.isFavorite ? 'opacity-100' : 'opacity-0 group-hover:opacity-100 hover:bg-slate-100'
         )}
       >
         <Star
           className={cn(
             'h-4 w-4',
-            document.isFavorite ? 'text-yellow-400 fill-yellow-400' : 'text-slate-300'
+            doc.isFavorite ? 'text-yellow-400 fill-yellow-400' : 'text-slate-300'
           )}
         />
       </button>
@@ -291,31 +294,31 @@ export function DocumentCard({
       {/* File Name */}
       <div className="text-center">
         <div className="flex items-center justify-center gap-1.5 mb-1">
-          <h4 className="font-medium text-slate-900 truncate max-w-[150px]">{document.name}</h4>
-          {document.isConfidential && (
+          <h4 className="font-medium text-slate-900 truncate max-w-[150px]">{doc.name}</h4>
+          {doc.isConfidential && (
             <Tooltip content="Confidential">
               <Lock className="h-3.5 w-3.5 text-slate-400 flex-shrink-0" />
             </Tooltip>
           )}
         </div>
-        <p className="text-xs text-slate-500">{formatFileSize(document.fileSize)}</p>
+        <p className="text-xs text-slate-500">{formatFileSize(doc.fileSize)}</p>
       </div>
 
       {/* Status & Version */}
       <div className="mt-3 flex items-center justify-center gap-2">
         <Badge variant={status.variant} size="sm">{status.label}</Badge>
-        <span className="text-xs text-slate-400">v{document.version}</span>
+        <span className="text-xs text-slate-400">v{doc.version}</span>
       </div>
 
       {/* Meta Info */}
       <div className="mt-3 flex items-center justify-between text-xs text-slate-500">
         <div className="flex items-center gap-1">
           <Clock className="h-3 w-3" />
-          <span>{formatRelativeTime(document.updatedAt)}</span>
+          <span>{formatRelativeTime(doc.updatedAt)}</span>
         </div>
         <div className="flex items-center gap-1">
           <User className="h-3 w-3" />
-          <span className="truncate max-w-[80px]">{document.uploadedBy}</span>
+          <span className="truncate max-w-[80px]">{doc.uploadedBy}</span>
         </div>
       </div>
 
@@ -324,7 +327,7 @@ export function DocumentCard({
         <div className="flex items-center justify-center gap-1 rounded-b-lg bg-slate-50 px-4 py-2 border-t border-slate-200">
           <Tooltip content="View">
             <button
-              onClick={(e) => { e.stopPropagation(); onView?.(document); }}
+              onClick={(e) => { e.stopPropagation(); onView?.(doc); }}
               className="rounded p-2 hover:bg-white hover:shadow-sm transition-all"
             >
               <Eye className="h-4 w-4 text-slate-600" />
@@ -332,7 +335,7 @@ export function DocumentCard({
           </Tooltip>
           <Tooltip content="Download">
             <button
-              onClick={(e) => { e.stopPropagation(); onDownload?.(document); }}
+              onClick={(e) => { e.stopPropagation(); onDownload?.(doc); }}
               className="rounded p-2 hover:bg-white hover:shadow-sm transition-all"
             >
               <Download className="h-4 w-4 text-slate-600" />
@@ -340,7 +343,7 @@ export function DocumentCard({
           </Tooltip>
           <Tooltip content="Share">
             <button
-              onClick={(e) => { e.stopPropagation(); onShare?.(document); }}
+              onClick={(e) => { e.stopPropagation(); onShare?.(doc); }}
               className="rounded p-2 hover:bg-white hover:shadow-sm transition-all"
             >
               <Share2 className="h-4 w-4 text-slate-600" />
@@ -348,7 +351,7 @@ export function DocumentCard({
           </Tooltip>
           <Tooltip content="Delete">
             <button
-              onClick={(e) => { e.stopPropagation(); onDelete?.(document); }}
+              onClick={(e) => { e.stopPropagation(); onDelete?.(doc); }}
               className="rounded p-2 hover:bg-white hover:shadow-sm transition-all"
             >
               <Trash2 className="h-4 w-4 text-danger-600" />

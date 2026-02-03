@@ -2,7 +2,7 @@
 // Pipeline Component Types
 // ============================================================================
 
-import { DealStage, TargetStatus, TaskPriority } from '@/types';
+import { type DealStage, type TargetStatus, type TaskPriority } from '@/types';
 
 // ============================================================================
 // Deal / Target Types

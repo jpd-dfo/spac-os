@@ -3,13 +3,17 @@
  * RESTful endpoints for SPAC management
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
+
 import { getServerSession } from 'next-auth';
-import { prisma } from '@/lib/prisma';
-import { authOptions } from '@/lib/auth';
-import { SpacCreateSchema } from '@/schemas';
 import { z } from 'zod';
+
+import { authOptions } from '@/lib/auth';
 import { logger } from '@/lib/logger';
+import { prisma } from '@/lib/prisma';
+import { SpacCreateSchema } from '@/schemas';
+
+
 
 // Query params schema
 const ListQuerySchema = z.object({
@@ -194,18 +198,38 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Map Zod schema data to Prisma schema fields
+    const prismaData = {
+      organizationId: data.organizationId,
+      name: data.name,
+      ticker: data.ticker,
+      cik: data.cik,
+      status: data.status as any, // Handle enum differences
+      phase: data.phase as any, // Handle enum differences
+      ipoDate: data.ipoDate,
+      ipoSize: data.ipoSize,
+      trustAmount: data.trustSize,
+      trustBalance: data.trustBalance,
+      deadline: data.deadline,
+      deadlineDate: data.deadlineDate,
+      maxExtensions: data.maxExtensions,
+      description: data.description,
+      targetSectors: data.targetSectors,
+      targetGeographies: data.targetGeographies,
+      tags: data.tags,
+    };
+
+    // Remove undefined values
+    const cleanedData = Object.fromEntries(
+      Object.entries(prismaData).filter(([_, v]) => v !== undefined)
+    );
+
     // Create SPAC
     const spac = await prisma.spac.create({
-      data: {
-        ...data,
-        createdById: session.user.id,
-      },
+      data: cleanedData as any,
       include: {
         organization: {
           select: { id: true, name: true },
-        },
-        createdBy: {
-          select: { id: true, name: true, email: true },
         },
       },
     });

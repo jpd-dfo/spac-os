@@ -1,7 +1,7 @@
 'use client';
 
-import { Card, CardContent } from '@/components/ui/Card';
 import { SettingsNav } from '@/components/settings';
+import { Card, CardContent } from '@/components/ui/Card';
 
 export default function SettingsLayout({
   children,

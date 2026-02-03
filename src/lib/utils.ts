@@ -1,6 +1,6 @@
 import { type ClassValue, clsx } from 'clsx';
-import { twMerge } from 'tailwind-merge';
 import { format, formatDistanceToNow, parseISO, isValid } from 'date-fns';
+import { twMerge } from 'tailwind-merge';
 
 // ============================================================================
 // CLASS NAME UTILITIES
@@ -21,9 +21,9 @@ export function cn(...inputs: ClassValue[]): string {
  * Format a date with a standard format
  */
 export function formatDate(date: Date | string | null | undefined, formatStr = 'MMM d, yyyy'): string {
-  if (!date) return '-';
+  if (!date) {return '-';}
   const parsed = typeof date === 'string' ? parseISO(date) : date;
-  if (!isValid(parsed)) return '-';
+  if (!isValid(parsed)) {return '-';}
   return format(parsed, formatStr);
 }
 
@@ -38,9 +38,9 @@ export function formatDateTime(date: Date | string | null | undefined): string {
  * Get relative time from now
  */
 export function formatRelativeTime(date: Date | string | null | undefined): string {
-  if (!date) return '-';
+  if (!date) {return '-';}
   const parsed = typeof date === 'string' ? parseISO(date) : date;
-  if (!isValid(parsed)) return '-';
+  if (!isValid(parsed)) {return '-';}
   return formatDistanceToNow(parsed, { addSuffix: true });
 }
 
@@ -48,7 +48,7 @@ export function formatRelativeTime(date: Date | string | null | undefined): stri
  * Check if a date is in the past
  */
 export function isPastDate(date: Date | string | null | undefined): boolean {
-  if (!date) return false;
+  if (!date) {return false;}
   const parsed = typeof date === 'string' ? parseISO(date) : date;
   return parsed < new Date();
 }
@@ -57,9 +57,9 @@ export function isPastDate(date: Date | string | null | undefined): boolean {
  * Get days until a date
  */
 export function daysUntil(date: Date | string | null | undefined): number | null {
-  if (!date) return null;
+  if (!date) {return null;}
   const parsed = typeof date === 'string' ? parseISO(date) : date;
-  if (!isValid(parsed)) return null;
+  if (!isValid(parsed)) {return null;}
   const now = new Date();
   const diff = parsed.getTime() - now.getTime();
   return Math.ceil(diff / (1000 * 60 * 60 * 24));
@@ -77,7 +77,7 @@ export function formatCurrency(
   currency = 'USD',
   options: Intl.NumberFormatOptions = {}
 ): string {
-  if (value === null || value === undefined) return '-';
+  if (value === null || value === undefined) {return '-';}
   return new Intl.NumberFormat('en-US', {
     style: 'currency',
     currency,
@@ -91,7 +91,7 @@ export function formatCurrency(
  * Format a number in millions/billions
  */
 export function formatLargeNumber(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '-';
+  if (value === null || value === undefined) {return '-';}
   if (value >= 1_000_000_000) {
     return `$${(value / 1_000_000_000).toFixed(1)}B`;
   }
@@ -108,7 +108,7 @@ export function formatLargeNumber(value: number | null | undefined): string {
  * Format a percentage
  */
 export function formatPercent(value: number | null | undefined, decimals = 1): string {
-  if (value === null || value === undefined) return '-';
+  if (value === null || value === undefined) {return '-';}
   return `${value.toFixed(decimals)}%`;
 }
 
@@ -119,7 +119,7 @@ export function formatNumber(
   value: number | null | undefined,
   options: Intl.NumberFormatOptions = {}
 ): string {
-  if (value === null || value === undefined) return '-';
+  if (value === null || value === undefined) {return '-';}
   return new Intl.NumberFormat('en-US', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 2,
@@ -131,7 +131,7 @@ export function formatNumber(
  * Format a multiple (e.g., EV/EBITDA)
  */
 export function formatMultiple(value: number | null | undefined): string {
-  if (value === null || value === undefined) return '-';
+  if (value === null || value === undefined) {return '-';}
   return `${value.toFixed(1)}x`;
 }
 
@@ -139,7 +139,7 @@ export function formatMultiple(value: number | null | undefined): string {
  * Format file size
  */
 export function formatFileSize(bytes: number): string {
-  if (bytes === 0) return '0 B';
+  if (bytes === 0) {return '0 B';}
   const k = 1024;
   const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
   const i = Math.floor(Math.log(bytes) / Math.log(k));
@@ -154,7 +154,7 @@ export function formatFileSize(bytes: number): string {
  * Truncate a string with ellipsis
  */
 export function truncate(str: string, length: number): string {
-  if (str.length <= length) return str;
+  if (str.length <= length) {return str;}
   return `${str.slice(0, length)}...`;
 }
 
@@ -162,7 +162,7 @@ export function truncate(str: string, length: number): string {
  * Generate initials from a name
  */
 export function getInitials(name: string | null | undefined): string {
-  if (!name) return '?';
+  if (!name) {return '?';}
   return name
     .split(' ')
     .map((n) => n[0])
@@ -247,7 +247,7 @@ export function unique<T>(array: T[], key?: keyof T): T[] {
   const seen = new Set();
   return array.filter((item) => {
     const value = item[key];
-    if (seen.has(value)) return false;
+    if (seen.has(value)) {return false;}
     seen.add(value);
     return true;
   });
