@@ -230,6 +230,30 @@ enum ConflictSeverity {
   CRITICAL
 }
 
+// Sprint 8 - CRM Enums
+enum ContactStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+  PROSPECT
+  LEAD
+}
+
+enum InteractionType {
+  EMAIL
+  CALL
+  MEETING
+  NOTE
+  TASK
+  LINKEDIN
+  OTHER
+}
+
+enum EmailDirection {
+  INBOUND
+  OUTBOUND
+}
+
 enum TradingWindowStatus {
   OPEN
   CLOSED
@@ -275,6 +299,15 @@ model User {
   insiderTradingWindows InsiderTradingWindow[]
   comments              Comment[]
   auditLogs             AuditLog[]             @relation("UserAuditLogs")
+
+  // Sprint 8 - CRM Relations
+  ownedContacts      Contact[]           @relation("ContactOwner")
+  createdInteractions Interaction[]      @relation("InteractionCreator")
+  createdContactNotes ContactNote[]      @relation("ContactNoteCreator")
+  createdMeetings    Meeting[]           @relation("MeetingCreator")
+  meetingAttendances MeetingAttendee[]   @relation("MeetingAttendees")
+  calendarConnection CalendarConnection?
+  emailConnection    EmailConnection?
 
   @@index([clerkId])
   @@index([email])
@@ -686,23 +719,236 @@ model Comment {
 
 /// Contact - CRM contacts for investors, advisors, and other stakeholders
 model Contact {
-  id        String      @id @default(cuid())
-  firstName String
-  lastName  String
-  email     String?
-  phone     String?
-  company   String?
-  title     String?
-  type      ContactType @default(OTHER)
+  id                String        @id @default(cuid())
+  firstName         String
+  lastName          String
+  email             String?
+  phone             String?
+  mobile            String?
+  company           String?       // Legacy field - prefer companyId
+  companyId         String?
+  title             String?
+  type              ContactType   @default(OTHER)
+  status            ContactStatus @default(ACTIVE)
+  linkedIn          String?
+  twitter           String?
+  address           String?
+  city              String?
+  state             String?
+  country           String?
+  postalCode        String?
+  avatarUrl         String?
+  notes             String?       @db.Text
+  tags              String[]      @default([])
+  isStarred         Boolean       @default(false)
+  relationshipScore Int           @default(0)
+  lastInteractionAt DateTime?
+  ownerId           String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  targets TargetContact[]
+  companyRef    Company?          @relation(fields: [companyId], references: [id])
+  owner         User?             @relation("ContactOwner", fields: [ownerId], references: [id])
+  targets       TargetContact[]
+  interactions  Interaction[]
+  meetings      MeetingAttendee[]
+  contactNotes  ContactNote[]
+  emails        Email[]
 
   @@index([email])
+  @@index([companyId])
+  @@index([ownerId])
+  @@index([status])
   @@map("contacts")
+}
+
+/// Company - Organizations that contacts belong to
+model Company {
+  id           String  @id @default(cuid())
+  name         String
+  industry     String?
+  website      String?
+  description  String? @db.Text
+  type         String? // "Investment Bank", "Law Firm", "Target", etc.
+  size         String? // "1-50", "51-200", etc.
+  headquarters String?
+  foundedYear  Int?
+  logoUrl      String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relations
+  contacts Contact[]
+  deals    CompanyDeal[]
+
+  @@index([name])
+  @@map("companies")
+}
+
+/// CompanyDeal - Deal history for companies
+model CompanyDeal {
+  id        String    @id @default(cuid())
+  companyId String
+  dealName  String
+  role      String    // "Lead Advisor", "Co-Counsel", etc.
+  status    String    // "Won", "Lost", "In Progress"
+  value     Decimal?  @db.Decimal(18, 2)
+  closedAt  DateTime?
+
+  createdAt DateTime @default(now())
+
+  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
+
+  @@index([companyId])
+  @@map("company_deals")
+}
+
+/// Interaction - Activity log for contact interactions
+model Interaction {
+  id          String          @id @default(cuid())
+  contactId   String
+  type        InteractionType
+  subject     String?
+  description String?         @db.Text
+  date        DateTime        @default(now())
+  duration    Int?            // minutes
+  outcome     String?
+
+  createdAt   DateTime @default(now())
+  createdById String?
+
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("InteractionCreator", fields: [createdById], references: [id])
+
+  @@index([contactId])
+  @@index([date])
+  @@map("interactions")
+}
+
+/// ContactNote - Notes attached to contacts
+model ContactNote {
+  id        String  @id @default(cuid())
+  contactId String
+  content   String  @db.Text
+  isPinned  Boolean @default(false)
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  contact   Contact @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  createdBy User?   @relation("ContactNoteCreator", fields: [createdById], references: [id])
+
+  @@index([contactId])
+  @@map("contact_notes")
+}
+
+/// Meeting - Scheduled meetings
+model Meeting {
+  id          String   @id @default(cuid())
+  title       String
+  description String?  @db.Text
+  startTime   DateTime
+  endTime     DateTime
+  location    String?
+  meetingUrl  String?  // Zoom/Google Meet link
+  calendarId  String?  // Google Calendar event ID
+  calendlyId  String?  // Calendly event ID
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  createdBy User?             @relation("MeetingCreator", fields: [createdById], references: [id])
+  attendees MeetingAttendee[]
+
+  @@index([startTime])
+  @@map("meetings")
+}
+
+/// MeetingAttendee - Meeting attendees junction table
+model MeetingAttendee {
+  id        String  @id @default(cuid())
+  meetingId String
+  contactId String?
+  userId    String?
+  email     String?
+  status    String  @default("pending") // "accepted", "declined", "pending"
+
+  meeting Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  contact Contact? @relation(fields: [contactId], references: [id])
+  user    User?    @relation("MeetingAttendees", fields: [userId], references: [id])
+
+  @@unique([meetingId, contactId])
+  @@unique([meetingId, userId])
+  @@map("meeting_attendees")
+}
+
+/// Email - Synced emails from Gmail
+model Email {
+  id        String         @id @default(cuid())
+  contactId String?
+  gmailId   String         @unique // Gmail message ID
+  threadId  String                 // Gmail thread ID
+  subject   String?
+  snippet   String?                // Preview text
+  body      String?        @db.Text // Full body (HTML)
+  direction EmailDirection
+  fromEmail String
+  toEmails  String[]
+  ccEmails  String[]       @default([])
+  date      DateTime
+  isRead    Boolean        @default(false)
+  isStarred Boolean        @default(false)
+  labels    String[]       @default([])
+
+  createdAt DateTime @default(now())
+
+  contact Contact? @relation(fields: [contactId], references: [id])
+
+  @@index([contactId])
+  @@index([threadId])
+  @@index([date])
+  @@map("emails")
+}
+
+/// CalendarConnection - OAuth tokens for calendar integrations
+model CalendarConnection {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  provider     String    // "google", "calendly"
+  accessToken  String    @db.Text
+  refreshToken String?   @db.Text
+  expiresAt    DateTime?
+  scope        String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("calendar_connections")
+}
+
+/// EmailConnection - OAuth tokens for Gmail integration
+model EmailConnection {
+  id           String    @id @default(cuid())
+  userId       String    @unique
+  provider     String    // "gmail"
+  accessToken  String    @db.Text
+  refreshToken String?   @db.Text
+  expiresAt    DateTime?
+  historyId    String?   // Gmail history ID for incremental sync
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("email_connections")
 }
 
 /// Task - Tasks and todos related to SPAC operations

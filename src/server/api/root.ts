@@ -4,10 +4,15 @@
  */
 
 import { alertRouter } from './routers/alert.router';
+import { calendarRouter } from './routers/calendar.router';
+import { companyRouter } from './routers/company.router';
 import { complianceRouter } from './routers/compliance.router';
+import { contactRouter } from './routers/contact.router';
 import { documentRouter } from './routers/document.router';
+import { emailRouter } from './routers/email.router';
 import { filingRouter } from './routers/filing.router';
 import { financialRouter } from './routers/financial.router';
+import { interactionRouter } from './routers/interaction.router';
 import { noteRouter } from './routers/note.router';
 import { spacRouter } from './routers/spac';
 import { targetRouter } from './routers/target.router';
@@ -20,6 +25,8 @@ import { createTRPCRouter } from './trpc';
  * API Structure:
  *
  * - alert.*          - Compliance alerts (list, getById, create, markAsRead, dismiss, generate)
+ * - calendar.*       - Calendar integration (connectGoogle, disconnectGoogle, getGoogleStatus, getGoogleEvents, createGoogleEvent, updateGoogleEvent, deleteGoogleEvent, connectCalendly, disconnectCalendly, getCalendlyStatus, getCalendlyLinks, createCalendlyLink, list, getById, create, update, delete, addAttendee, removeAttendee)
+ * - email.*          - Gmail integration (connect, disconnect, getStatus, sync, list, getThread, send, reply, markRead, toggleStar)
  * - filing.*         - SEC filing management (list, getById, create, update, delete, syncFilingsFromEdgar, getEdgarFilings)
  * - spac.*           - SPAC management (list, getById, create, update, delete)
  * - target.*         - Acquisition target management (list, getById, create, update, delete, updateStatus)
@@ -28,10 +35,15 @@ import { createTRPCRouter } from './trpc';
  */
 export const appRouter = createTRPCRouter({
   alert: alertRouter,
+  calendar: calendarRouter,
+  company: companyRouter,
   compliance: complianceRouter,
+  contact: contactRouter,
   document: documentRouter,
+  email: emailRouter,
   filing: filingRouter,
   financial: financialRouter,
+  interaction: interactionRouter,
   note: noteRouter,
   spac: spacRouter,
   target: targetRouter,

@@ -4,6 +4,7 @@
  */
 
 export { alertRouter } from './alert.router';
+export { emailRouter } from './email.router';
 export { spacRouter } from './spac.router';
 export { targetRouter } from './target.router';
 export { filingRouter } from './filing.router';
@@ -13,3 +14,4 @@ export { complianceRouter } from './compliance.router';
 export { financialRouter } from './financial.router';
 export { analyticsRouter } from './analytics.router';
 export { webhookRouter } from './webhook.router';
+export { calendarRouter } from './calendar.router';

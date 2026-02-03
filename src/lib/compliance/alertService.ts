@@ -479,6 +479,51 @@ export async function getActiveAlerts(options?: {
 }
 
 /**
+ * Get active alerts with total count in a single query
+ * Optimized for pagination - avoids N+1 queries
+ */
+export async function getActiveAlertsWithCount(options?: {
+  spacId?: string;
+  severity?: AlertSeverity[];
+  type?: AlertType[];
+  isRead?: boolean;
+  limit?: number;
+  offset?: number;
+}): Promise<{ alerts: Awaited<ReturnType<typeof getActiveAlerts>>; total: number }> {
+  const { spacId, severity, type, isRead, limit = 50, offset = 0 } = options || {};
+
+  const where = {
+    spacId: spacId || undefined,
+    isDismissed: false,
+    ...(severity?.length && { severity: { in: severity } }),
+    ...(type?.length && { type: { in: type } }),
+    ...(isRead !== undefined && { isRead }),
+  };
+
+  const [alerts, total] = await Promise.all([
+    db.complianceAlert.findMany({
+      where,
+      include: {
+        spac: {
+          select: { id: true, name: true, ticker: true },
+        },
+      },
+      orderBy: [
+        { isRead: 'asc' },
+        { severity: 'asc' },
+        { dueDate: 'asc' },
+        { createdAt: 'desc' },
+      ],
+      take: limit,
+      skip: offset,
+    }),
+    db.complianceAlert.count({ where }),
+  ]);
+
+  return { alerts, total };
+}
+
+/**
  * Get alert by ID
  */
 export async function getAlertById(alertId: string) {

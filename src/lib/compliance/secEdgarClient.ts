@@ -125,6 +125,15 @@ const SEC_USER_AGENT = 'SPAC-OS/1.0 (contact@spacos.com)';
 
 // Rate limiting: SEC allows max 10 requests per second
 const RATE_LIMIT_MS = 100;
+
+// NOTE: Serverless Environment Limitation
+// This module-level state does not persist across serverless function instances.
+// Each cold start creates a new instance with lastRequestTime = 0.
+// This is acceptable for SEC EDGAR because:
+// 1. SEC's limit is generous (10 req/sec) and our 100ms delay is conservative
+// 2. Serverless instances typically handle one request at a time
+// 3. Cold starts are infrequent enough that we won't hit rate limits
+// For high-volume scenarios, consider using Redis or a distributed rate limiter.
 let lastRequestTime = 0;
 
 // ============================================================================

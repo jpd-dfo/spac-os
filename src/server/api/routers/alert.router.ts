@@ -10,7 +10,7 @@ import {
   createAlert,
   dismissAlert,
   dismissMany,
-  getActiveAlerts,
+  getActiveAlertsWithCount,
   getAlertById,
   getRecentAlerts,
   getUnreadCount,
@@ -82,7 +82,8 @@ export const alertRouter = createTRPCRouter({
     .query(async ({ input }) => {
       const { spacId, severity, type, isRead, page, pageSize } = input;
 
-      const alerts = await getActiveAlerts({
+      // Single optimized query for both list and count
+      const { alerts, total } = await getActiveAlertsWithCount({
         spacId,
         severity: severity as AlertSeverity[] | undefined,
         type: type as AlertType[] | undefined,
@@ -90,9 +91,6 @@ export const alertRouter = createTRPCRouter({
         limit: pageSize,
         offset: (page - 1) * pageSize,
       });
-
-      // Get total count for pagination
-      const total = await getUnreadCount(spacId) + (await getActiveAlerts({ spacId, isRead: true })).length;
 
       return {
         items: alerts,

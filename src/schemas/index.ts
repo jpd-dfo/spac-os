@@ -212,15 +212,14 @@ export const AuditActionSchema = z.enum([
 
 export const ContactTypeSchema = z.enum([
   'INVESTOR',
-  'LEGAL',
-  'BANKING',
-  'ACCOUNTING',
-  'TARGET_MANAGEMENT',
-  'BOARD_MEMBER',
   'ADVISOR',
-  'REGULATORY',
-  'MEDIA',
-  'MANAGEMENT',
+  'LEGAL',
+  'BANKER',
+  'TARGET_EXEC',
+  'BOARD_MEMBER',
+  'SPONSOR',
+  'UNDERWRITER',
+  'AUDITOR',
   'OTHER',
 ]);
 
