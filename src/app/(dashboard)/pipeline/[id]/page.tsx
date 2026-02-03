@@ -29,12 +29,17 @@ import {
   Loader2,
   Plus,
   Flag,
+  Search,
+  FileSignature,
+  Sparkles,
 } from 'lucide-react';
-
 import toast from 'react-hot-toast';
 
 import { UploadModal } from '@/components/documents/UploadModal';
 import { TargetForm } from '@/components/forms/TargetForm';
+import { AIResearchPanel } from '@/components/pipeline/AIResearchPanel';
+import { AIScoreCard } from '@/components/pipeline/AIScoreCard';
+import { InvestmentMemo } from '@/components/pipeline/InvestmentMemo';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -530,6 +535,8 @@ export default function TargetDetailPage({ params }: PageProps) {
   const [isAddNoteModalOpen, setIsAddNoteModalOpen] = useState(false);
   const [newNoteContent, setNewNoteContent] = useState('');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
+  const [isResearchPanelOpen, setIsResearchPanelOpen] = useState(false);
+  const [isInvestmentMemoOpen, setIsInvestmentMemoOpen] = useState(false);
 
   // tRPC Query
   const {
@@ -863,6 +870,26 @@ export default function TargetDetailPage({ params }: PageProps) {
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-3">
+          {/* AI Actions */}
+          <Dropdown
+            trigger={
+              <Button variant="secondary">
+                <Sparkles className="mr-2 h-4 w-4" />
+                AI Tools
+              </Button>
+            }
+            align="right"
+          >
+            <DropdownLabel>AI Analysis</DropdownLabel>
+            <DropdownItem onClick={() => setIsResearchPanelOpen(true)}>
+              <Search className="mr-2 h-4 w-4" />
+              Research Company
+            </DropdownItem>
+            <DropdownItem onClick={() => setIsInvestmentMemoOpen(true)}>
+              <FileSignature className="mr-2 h-4 w-4" />
+              Generate Investment Memo
+            </DropdownItem>
+          </Dropdown>
           <Button variant="secondary" onClick={handleAddNote}>
             <Plus className="mr-2 h-4 w-4" />
             Add Note
@@ -1039,6 +1066,21 @@ export default function TargetDetailPage({ params }: PageProps) {
                   </CardContent>
                 </Card>
               )}
+
+              {/* AI Score Card */}
+              <AIScoreCard
+                targetId={target.id}
+                targetName={target.name}
+                targetData={{
+                  name: target.name,
+                  sector: target.subIndustry || target.industry,
+                  description: target.description,
+                  valuation: target.enterpriseValue,
+                  revenue: target.revenue,
+                  ebitda: target.ebitda,
+                }}
+                existingScore={target.evaluationScore}
+              />
 
               {/* Evaluation Scores */}
               <Card>
@@ -1392,6 +1434,30 @@ export default function TargetDetailPage({ params }: PageProps) {
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onUpload={handleUpload}
+      />
+
+      {/* AI Research Panel */}
+      <AIResearchPanel
+        targetId={target.id}
+        targetName={target.name}
+        targetSector={target.subIndustry || target.industry}
+        isOpen={isResearchPanelOpen}
+        onClose={() => setIsResearchPanelOpen(false)}
+      />
+
+      {/* Investment Memo Modal */}
+      <InvestmentMemo
+        isOpen={isInvestmentMemoOpen}
+        onClose={() => setIsInvestmentMemoOpen(false)}
+        target={{
+          id: target.id,
+          name: target.name,
+          sector: target.subIndustry || target.industry,
+          description: target.description,
+          valuation: target.enterpriseValue,
+          revenue: target.revenue,
+          ebitda: target.ebitda,
+        }}
       />
     </div>
   );
