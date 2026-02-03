@@ -10,9 +10,13 @@ import {
   List,
   ChevronDown,
   BarChart3,
+  Loader2,
+  AlertCircle,
+  CheckSquare,
 } from 'lucide-react';
 
 import { AddTargetForm, type NewTargetData } from '@/components/pipeline/AddTargetForm';
+import { BulkActionBar } from '@/components/pipeline/BulkActionBar';
 import { KanbanBoard, DEFAULT_COLUMNS } from '@/components/pipeline/KanbanBoard';
 import { PipelineFilters, DEFAULT_FILTERS, type PipelineFiltersState } from '@/components/pipeline/PipelineFilters';
 import { PipelineStats, PipelineStatsBar } from '@/components/pipeline/PipelineStats';
@@ -21,13 +25,112 @@ import { TargetDetailModal, type TargetDetails } from '@/components/pipeline/Tar
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Dropdown, DropdownItem, DropdownLabel } from '@/components/ui/Dropdown';
+import { exportToCSV, exportToExcel, type ExportableTarget } from '@/lib/export';
+import { trpc } from '@/lib/trpc/client';
 import { cn } from '@/lib/utils';
 
 // ============================================================================
-// Mock Data - Healthcare Targets for Soren Acquisition Corporation
+// Data Transformation Utilities
 // ============================================================================
 
-const MOCK_TEAM_MEMBERS: { id: string; name: string; avatar: string | undefined; role: string }[] = [
+// Map database status to UI pipeline stage
+function mapStatusToStage(status: string): PipelineStage {
+  const statusToStageMap: Record<string, PipelineStage> = {
+    'IDENTIFIED': 'sourcing',
+    'PRELIMINARY': 'sourcing',
+    'RESEARCHING': 'sourcing',
+    'OUTREACH': 'initial_screening',
+    'NDA_SIGNED': 'initial_screening',
+    'DUE_DILIGENCE': 'deep_evaluation',
+    'TERM_SHEET': 'deep_evaluation',
+    'LOI_SIGNED': 'deep_evaluation',
+    'LOI': 'negotiation',
+    'DEFINITIVE': 'execution',
+    'DA_SIGNED': 'execution',
+    'CLOSING': 'execution',
+    'CLOSED': 'closed_passed',
+    'COMPLETED': 'closed_passed',
+    'PASSED': 'closed_passed',
+    'TERMINATED': 'closed_passed',
+  };
+  return statusToStageMap[status] || 'sourcing';
+}
+
+// Map UI stage to database status for mutations
+function mapStageToStatus(stage: PipelineStage): string {
+  const stageToStatusMap: Record<PipelineStage, string> = {
+    'sourcing': 'IDENTIFIED',
+    'initial_screening': 'NDA_SIGNED',
+    'deep_evaluation': 'DUE_DILIGENCE',
+    'negotiation': 'LOI',
+    'execution': 'DEFINITIVE',
+    'closed_passed': 'PASSED',
+  };
+  return stageToStatusMap[stage] || 'IDENTIFIED';
+}
+
+// Map priority number to string
+function mapPriorityToString(priority: number | null): 'low' | 'medium' | 'high' | 'critical' | undefined {
+  if (priority === null) {
+    return undefined;
+  }
+  if (priority <= 1) {
+    return 'critical';
+  }
+  if (priority <= 2) {
+    return 'high';
+  }
+  if (priority <= 3) {
+    return 'medium';
+  }
+  return 'low';
+}
+
+// Calculate days in stage from dates (simplified - uses updatedAt)
+function calculateDaysInStage(updatedAt: Date | string | null): number {
+  if (!updatedAt) {
+    return 0;
+  }
+  const date = new Date(updatedAt);
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - date.getTime());
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+// Transform database target to UI target format
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformTargetToUI(dbTarget: any): Target {
+  return {
+    id: dbTarget.id,
+    name: dbTarget.name,
+    industry: dbTarget.industry || 'Unknown',
+    subIndustry: dbTarget.sector || undefined,
+    enterpriseValue: dbTarget.enterpriseValue || 0,
+    evaluationScore: dbTarget.overallScore ? Math.round(dbTarget.overallScore * 10) : 50, // Convert 1-10 to 0-100
+    daysInStage: calculateDaysInStage(dbTarget.updatedAt),
+    stage: mapStatusToStage(dbTarget.status),
+    priority: mapPriorityToString(dbTarget.priority),
+    source: 'research', // Default since not in DB
+    assignee: undefined, // Would need to add user assignment
+    description: dbTarget.description || '',
+    headquarters: dbTarget.headquarters || undefined,
+    revenue: dbTarget.revenue || undefined,
+    revenueGrowth: undefined, // Not directly in DB
+    ebitda: dbTarget.ebitda || undefined,
+    ebitdaMargin: dbTarget.ebitda && dbTarget.revenue
+      ? Math.round((dbTarget.ebitda / dbTarget.revenue) * 100)
+      : undefined,
+    employeeCount: dbTarget.employeeCount || undefined,
+    tags: dbTarget.tags || [],
+    investmentHighlights: dbTarget.keyOpportunities || undefined,
+    keyRisks: dbTarget.keyRisks || undefined,
+    createdAt: new Date(dbTarget.createdAt),
+    updatedAt: new Date(dbTarget.updatedAt),
+  };
+}
+
+// Placeholder team members (would come from users query in full implementation)
+const TEAM_MEMBERS: { id: string; name: string; avatar: string | undefined; role: string }[] = [
   { id: '1', name: 'Sarah Chen', avatar: undefined, role: 'Managing Director' },
   { id: '2', name: 'Michael Torres', avatar: undefined, role: 'Vice President' },
   { id: '3', name: 'Emily Watson', avatar: undefined, role: 'Associate' },
@@ -35,7 +138,8 @@ const MOCK_TEAM_MEMBERS: { id: string; name: string; avatar: string | undefined;
   { id: '5', name: 'Jessica Liu', avatar: undefined, role: 'Principal' },
 ];
 
-const MOCK_TARGETS: Target[] = [
+// Legacy mock data kept for reference - DELETE AFTER CONFIRMING tRPC WORKS
+const _MOCK_TARGETS_DEPRECATED: Target[] = [
   // Sourcing Stage
   {
     id: '1',
@@ -48,7 +152,7 @@ const MOCK_TARGETS: Target[] = [
     stage: 'sourcing',
     priority: 'medium',
     source: 'research',
-    assignee: MOCK_TEAM_MEMBERS[3],
+    assignee: TEAM_MEMBERS[3],
     description: 'Leading provider of AI-powered healthcare analytics solutions for hospital systems.',
     headquarters: 'Boston, MA',
     tags: ['saas', 'ai-driven', 'hospital-systems'],
@@ -66,7 +170,7 @@ const MOCK_TARGETS: Target[] = [
     stage: 'sourcing',
     priority: 'high',
     source: 'banker',
-    assignee: MOCK_TEAM_MEMBERS[2],
+    assignee: TEAM_MEMBERS[2],
     description: 'Innovative gene therapy company focused on rare genetic disorders.',
     headquarters: 'San Diego, CA',
     tags: ['gene-therapy', 'rare-disease', 'clinical-stage'],
@@ -102,7 +206,7 @@ const MOCK_TARGETS: Target[] = [
     stage: 'initial_screening',
     priority: 'high',
     source: 'referral',
-    assignee: MOCK_TEAM_MEMBERS[1],
+    assignee: TEAM_MEMBERS[1],
     description: 'Next-generation molecular diagnostics for oncology and infectious diseases.',
     headquarters: 'Cambridge, MA',
     revenue: 95000000,
@@ -122,7 +226,7 @@ const MOCK_TARGETS: Target[] = [
     daysInStage: 18,
     stage: 'initial_screening',
     source: 'research',
-    assignee: MOCK_TEAM_MEMBERS[2],
+    assignee: TEAM_MEMBERS[2],
     description: 'Healthcare data interoperability platform connecting EHR systems.',
     headquarters: 'Chicago, IL',
     revenue: 52000000,
@@ -141,7 +245,7 @@ const MOCK_TARGETS: Target[] = [
     stage: 'initial_screening',
     priority: 'medium',
     source: 'banker',
-    assignee: MOCK_TEAM_MEMBERS[4],
+    assignee: TEAM_MEMBERS[4],
     description: 'Innovative cardiovascular monitoring and intervention devices.',
     headquarters: 'Minneapolis, MN',
     revenue: 120000000,
@@ -163,7 +267,7 @@ const MOCK_TARGETS: Target[] = [
     stage: 'deep_evaluation',
     priority: 'high',
     source: 'banker',
-    assignee: MOCK_TEAM_MEMBERS[0],
+    assignee: TEAM_MEMBERS[0],
     description: 'Leading developer of minimally invasive orthopedic surgical devices.',
     headquarters: 'Denver, CO',
     revenue: 140000000,
@@ -197,7 +301,7 @@ const MOCK_TARGETS: Target[] = [
     stage: 'deep_evaluation',
     priority: 'critical',
     source: 'referral',
-    assignee: MOCK_TEAM_MEMBERS[0],
+    assignee: TEAM_MEMBERS[0],
     description: 'Clinical-stage biotech developing novel treatments for neurological disorders.',
     headquarters: 'San Francisco, CA',
     revenue: 0,
@@ -228,7 +332,7 @@ const MOCK_TARGETS: Target[] = [
     stage: 'deep_evaluation',
     priority: 'high',
     source: 'research',
-    assignee: MOCK_TEAM_MEMBERS[1],
+    assignee: TEAM_MEMBERS[1],
     description: 'AI-powered revenue cycle management solution for healthcare providers.',
     headquarters: 'Atlanta, GA',
     revenue: 85000000,
@@ -259,7 +363,7 @@ const MOCK_TARGETS: Target[] = [
     stage: 'negotiation',
     priority: 'critical',
     source: 'banker',
-    assignee: MOCK_TEAM_MEMBERS[0],
+    assignee: TEAM_MEMBERS[0],
     description: 'National behavioral health services platform with 45 outpatient locations.',
     headquarters: 'Phoenix, AZ',
     revenue: 180000000,
@@ -293,7 +397,7 @@ const MOCK_TARGETS: Target[] = [
     stage: 'negotiation',
     priority: 'high',
     source: 'referral',
-    assignee: MOCK_TEAM_MEMBERS[4],
+    assignee: TEAM_MEMBERS[4],
     description: 'Specialty pharmacy management platform connecting providers and pharmacies.',
     headquarters: 'Philadelphia, PA',
     revenue: 72000000,
@@ -316,7 +420,7 @@ const MOCK_TARGETS: Target[] = [
     stage: 'execution',
     priority: 'critical',
     source: 'banker',
-    assignee: MOCK_TEAM_MEMBERS[0],
+    assignee: TEAM_MEMBERS[0],
     description: 'Leading remote patient monitoring platform for chronic disease management.',
     headquarters: 'Austin, TX',
     revenue: 165000000,
@@ -398,7 +502,7 @@ const MOCK_TARGETS: Target[] = [
     daysInStage: 4,
     stage: 'sourcing',
     source: 'research',
-    assignee: MOCK_TEAM_MEMBERS[3],
+    assignee: TEAM_MEMBERS[3],
     description: 'AI-assisted surgical planning and navigation software.',
     headquarters: 'Pittsburgh, PA',
     tags: ['ai', 'surgical', 'software'],
@@ -417,7 +521,7 @@ const MOCK_TARGETS: Target[] = [
     daysInStage: 16,
     stage: 'initial_screening',
     source: 'referral',
-    assignee: MOCK_TEAM_MEMBERS[2],
+    assignee: TEAM_MEMBERS[2],
     description: 'Advanced wound care products and biologics.',
     headquarters: 'Columbus, OH',
     revenue: 68000000,
@@ -439,7 +543,7 @@ const MOCK_TARGETS: Target[] = [
     stage: 'deep_evaluation',
     priority: 'medium',
     source: 'banker',
-    assignee: MOCK_TEAM_MEMBERS[1],
+    assignee: TEAM_MEMBERS[1],
     description: 'Regional clinical laboratory network with specialty testing capabilities.',
     headquarters: 'Dallas, TX',
     revenue: 110000000,
@@ -518,8 +622,45 @@ function applyFilters(targets: Target[], filters: PipelineFiltersState): Target[
 // ============================================================================
 
 export default function PipelinePage() {
-  // State
-  const [targets, setTargets] = useState<Target[]>(MOCK_TARGETS);
+  // tRPC Queries and Mutations
+  const utils = trpc.useUtils();
+
+  const {
+    data: targetListData,
+    isLoading,
+    error,
+  } = trpc.target.list.useQuery({
+    page: 1,
+    pageSize: 100, // Get all for client-side filtering
+  });
+
+  const updateStatusMutation = trpc.target.updateStatus.useMutation({
+    onSuccess: () => {
+      utils.target.list.invalidate();
+    },
+  });
+
+  const createTargetMutation = trpc.target.create.useMutation({
+    onSuccess: () => {
+      utils.target.list.invalidate();
+    },
+  });
+
+  const deleteTargetMutation = trpc.target.delete.useMutation({
+    onSuccess: () => {
+      utils.target.list.invalidate();
+    },
+  });
+
+  // Transform database targets to UI format
+  const targets: Target[] = useMemo(() => {
+    if (!targetListData?.items) {
+      return [];
+    }
+    return targetListData.items.map(transformTargetToUI);
+  }, [targetListData]);
+
+  // UI State
   const [filters, setFilters] = useState<PipelineFiltersState>(DEFAULT_FILTERS);
   const [showFilters, setShowFilters] = useState(false);
   const [showStats, setShowStats] = useState(true);
@@ -530,6 +671,11 @@ export default function PipelinePage() {
   const [addFormInitialStage, setAddFormInitialStage] = useState<PipelineStage>('sourcing');
   const [sortBy, setSortBy] = useState<'name' | 'value' | 'score' | 'days'>('value');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('desc');
+  const [isExporting, setIsExporting] = useState(false);
+
+  // Selection state for bulk operations
+  const [selectedTargets, setSelectedTargets] = useState<Set<string>>(new Set());
+  const [isBulkOperationLoading, setIsBulkOperationLoading] = useState(false);
 
   // Filtered and sorted targets
   const filteredTargets = useMemo(() => {
@@ -573,16 +719,14 @@ export default function PipelinePage() {
 
   // Handlers
   const handleTargetMove = useCallback(
-    (targetId: string, fromStage: PipelineStage, toStage: PipelineStage) => {
-      setTargets((prev) =>
-        prev.map((target) =>
-          target.id === targetId
-            ? { ...target, stage: toStage, daysInStage: 0, updatedAt: new Date() }
-            : target
-        )
-      );
+    (targetId: string, _fromStage: PipelineStage, toStage: PipelineStage) => {
+      const newStatus = mapStageToStatus(toStage);
+      updateStatusMutation.mutate({
+        id: targetId,
+        status: newStatus as 'IDENTIFIED' | 'PRELIMINARY' | 'NDA_SIGNED' | 'DUE_DILIGENCE' | 'TERM_SHEET' | 'LOI' | 'DEFINITIVE' | 'CLOSED' | 'PASSED' | 'TERMINATED',
+      });
     },
-    []
+    [updateStatusMutation]
   );
 
   const handleTargetClick = useCallback((target: Target) => {
@@ -598,20 +742,17 @@ export default function PipelinePage() {
           break;
         case 'edit':
           // TODO: Open edit form
+          setSelectedTarget(target);
           break;
         case 'move':
           // TODO: Open stage picker
           break;
         case 'archive':
-          setTargets((prev) =>
-            prev.map((t) =>
-              t.id === target.id ? { ...t, stage: 'closed_passed' as PipelineStage } : t
-            )
-          );
+          deleteTargetMutation.mutate({ id: target.id });
           break;
       }
     },
-    [handleTargetClick]
+    [handleTargetClick, deleteTargetMutation]
   );
 
   const handleAddTarget = useCallback((stage?: PipelineStage) => {
@@ -620,26 +761,23 @@ export default function PipelinePage() {
   }, []);
 
   const handleSubmitNewTarget = useCallback((data: NewTargetData) => {
-    const newTarget: Target = {
-      id: `new-${Date.now()}`,
+    // Map UI stage to database status
+    const status = mapStageToStatus(data.stage);
+
+    createTargetMutation.mutate({
       name: data.name,
       industry: data.industry,
-      subIndustry: data.subIndustry,
+      sector: data.subIndustry,
       enterpriseValue: data.estimatedValuation,
-      evaluationScore: 50, // Initial score
-      daysInStage: 0,
-      stage: data.stage,
-      source: data.source,
       description: data.description,
-      headquarters: data.headquarters,
+      status: status as 'IDENTIFIED' | 'PRELIMINARY' | 'NDA_SIGNED' | 'DUE_DILIGENCE' | 'TERM_SHEET' | 'LOI' | 'DEFINITIVE' | 'CLOSED' | 'PASSED' | 'TERMINATED',
       tags: data.tags,
-      createdAt: new Date(),
-      updatedAt: new Date(),
-    };
-
-    setTargets((prev) => [...prev, newTarget]);
-    setIsAddFormOpen(false);
-  }, []);
+    }, {
+      onSuccess: () => {
+        setIsAddFormOpen(false);
+      },
+    });
+  }, [createTargetMutation]);
 
   const handleAdvanceTarget = useCallback((target: TargetDetails) => {
     const stageOrder: PipelineStage[] = [
@@ -653,15 +791,28 @@ export default function PipelinePage() {
     const currentIndex = stageOrder.indexOf(target.stage);
     const nextStage = stageOrder[currentIndex + 1];
     if (currentIndex < stageOrder.length - 1 && nextStage) {
-      handleTargetMove(target.id, target.stage, nextStage);
-      setIsDetailModalOpen(false);
+      const newStatus = mapStageToStatus(nextStage);
+      updateStatusMutation.mutate({
+        id: target.id,
+        status: newStatus as 'IDENTIFIED' | 'PRELIMINARY' | 'NDA_SIGNED' | 'DUE_DILIGENCE' | 'TERM_SHEET' | 'LOI' | 'DEFINITIVE' | 'CLOSED' | 'PASSED' | 'TERMINATED',
+      }, {
+        onSuccess: () => {
+          setIsDetailModalOpen(false);
+        },
+      });
     }
-  }, [handleTargetMove]);
+  }, [updateStatusMutation]);
 
   const handleRejectTarget = useCallback((target: TargetDetails) => {
-    handleTargetMove(target.id, target.stage, 'closed_passed');
-    setIsDetailModalOpen(false);
-  }, [handleTargetMove]);
+    updateStatusMutation.mutate({
+      id: target.id,
+      status: 'PASSED',
+    }, {
+      onSuccess: () => {
+        setIsDetailModalOpen(false);
+      },
+    });
+  }, [updateStatusMutation]);
 
   const handleSort = useCallback((newSortBy: typeof sortBy) => {
     if (sortBy === newSortBy) {
@@ -671,6 +822,122 @@ export default function PipelinePage() {
       setSortDirection('desc');
     }
   }, [sortBy]);
+
+  // Selection handlers for bulk operations
+  const toggleSelection = useCallback((target: Target, selected: boolean) => {
+    setSelectedTargets((prev) => {
+      const newSet = new Set(prev);
+      if (selected) {
+        newSet.add(target.id);
+      } else {
+        newSet.delete(target.id);
+      }
+      return newSet;
+    });
+  }, []);
+
+  const selectAll = useCallback(() => {
+    const allIds = new Set(filteredTargets.map((t) => t.id));
+    setSelectedTargets(allIds);
+  }, [filteredTargets]);
+
+  const deselectAll = useCallback(() => {
+    setSelectedTargets(new Set());
+  }, []);
+
+  // Bulk operation handlers
+  const handleBulkMoveToStage = useCallback(async (stage: PipelineStage) => {
+    if (selectedTargets.size === 0) {return;}
+
+    setIsBulkOperationLoading(true);
+    const newStatus = mapStageToStatus(stage);
+
+    try {
+      // Process all selected targets
+      const promises = Array.from(selectedTargets).map((targetId) =>
+        updateStatusMutation.mutateAsync({
+          id: targetId,
+          status: newStatus as 'IDENTIFIED' | 'PRELIMINARY' | 'NDA_SIGNED' | 'DUE_DILIGENCE' | 'TERM_SHEET' | 'LOI' | 'DEFINITIVE' | 'CLOSED' | 'PASSED' | 'TERMINATED',
+        })
+      );
+
+      await Promise.all(promises);
+
+      // Clear selection after successful operation
+      setSelectedTargets(new Set());
+      utils.target.list.invalidate();
+    } catch {
+      // Error handling - mutations already have error handling
+      console.error('Bulk move operation failed');
+    } finally {
+      setIsBulkOperationLoading(false);
+    }
+  }, [selectedTargets, updateStatusMutation, utils.target.list]);
+
+  const handleBulkArchive = useCallback(async () => {
+    if (selectedTargets.size === 0) {return;}
+
+    setIsBulkOperationLoading(true);
+
+    try {
+      // Process all selected targets for deletion
+      const promises = Array.from(selectedTargets).map((targetId) =>
+        deleteTargetMutation.mutateAsync({ id: targetId })
+      );
+
+      await Promise.all(promises);
+
+      // Clear selection after successful operation
+      setSelectedTargets(new Set());
+      utils.target.list.invalidate();
+    } catch {
+      // Error handling - mutations already have error handling
+      console.error('Bulk archive operation failed');
+    } finally {
+      setIsBulkOperationLoading(false);
+    }
+  }, [selectedTargets, deleteTargetMutation, utils.target.list]);
+
+  // Transform filtered targets to exportable format
+  const getExportData = useCallback((): ExportableTarget[] => {
+    return filteredTargets.map((target) => ({
+      id: target.id,
+      name: target.name,
+      industry: target.industry,
+      stage: target.stage,
+      enterpriseValue: target.enterpriseValue,
+      revenue: target.revenue,
+      ebitda: target.ebitda,
+      evaluationScore: target.evaluationScore,
+      priority: target.priority,
+      headquarters: target.headquarters,
+      employeeCount: target.employeeCount,
+      description: target.description,
+      tags: target.tags,
+      createdAt: target.createdAt,
+      updatedAt: target.updatedAt,
+    }));
+  }, [filteredTargets]);
+
+  const handleExportCSV = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const data = getExportData();
+      await exportToCSV(data, 'spac-pipeline');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [getExportData]);
+
+  const handleExportExcel = useCallback(async () => {
+    setIsExporting(true);
+    try {
+      const data = getExportData();
+      await exportToExcel(data, 'spac-pipeline');
+    } finally {
+      setIsExporting(false);
+    }
+  }, [getExportData]);
 
   return (
     <div className="space-y-6">
@@ -683,6 +950,18 @@ export default function PipelinePage() {
           </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
+          {/* Select All / Deselect Toggle */}
+          <Button
+            variant={selectedTargets.size > 0 ? 'primary' : 'secondary'}
+            size="md"
+            onClick={selectedTargets.size === filteredTargets.length ? deselectAll : selectAll}
+          >
+            <CheckSquare className="mr-2 h-4 w-4" />
+            {selectedTargets.size === filteredTargets.length && filteredTargets.length > 0
+              ? 'Deselect All'
+              : 'Select All'}
+          </Button>
+
           {/* View Toggle */}
           <div className="flex rounded-lg border border-slate-200 bg-white p-1">
             <button
@@ -772,16 +1051,23 @@ export default function PipelinePage() {
           {/* Export */}
           <Dropdown
             trigger={
-              <Button variant="secondary" size="md">
-                <Download className="mr-2 h-4 w-4" />
-                Export
+              <Button variant="secondary" size="md" disabled={isExporting}>
+                {isExporting ? (
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="mr-2 h-4 w-4" />
+                )}
+                {isExporting ? 'Exporting...' : 'Export'}
               </Button>
             }
             align="right"
           >
-            <DropdownItem>Export as CSV</DropdownItem>
-            <DropdownItem>Export as Excel</DropdownItem>
-            <DropdownItem>Export as PDF</DropdownItem>
+            <DropdownItem onClick={handleExportCSV} disabled={isExporting}>
+              Export as CSV
+            </DropdownItem>
+            <DropdownItem onClick={handleExportExcel} disabled={isExporting}>
+              Export as Excel
+            </DropdownItem>
           </Dropdown>
 
           {/* Add Target */}
@@ -800,7 +1086,7 @@ export default function PipelinePage() {
         <PipelineFilters
           filters={filters}
           onFiltersChange={setFilters}
-          availableAssignees={MOCK_TEAM_MEMBERS}
+          availableAssignees={TEAM_MEMBERS}
         />
       )}
 
@@ -809,20 +1095,45 @@ export default function PipelinePage() {
         <PipelineStats targets={filteredTargets} />
       )}
 
+      {/* Loading State */}
+      {isLoading && (
+        <div className="flex h-64 items-center justify-center rounded-lg border border-slate-200 bg-white">
+          <div className="flex items-center gap-3 text-slate-500">
+            <Loader2 className="h-6 w-6 animate-spin" />
+            <span>Loading pipeline...</span>
+          </div>
+        </div>
+      )}
+
+      {/* Error State */}
+      {error && (
+        <div className="flex h-64 items-center justify-center rounded-lg border border-red-200 bg-red-50">
+          <div className="flex items-center gap-3 text-red-600">
+            <AlertCircle className="h-6 w-6" />
+            <span>Failed to load pipeline: {error.message}</span>
+          </div>
+        </div>
+      )}
+
       {/* Main Content */}
-      {viewMode === 'kanban' ? (
+      {!isLoading && !error && viewMode === 'kanban' ? (
         <KanbanBoard
           targets={filteredTargets}
           columns={DEFAULT_COLUMNS}
+          isLoading={updateStatusMutation.isPending}
           onTargetMove={handleTargetMove}
           onTargetClick={handleTargetClick}
           onTargetQuickAction={handleQuickAction}
           onAddTarget={handleAddTarget}
+          selectedTargets={selectedTargets}
+          onSelectionChange={toggleSelection}
+          showCheckboxes={true}
         />
-      ) : (
+      ) : !isLoading && !error && (
         <div className="space-y-3">
           {/* List Header */}
           <div className="flex items-center gap-4 rounded-lg bg-slate-100 px-4 py-2 text-sm font-medium text-slate-600">
+            <div className="w-4" /> {/* Checkbox */}
             <div className="w-8" /> {/* Logo */}
             <div className="min-w-[180px] flex-1">Target</div>
             <div className="w-24 text-right">EV</div>
@@ -840,6 +1151,9 @@ export default function PipelinePage() {
               target={target}
               onClick={handleTargetClick}
               onQuickAction={handleQuickAction}
+              selected={selectedTargets.has(target.id)}
+              showCheckbox={true}
+              onSelectionChange={toggleSelection}
             />
           ))}
 
@@ -871,6 +1185,15 @@ export default function PipelinePage() {
         onClose={() => setIsAddFormOpen(false)}
         onSubmit={handleSubmitNewTarget}
         initialStage={addFormInitialStage}
+      />
+
+      {/* Bulk Action Bar */}
+      <BulkActionBar
+        selectedCount={selectedTargets.size}
+        onMoveToStage={handleBulkMoveToStage}
+        onArchive={handleBulkArchive}
+        onClearSelection={deselectAll}
+        isLoading={isBulkOperationLoading}
       />
     </div>
   );

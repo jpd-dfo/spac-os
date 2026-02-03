@@ -150,7 +150,7 @@ export const spacRouter = createTRPCRouter({
       if (targetGeographies?.length) {where.targetGeographies = { hasSome: targetGeographies };}
       if (tags?.length) {where.tags = { hasSome: tags };}
 
-      const [items, total] = await Promise.all([
+      const [rawItems, total] = await Promise.all([
         ctx.db.spac.findMany({
           where,
           include: {
@@ -172,6 +172,26 @@ export const spacRouter = createTRPCRouter({
         }),
         ctx.db.spac.count({ where }),
       ]);
+
+      // Transform Decimal/BigInt fields to serializable types
+      const items = rawItems.map((spac) => ({
+        ...spac,
+        trustAmount: spac.trustAmount ? Number(spac.trustAmount) : null,
+        ipoSize: spac.ipoSize ? Number(spac.ipoSize) : null,
+        trustBalance: spac.trustBalance ? Number(spac.trustBalance) : null,
+        sharesOutstanding: spac.sharesOutstanding ? Number(spac.sharesOutstanding) : null,
+        redemptionRate: spac.redemptionRate ? Number(spac.redemptionRate) : null,
+        trustAccounts: spac.trustAccounts.map((ta) => ({
+          ...ta,
+          currentBalance: ta.currentBalance ? Number(ta.currentBalance) : null,
+          perShareValue: ta.perShareValue ? Number(ta.perShareValue) : null,
+          accruedInterest: ta.accruedInterest ? Number(ta.accruedInterest) : null,
+        })),
+        sponsors: spac.sponsors.map((s) => ({
+          ...s,
+          ownershipPct: s.ownershipPct ? Number(s.ownershipPct) : null,
+        })),
+      }));
 
       return {
         items,

@@ -38,6 +38,10 @@ interface KanbanBoardProps {
   onTargetQuickAction?: (target: Target, action: QuickAction) => void;
   onAddTarget?: (stage?: PipelineStage) => void;
   showColumnSettings?: boolean;
+  // Selection props
+  selectedTargets?: Set<string>;
+  onSelectionChange?: (target: Target, selected: boolean) => void;
+  showCheckboxes?: boolean;
 }
 
 // ============================================================================
@@ -189,6 +193,10 @@ interface KanbanColumnContainerProps {
   onDragEnd: () => void;
   onDragOver: (e: React.DragEvent, column: KanbanColumn) => void;
   onDrop: (e: React.DragEvent, column: KanbanColumn) => void;
+  // Selection props
+  selectedTargets?: Set<string>;
+  onSelectionChange?: (target: Target, selected: boolean) => void;
+  showCheckboxes?: boolean;
 }
 
 function KanbanColumnContainer({
@@ -204,6 +212,9 @@ function KanbanColumnContainer({
   onDragEnd,
   onDragOver,
   onDrop,
+  selectedTargets,
+  onSelectionChange,
+  showCheckboxes,
 }: KanbanColumnContainerProps) {
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -300,8 +311,11 @@ function KanbanColumnContainer({
                 <TargetCard
                   target={target}
                   isDragging={draggedTarget?.id === target.id}
+                  isSelected={selectedTargets?.has(target.id)}
+                  showCheckbox={showCheckboxes}
                   onClick={onTargetClick}
                   onQuickAction={onTargetQuickAction}
+                  onSelectionChange={onSelectionChange}
                 />
               </div>
             ))
@@ -335,6 +349,9 @@ export function KanbanBoard({
   onTargetQuickAction,
   onAddTarget,
   showColumnSettings = false,
+  selectedTargets,
+  onSelectionChange,
+  showCheckboxes = false,
 }: KanbanBoardProps) {
   const [draggedTarget, setDraggedTarget] = useState<Target | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
@@ -421,6 +438,9 @@ export function KanbanBoard({
           onDragEnd={handleDragEnd}
           onDragOver={handleDragOver}
           onDrop={handleDrop}
+          selectedTargets={selectedTargets}
+          onSelectionChange={onSelectionChange}
+          showCheckboxes={showCheckboxes}
         />
       ))}
     </div>

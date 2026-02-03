@@ -9,6 +9,7 @@ import { useState } from 'react';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { httpBatchLink, loggerLink } from '@trpc/client';
+import superjson from 'superjson';
 
 import { trpc } from './client';
 
@@ -49,24 +50,24 @@ export function TRPCProvider({ children }: { children: React.ReactNode }) {
   );
 
   const [trpcClient] = useState(() => {
-    // Type assertion needed due to tRPC version mismatch between client and server configs
-    const links = [
-      loggerLink({
-        enabled: (opts) =>
-          process.env.NODE_ENV === 'development' ||
-          (opts.direction === 'down' && opts.result instanceof Error),
-      }),
-      httpBatchLink({
-        url: `${getBaseUrl()}/api/trpc`,
-        headers() {
-          return {
-            'x-trpc-source': 'react',
-          };
-        },
-      }),
-    ];
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return trpc.createClient({ links } as any);
+    return trpc.createClient({
+      transformer: superjson,
+      links: [
+        loggerLink({
+          enabled: (opts) =>
+            process.env.NODE_ENV === 'development' ||
+            (opts.direction === 'down' && opts.result instanceof Error),
+        }),
+        httpBatchLink({
+          url: `${getBaseUrl()}/api/trpc`,
+          headers() {
+            return {
+              'x-trpc-source': 'react',
+            };
+          },
+        }),
+      ],
+    });
   });
 
   return (

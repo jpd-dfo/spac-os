@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -26,15 +26,20 @@ import {
   Activity,
   MoreHorizontal,
   LinkIcon,
+  Loader2,
 } from 'lucide-react';
 
+import { TargetForm } from '@/components/forms/TargetForm';
 import { Avatar } from '@/components/ui/Avatar';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
+import { Modal, ModalHeader, ModalTitle, ModalBody } from '@/components/ui/Modal';
 import { Tooltip } from '@/components/ui/Tooltip';
+import { trpc } from '@/lib/trpc/client';
 import { cn, formatLargeNumber, formatDate, formatRelativeTime } from '@/lib/utils';
+import type { Target, TargetStatus } from '@/types';
 
 // ============================================================================
 // Types
@@ -138,10 +143,142 @@ interface TargetDetails {
 }
 
 // ============================================================================
-// Mock Data
+// Data Transformation Utilities
 // ============================================================================
 
-const MOCK_TARGET: TargetDetails = {
+// Map database status to UI pipeline stage
+function mapStatusToStage(status: string): PipelineStage {
+  const statusToStageMap: Record<string, PipelineStage> = {
+    'IDENTIFIED': 'sourcing',
+    'PRELIMINARY': 'sourcing',
+    'RESEARCHING': 'sourcing',
+    'OUTREACH': 'initial_screening',
+    'NDA_SIGNED': 'initial_screening',
+    'DUE_DILIGENCE': 'deep_evaluation',
+    'TERM_SHEET': 'deep_evaluation',
+    'LOI_SIGNED': 'deep_evaluation',
+    'LOI': 'negotiation',
+    'DEFINITIVE': 'execution',
+    'DA_SIGNED': 'execution',
+    'CLOSING': 'execution',
+    'CLOSED': 'closed_passed',
+    'COMPLETED': 'closed_passed',
+    'PASSED': 'closed_passed',
+    'TERMINATED': 'closed_passed',
+  };
+  return statusToStageMap[status] || 'sourcing';
+}
+
+// Schema TargetStatus type for mutations
+type SchemaTargetStatus = 'IDENTIFIED' | 'PRELIMINARY' | 'NDA_SIGNED' | 'DUE_DILIGENCE' | 'TERM_SHEET' | 'LOI' | 'DEFINITIVE' | 'CLOSED' | 'PASSED' | 'TERMINATED';
+
+// Map UI stage to database status for mutations
+function mapStageToStatus(stage: PipelineStage): SchemaTargetStatus {
+  const stageToStatusMap: Record<PipelineStage, SchemaTargetStatus> = {
+    'sourcing': 'IDENTIFIED',
+    'initial_screening': 'NDA_SIGNED',
+    'deep_evaluation': 'DUE_DILIGENCE',
+    'negotiation': 'LOI',
+    'execution': 'DEFINITIVE',
+    'closed_passed': 'PASSED',
+  };
+  return stageToStatusMap[stage] || 'IDENTIFIED';
+}
+
+// Map priority number to string
+function mapPriorityToString(priority: number | null): 'low' | 'medium' | 'high' | 'critical' | undefined {
+  if (priority === null) {
+    return undefined;
+  }
+  if (priority <= 1) {
+    return 'critical';
+  }
+  if (priority <= 2) {
+    return 'high';
+  }
+  if (priority <= 3) {
+    return 'medium';
+  }
+  return 'low';
+}
+
+// Calculate days in stage from dates
+function calculateDaysInStage(updatedAt: Date | string | null): number {
+  if (!updatedAt) {
+    return 0;
+  }
+  const date = new Date(updatedAt);
+  const now = new Date();
+  const diffTime = Math.abs(now.getTime() - date.getTime());
+  return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+}
+
+// Transform database target to UI TargetDetails format
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function transformDbTargetToDetails(dbTarget: any): TargetDetails {
+  return {
+    id: dbTarget.id,
+    name: dbTarget.name,
+    industry: dbTarget.industry || 'Unknown',
+    subIndustry: dbTarget.sector || undefined,
+    description: dbTarget.description || undefined,
+    headquarters: dbTarget.headquarters || undefined,
+    website: dbTarget.website || undefined,
+    foundedYear: dbTarget.foundedYear || undefined,
+    employeeCount: dbTarget.employeeCount || undefined,
+    stage: mapStatusToStage(dbTarget.status),
+    priority: mapPriorityToString(dbTarget.priority),
+    source: 'research', // Default - not in DB
+    enterpriseValue: dbTarget.enterpriseValue || 0,
+    equityValue: dbTarget.equityValue || undefined,
+    revenue: dbTarget.revenue || undefined,
+    revenueGrowth: undefined, // Not directly in DB
+    ebitda: dbTarget.ebitda || undefined,
+    ebitdaMargin: dbTarget.ebitda && dbTarget.revenue
+      ? Math.round((dbTarget.ebitda / dbTarget.revenue) * 100)
+      : undefined,
+    evaluationScore: dbTarget.overallScore ? Math.round(dbTarget.overallScore * 10) : 50,
+    managementScore: dbTarget.managementScore ? dbTarget.managementScore * 10 : undefined,
+    marketScore: dbTarget.marketScore ? dbTarget.marketScore * 10 : undefined,
+    financialScore: dbTarget.financialScore ? dbTarget.financialScore * 10 : undefined,
+    operationalScore: dbTarget.operationalScore ? dbTarget.operationalScore * 10 : undefined,
+    riskScore: dbTarget.riskScore ? dbTarget.riskScore * 10 : undefined,
+    daysInStage: calculateDaysInStage(dbTarget.updatedAt),
+    assignee: undefined, // Would need user assignment system
+    associatedSpac: dbTarget.spac ? {
+      id: dbTarget.spac.id,
+      name: dbTarget.spac.name,
+      ticker: dbTarget.spac.ticker || '',
+    } : undefined,
+    tags: dbTarget.tags || [],
+    investmentHighlights: dbTarget.keyOpportunities || [],
+    keyRisks: dbTarget.keyRisks || [],
+    keyContacts: dbTarget.contacts?.map((c: { contact: { id: string; name: string; title?: string; email?: string; phone?: string } }) => ({
+      id: c.contact.id,
+      name: c.contact.name,
+      title: c.contact.title || '',
+      email: c.contact.email,
+      phone: c.contact.phone,
+    })) || [],
+    documents: dbTarget.documents?.map((d: { id: string; name: string; type?: string; fileSize?: number; createdAt: string }) => ({
+      id: d.id,
+      name: d.name,
+      type: d.type || 'Unknown',
+      size: d.fileSize ? `${Math.round(d.fileSize / 1024)} KB` : 'Unknown',
+      uploadedAt: new Date(d.createdAt),
+      uploadedBy: 'System',
+    })) || [],
+    activities: [], // Would need activity log system
+    createdAt: new Date(dbTarget.createdAt),
+    updatedAt: new Date(dbTarget.updatedAt),
+  };
+}
+
+// ============================================================================
+// Legacy Mock Data (kept for reference - to be deleted)
+// ============================================================================
+
+const _MOCK_TARGET_DEPRECATED: TargetDetails = {
   id: '7',
   name: 'OrthoInnovate',
   industry: 'Medical Devices',
@@ -337,25 +474,53 @@ interface PageProps {
 
 export default function TargetDetailPage({ params }: PageProps) {
   const router = useRouter();
-  const [target, setTarget] = useState<TargetDetails | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'financials' | 'diligence' | 'documents' | 'activity'>('overview');
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
-  // Load target data
-  useEffect(() => {
-    // Simulate API call - in real app, fetch from API using params.id
-    const loadTarget = async () => {
-      setIsLoading(true);
-      // Simulated delay
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      setTarget(MOCK_TARGET);
-      setIsLoading(false);
-    };
-    loadTarget();
-  }, [params.id]);
+  // tRPC Query
+  const {
+    data: dbTarget,
+    isLoading,
+    error,
+  } = trpc.target.getById.useQuery(
+    { id: params.id },
+    { enabled: !!params.id }
+  );
+
+  // tRPC Mutations
+  const utils = trpc.useUtils();
+
+  const updateStatusMutation = trpc.target.updateStatus.useMutation({
+    onSuccess: () => {
+      utils.target.getById.invalidate({ id: params.id });
+    },
+  });
+
+  const deleteTargetMutation = trpc.target.delete.useMutation({
+    onSuccess: () => {
+      router.push('/pipeline');
+    },
+  });
+
+  const updateTargetMutation = trpc.target.update.useMutation({
+    onSuccess: () => {
+      utils.target.getById.invalidate({ id: params.id });
+      setIsEditModalOpen(false);
+    },
+  });
+
+  // Transform database target to UI format
+  const target = useMemo(() => {
+    if (!dbTarget) {
+      return null;
+    }
+    return transformDbTargetToDetails(dbTarget);
+  }, [dbTarget]);
 
   const handleAdvanceStage = useCallback(() => {
-    if (!target) {return;}
+    if (!target) {
+      return;
+    }
     const stageOrder: PipelineStage[] = [
       'sourcing',
       'initial_screening',
@@ -367,19 +532,77 @@ export default function TargetDetailPage({ params }: PageProps) {
     const currentIndex = stageOrder.indexOf(target.stage);
     const nextStage = stageOrder[currentIndex + 1];
     if (currentIndex < stageOrder.length - 1 && nextStage) {
-      setTarget({ ...target, stage: nextStage, daysInStage: 0 });
+      const newStatus = mapStageToStatus(nextStage);
+      updateStatusMutation.mutate({
+        id: target.id,
+        status: newStatus as 'IDENTIFIED' | 'PRELIMINARY' | 'NDA_SIGNED' | 'DUE_DILIGENCE' | 'TERM_SHEET' | 'LOI' | 'DEFINITIVE' | 'CLOSED' | 'PASSED' | 'TERMINATED',
+      });
     }
-  }, [target]);
+  }, [target, updateStatusMutation]);
 
   const handleReject = useCallback(() => {
-    if (!target) {return;}
-    setTarget({ ...target, stage: 'closed_passed', daysInStage: 0 });
-  }, [target]);
+    if (!target) {
+      return;
+    }
+    updateStatusMutation.mutate({
+      id: target.id,
+      status: 'PASSED',
+    });
+  }, [target, updateStatusMutation]);
+
+  const handleArchive = useCallback(() => {
+    if (!target) {
+      return;
+    }
+    deleteTargetMutation.mutate({ id: target.id });
+  }, [target, deleteTargetMutation]);
+
+  const handleEdit = useCallback(() => {
+    setIsEditModalOpen(true);
+  }, []);
+
+  const handleEditSubmit = useCallback(async (data: Partial<Target>) => {
+    if (!target) {
+      return;
+    }
+    updateTargetMutation.mutate({
+      id: target.id,
+      data: {
+        name: data.name,
+        description: data.description,
+        industry: data.industry,
+        sector: data.sector,
+        enterpriseValue: data.enterpriseValue,
+        revenue: data.ltmRevenue,
+        ebitda: data.ltmEbitda,
+        priority: data.priority,
+        probability: data.probability,
+        status: data.status as SchemaTargetStatus | undefined,
+        stage: data.stage,
+      },
+    });
+    setIsEditModalOpen(false);
+  }, [target, updateTargetMutation]);
 
   if (isLoading) {
     return (
       <div className="flex h-96 items-center justify-center">
-        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary-200 border-t-primary-600" />
+        <div className="flex items-center gap-3 text-slate-500">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <span>Loading target details...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="flex h-96 flex-col items-center justify-center">
+        <AlertCircle className="h-12 w-12 text-red-400" />
+        <p className="mt-4 text-red-600">Error loading target: {error.message}</p>
+        <Button variant="secondary" className="mt-4" onClick={() => router.push('/pipeline')}>
+          Back to Pipeline
+        </Button>
       </div>
     );
   }
@@ -497,7 +720,7 @@ export default function TargetDetailPage({ params }: PageProps) {
 
         {/* Actions */}
         <div className="flex flex-wrap items-center gap-3">
-          <Button variant="secondary">
+          <Button variant="secondary" onClick={handleEdit}>
             <Edit className="mr-2 h-4 w-4" />
             Edit
           </Button>
@@ -512,7 +735,7 @@ export default function TargetDetailPage({ params }: PageProps) {
             <DropdownItem>Export to PDF</DropdownItem>
             <DropdownItem>Share</DropdownItem>
             <DropdownDivider />
-            <DropdownItem variant="danger">Archive</DropdownItem>
+            <DropdownItem variant="danger" onClick={handleArchive}>Archive</DropdownItem>
           </Dropdown>
           {canReject && (
             <Button variant="danger" onClick={handleReject}>
@@ -917,6 +1140,32 @@ export default function TargetDetailPage({ params }: PageProps) {
           )}
         </div>
       </div>
+
+      {/* Edit Target Modal */}
+      <Modal isOpen={isEditModalOpen} onClose={() => setIsEditModalOpen(false)} size="xl">
+        <ModalHeader>
+          <ModalTitle>Edit Target</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          <TargetForm
+            spacId={target.associatedSpac?.id || ''}
+            initialData={{
+              name: target.name,
+              description: target.description,
+              industry: target.industry,
+              sector: target.subIndustry,
+              status: mapStageToStatus(target.stage) as TargetStatus,
+              enterpriseValue: target.enterpriseValue,
+              ltmRevenue: target.revenue,
+              ltmEbitda: target.ebitda,
+              priority: target.priority === 'critical' ? 1 : target.priority === 'high' ? 2 : target.priority === 'medium' ? 3 : 4,
+            }}
+            onSubmit={handleEditSubmit}
+            onCancel={() => setIsEditModalOpen(false)}
+            isLoading={updateTargetMutation.isPending}
+          />
+        </ModalBody>
+      </Modal>
     </div>
   );
 }

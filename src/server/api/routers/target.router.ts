@@ -73,7 +73,23 @@ export const targetRouter = createTRPCRouter({
         });
       }
 
-      return target;
+      // Serialize Decimal fields
+      return {
+        ...target,
+        valuation: target.valuation ? Number(target.valuation) : null,
+        enterpriseValue: target.enterpriseValue ? Number(target.enterpriseValue) : null,
+        revenue: target.revenue ? Number(target.revenue) : null,
+        ebitda: target.ebitda ? Number(target.ebitda) : null,
+        evRevenue: target.evRevenue ? Number(target.evRevenue) : null,
+        evEbitda: target.evEbitda ? Number(target.evEbitda) : null,
+        aiScore: target.aiScore ? Number(target.aiScore) : null,
+        overallScore: target.overallScore ? Number(target.overallScore) : null,
+        probability: target.probability ? Number(target.probability) : null,
+        transactions: target.transactions.map((t) => ({
+          ...t,
+          amount: t.amount ? Number(t.amount) : null,
+        })),
+      };
     }),
 
   list: protectedProcedure
@@ -144,7 +160,7 @@ export const targetRouter = createTRPCRouter({
         };
       }
 
-      const [items, total] = await Promise.all([
+      const [rawItems, total] = await Promise.all([
         ctx.db.target.findMany({
           where,
           include: {
@@ -161,6 +177,20 @@ export const targetRouter = createTRPCRouter({
         }),
         ctx.db.target.count({ where }),
       ]);
+
+      // Serialize Decimal fields
+      const items = rawItems.map((target) => ({
+        ...target,
+        valuation: target.valuation ? Number(target.valuation) : null,
+        enterpriseValue: target.enterpriseValue ? Number(target.enterpriseValue) : null,
+        revenue: target.revenue ? Number(target.revenue) : null,
+        ebitda: target.ebitda ? Number(target.ebitda) : null,
+        evRevenue: target.evRevenue ? Number(target.evRevenue) : null,
+        evEbitda: target.evEbitda ? Number(target.evEbitda) : null,
+        aiScore: target.aiScore ? Number(target.aiScore) : null,
+        overallScore: target.overallScore ? Number(target.overallScore) : null,
+        probability: target.probability ? Number(target.probability) : null,
+      }));
 
       return {
         items,
@@ -389,12 +419,27 @@ export const targetRouter = createTRPCRouter({
         orderBy: [{ priority: 'asc' }, { probability: 'desc' }],
       });
 
-      // Group by status
-      const pipeline: Record<string, typeof targets> = {};
+      // Group by status and serialize Decimals
+      const pipeline: Record<string, Array<{
+        id: string;
+        name: string;
+        status: string;
+        stage: string | null;
+        priority: number | null;
+        probability: number | null;
+        enterpriseValue: number | null;
+        industry: string | null;
+        spac: { id: string; name: string; ticker: string | null } | null;
+      }>> = {};
+
       for (const target of targets) {
         const status = target.status;
         if (!pipeline[status]) {pipeline[status] = [];}
-        pipeline[status]!.push(target);
+        pipeline[status]!.push({
+          ...target,
+          enterpriseValue: target.enterpriseValue ? Number(target.enterpriseValue) : null,
+          probability: target.probability ? Number(target.probability) : null,
+        });
       }
 
       return pipeline;
@@ -528,9 +573,29 @@ export const targetRouter = createTRPCRouter({
         comparables.reduce((sum, c) => sum + (Number(c.evEbitda) || 0), 0) /
         (comparables.filter((c) => c.evEbitda).length || 1);
 
+      // Serialize Decimals for target
+      const serializedTarget = {
+        ...target,
+        enterpriseValue: target.enterpriseValue ? Number(target.enterpriseValue) : null,
+        revenue: target.revenue ? Number(target.revenue) : null,
+        ebitda: target.ebitda ? Number(target.ebitda) : null,
+        evRevenue: target.evRevenue ? Number(target.evRevenue) : null,
+        evEbitda: target.evEbitda ? Number(target.evEbitda) : null,
+      };
+
+      // Serialize Decimals for comparables
+      const serializedComparables = comparables.map((c) => ({
+        ...c,
+        enterpriseValue: c.enterpriseValue ? Number(c.enterpriseValue) : null,
+        revenue: c.revenue ? Number(c.revenue) : null,
+        ebitda: c.ebitda ? Number(c.ebitda) : null,
+        evRevenue: c.evRevenue ? Number(c.evRevenue) : null,
+        evEbitda: c.evEbitda ? Number(c.evEbitda) : null,
+      }));
+
       return {
-        target,
-        comparables,
+        target: serializedTarget,
+        comparables: serializedComparables,
         industryAverages: {
           evRevenue: avgEvRevenue,
           evEbitda: avgEvEbitda,
@@ -795,9 +860,9 @@ export const targetRouter = createTRPCRouter({
           .filter((i) => i.industry)
           .map((i) => ({ industry: i.industry, count: i._count })),
         averages: {
-          enterpriseValue: avgValuation._avg.enterpriseValue,
-          evRevenue: avgValuation._avg.evRevenue,
-          evEbitda: avgValuation._avg.evEbitda,
+          enterpriseValue: avgValuation._avg.enterpriseValue ? Number(avgValuation._avg.enterpriseValue) : null,
+          evRevenue: avgValuation._avg.evRevenue ? Number(avgValuation._avg.evRevenue) : null,
+          evEbitda: avgValuation._avg.evEbitda ? Number(avgValuation._avg.evEbitda) : null,
         },
         conversionRate,
       };
