@@ -1,7 +1,6 @@
 // SPAC OS - Contacts Module Components
 // =====================================
 
-export { ContactList } from './ContactList';
 export { ContactCard } from './ContactCard';
 export { ContactDetailModal } from './ContactDetailModal';
 export { RelationshipGraph } from './RelationshipGraph';
@@ -9,17 +8,10 @@ export { InteractionLog } from './InteractionLog';
 export { CompanyProfile } from './CompanyProfile';
 export { AddContactForm } from './AddContactForm';
 
-// Export types and mock data
+// Export types from dedicated types file
 export {
-  mockContacts,
-  mockCompanies,
   contactCategories,
-  getContactById,
-  getCompanyById,
-  getContactsByCompany,
-  getContactsByCategory,
-  searchContacts,
-} from './mockContactsData';
+} from './contact.types';
 
 export type {
   ContactCategory,
@@ -29,4 +21,4 @@ export type {
   LinkedDeal,
   ExtendedContact,
   Company,
-} from './mockContactsData';
+} from './contact.types';

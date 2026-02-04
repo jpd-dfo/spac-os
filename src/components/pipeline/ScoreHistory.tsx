@@ -186,6 +186,13 @@ export function TrendBadge({ trend, changePercent, showPercent = true, size = 'm
   );
 }
 
+// Tailwind theme color values from tailwind.config.ts
+// Using these constants avoids hardcoded hex values and maintains consistency with theme
+const SPARKLINE_COLORS = {
+  success: 'rgb(34, 197, 94)', // success-500 from Tailwind config
+  danger: 'rgb(239, 68, 68)',  // danger-500 from Tailwind config
+} as const;
+
 interface SparklineProps {
   data: number[];
   width?: number;
@@ -218,12 +225,12 @@ function Sparkline({ data, width = 100, height = 30, className }: SparklineProps
 
   const pathD = `M ${points.join(' L ')}`;
 
-  // Determine color based on trend
+  // Determine color based on trend using theme colors
   // We already checked data.length >= 2 above, so these are safe
   const lastValue = data[data.length - 1] ?? 0;
   const firstValue = data[0] ?? 0;
   const isImproving = lastValue >= firstValue;
-  const strokeColor = isImproving ? '#22c55e' : '#ef4444';
+  const strokeColor = isImproving ? SPARKLINE_COLORS.success : SPARKLINE_COLORS.danger;
 
   return (
     <svg

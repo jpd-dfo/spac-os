@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/Button';
 import { Input, Textarea } from '@/components/ui/Input';
 import { cn } from '@/lib/utils';
 
-import type { ContactCategory, ExtendedContact } from './mockContactsData';
+import type { ContactCategory, ExtendedContact } from './contact.types';
 
 interface AddContactFormProps {
   onSubmit: (contact: Partial<ExtendedContact>) => void;

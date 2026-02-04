@@ -22,7 +22,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatDate, formatRelativeTime } from '@/lib/utils';
 
-import type { ContactInteraction, InteractionType } from './mockContactsData';
+import type { ContactInteraction, InteractionType } from './contact.types';
 
 interface InteractionLogProps {
   interactions: ContactInteraction[];

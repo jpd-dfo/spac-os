@@ -1,4 +1,5 @@
 import { jsPDF } from 'jspdf';
+import toast from 'react-hot-toast';
 
 // ============================================================================
 // Types
@@ -48,7 +49,12 @@ const COLORS = {
 // Helper Functions
 // ============================================================================
 
-function formatCurrency(value: number): string {
+function formatCurrency(value: number | null | undefined): string {
+  // Handle null, undefined, and NaN gracefully
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return 'N/A';
+  }
+
   if (value >= 1_000_000_000) {
     return `$${(value / 1_000_000_000).toFixed(1)}B`;
   } else if (value >= 1_000_000) {
@@ -276,28 +282,36 @@ export function downloadMemoPDF(
   memoData: MemoData,
   filename?: string
 ): void {
-  const blob = generateMemoPDF(memoData);
+  try {
+    const blob = generateMemoPDF(memoData);
 
-  // Create filename
-  const sanitizedCompanyName = memoData.companyName
-    .replace(/[^a-zA-Z0-9\s-]/g, '')
-    .replace(/\s+/g, '-')
-    .toLowerCase();
+    // Create filename
+    const sanitizedCompanyName = memoData.companyName
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .toLowerCase();
 
-  const date = new Date().toISOString().split('T')[0];
-  const finalFilename = filename || `investment-memo-${sanitizedCompanyName}-${date}.pdf`;
+    const date = new Date().toISOString().split('T')[0];
+    const finalFilename = filename || `investment-memo-${sanitizedCompanyName}-${date}.pdf`;
 
-  // Create download link
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement('a');
-  link.href = url;
-  link.download = finalFilename;
+    // Create download link
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = finalFilename;
 
-  // Trigger download
-  document.body.appendChild(link);
-  link.click();
+    // Trigger download
+    document.body.appendChild(link);
+    link.click();
 
-  // Cleanup
-  document.body.removeChild(link);
-  URL.revokeObjectURL(url);
+    // Cleanup
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    toast.success(`Investment memo downloaded: ${finalFilename}`);
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('PDF export failed:', error);
+    toast.error(`Failed to export PDF: ${errorMessage}`);
+  }
 }

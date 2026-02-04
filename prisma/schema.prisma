@@ -1501,6 +1501,9 @@ model ComplianceAlert {
   @@index([isRead])
   @@index([isDismissed])
   @@index([dueDate])
+  // TD-001: Composite index for optimized alert list queries
+  // Covers the common filter pattern: isDismissed + spacId + ordering columns
+  @@index([isDismissed, spacId, isRead, severity, dueDate, createdAt])
   @@map("compliance_alerts")
 }
 

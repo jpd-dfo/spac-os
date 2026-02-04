@@ -31,7 +31,7 @@ import { cn, formatDate, formatRelativeTime } from '@/lib/utils';
 
 import { InteractionLog } from './InteractionLog';
 
-import type { ExtendedContact, ContactCategory } from './mockContactsData';
+import type { ExtendedContact, ContactCategory } from './contact.types';
 
 interface ContactDetailModalProps {
   contact: ExtendedContact;

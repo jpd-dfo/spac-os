@@ -21,7 +21,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { cn, formatRelativeTime } from '@/lib/utils';
 
-import type { ExtendedContact, ContactCategory } from './mockContactsData';
+import type { ExtendedContact, ContactCategory } from './contact.types';
 
 interface ContactCardProps {
   contact: ExtendedContact;

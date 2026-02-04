@@ -17,7 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn } from '@/lib/utils';
 
-import type { ExtendedContact, ContactCategory } from './mockContactsData';
+import type { ExtendedContact, ContactCategory } from './contact.types';
 
 interface RelationshipGraphProps {
   contacts: ExtendedContact[];

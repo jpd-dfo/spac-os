@@ -19,6 +19,9 @@ import {
   MessageSquare,
   ChevronRight,
   Clock,
+  Phone,
+  Mail,
+  Linkedin,
   type LucideIcon,
 } from 'lucide-react';
 
@@ -33,13 +36,21 @@ import { cn, formatRelativeTime } from '@/lib/utils';
 export type ActivityType =
   | 'DOCUMENT_UPLOAD'
   | 'DOCUMENT_EDIT'
+  | 'DOCUMENT'
   | 'TARGET_ADDED'
   | 'TARGET_UPDATE'
   | 'TASK_COMPLETED'
   | 'TASK_ASSIGNED'
+  | 'TASK'
   | 'FILING_SUBMITTED'
   | 'FILING_APPROVED'
+  | 'FILING'
   | 'MEETING_SCHEDULED'
+  | 'MEETING'
+  | 'CALL'
+  | 'EMAIL'
+  | 'NOTE'
+  | 'LINKEDIN'
   | 'COMMENT_ADDED'
   | 'DEAL_UPDATE'
   | 'COMPLIANCE_ALERT'
@@ -55,7 +66,7 @@ export interface ActivityItem {
     avatar?: string;
   };
   relatedItem?: {
-    type: 'spac' | 'target' | 'document' | 'filing' | 'task';
+    type: 'spac' | 'target' | 'document' | 'filing' | 'task' | 'contact';
     id: string;
     name: string;
     href?: string;
@@ -97,6 +108,12 @@ const activityTypeConfig: Record<ActivityType, {
     bgColor: 'bg-purple-100',
     label: 'Document Edited',
   },
+  DOCUMENT: {
+    icon: FileText,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100',
+    label: 'Document',
+  },
   TARGET_ADDED: {
     icon: Target,
     color: 'text-primary-600',
@@ -121,6 +138,12 @@ const activityTypeConfig: Record<ActivityType, {
     bgColor: 'bg-slate-100',
     label: 'Task Assigned',
   },
+  TASK: {
+    icon: CheckCircle2,
+    color: 'text-slate-600',
+    bgColor: 'bg-slate-100',
+    label: 'Task',
+  },
   FILING_SUBMITTED: {
     icon: Send,
     color: 'text-indigo-600',
@@ -133,11 +156,47 @@ const activityTypeConfig: Record<ActivityType, {
     bgColor: 'bg-success-100',
     label: 'Filing Approved',
   },
+  FILING: {
+    icon: FileText,
+    color: 'text-indigo-600',
+    bgColor: 'bg-indigo-100',
+    label: 'Filing',
+  },
   MEETING_SCHEDULED: {
     icon: Calendar,
     color: 'text-warning-600',
     bgColor: 'bg-warning-100',
     label: 'Meeting Scheduled',
+  },
+  MEETING: {
+    icon: Calendar,
+    color: 'text-warning-600',
+    bgColor: 'bg-warning-100',
+    label: 'Meeting',
+  },
+  CALL: {
+    icon: Phone,
+    color: 'text-teal-600',
+    bgColor: 'bg-teal-100',
+    label: 'Call',
+  },
+  EMAIL: {
+    icon: Mail,
+    color: 'text-blue-600',
+    bgColor: 'bg-blue-100',
+    label: 'Email',
+  },
+  NOTE: {
+    icon: MessageSquare,
+    color: 'text-slate-600',
+    bgColor: 'bg-slate-100',
+    label: 'Note',
+  },
+  LINKEDIN: {
+    icon: Linkedin,
+    color: 'text-blue-700',
+    bgColor: 'bg-blue-100',
+    label: 'LinkedIn',
   },
   COMMENT_ADDED: {
     icon: MessageSquare,

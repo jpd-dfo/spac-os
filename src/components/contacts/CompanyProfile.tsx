@@ -24,7 +24,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatDate } from '@/lib/utils';
 
-import type { Company, ExtendedContact } from './mockContactsData';
+import type { Company, ExtendedContact } from './contact.types';
 
 interface CompanyProfileProps {
   company: Company;

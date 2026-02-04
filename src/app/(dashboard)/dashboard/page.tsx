@@ -356,17 +356,39 @@ export default function DashboardPage() {
     return activeSpac?.id || null;
   }, [spacsQuery.data]);
 
-  // Fetch filings for compliance calendar widget
+  // Fetch filings for compliance calendar widget and activity feed
   const filingsQuery = trpc.filing.list.useQuery(
     {
       page: 1,
       pageSize: 20,
-      sortBy: 'deadline',
-      sortOrder: 'asc',
+      sortBy: 'filedDate',
+      sortOrder: 'desc',
     },
     {
       refetchOnWindowFocus: false,
       retry: 2,
+    }
+  );
+
+  // Fetch recent interactions for activity feed
+  const interactionsQuery = trpc.interaction.getRecent.useQuery(
+    {
+      limit: 10,
+    },
+    {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    }
+  );
+
+  // Fetch recent documents for activity feed
+  const documentsQuery = trpc.document.getRecent.useQuery(
+    {
+      limit: 10,
+    },
+    {
+      refetchOnWindowFocus: false,
+      retry: 1,
     }
   );
 
@@ -719,18 +741,28 @@ export default function DashboardPage() {
   }, [spacStatsQuery.data, targetsQuery.data, pipelineData, primarySpac]);
 
   // ============================================================================
-  // DERIVED DATA: UPCOMING DEADLINES FROM REAL DATA
+  // DERIVED DATA: UPCOMING DEADLINES/MILESTONES FROM REAL DATA (TD-014 Fix)
+  // Aggregates: SPAC deadlines, target milestones, filing due dates
+  // Color-coded by urgency: critical (red), high (orange), medium (yellow)
   // ============================================================================
 
   const upcomingDeadlines = useMemo((): DeadlineItem[] => {
     const deadlines: DeadlineItem[] = [];
+    const now = new Date();
+
+    // Helper to calculate urgency based on days remaining
+    const getUrgencyFromDays = (daysRemaining: number): 'critical' | 'warning' | 'normal' => {
+      if (daysRemaining < 0) {return 'critical';} // Overdue
+      if (daysRemaining <= 7) {return 'critical';} // Due within a week
+      if (daysRemaining <= 30) {return 'warning';} // Due within a month
+      return 'normal';
+    };
 
     // Add SPAC business combination deadlines
     if (spacsQuery.data?.items) {
       spacsQuery.data.items.forEach((spac) => {
         if (spac.deadlineDate) {
           const deadline = new Date(spac.deadlineDate);
-          const now = new Date();
           const daysUntilDeadline = Math.ceil((deadline.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
           // Only show if deadline is within next 24 months or past due
@@ -754,7 +786,65 @@ export default function DashboardPage() {
                 name: spac.name,
                 href: `/spacs/${spac.id}`,
               },
+              urgency: getUrgencyFromDays(daysUntilDeadline),
               priority: daysUntilDeadline <= 90 ? 'critical' : daysUntilDeadline <= 180 ? 'high' : 'medium',
+            });
+          }
+        }
+      });
+    }
+
+    // Add filing deadlines from real filings data
+    if (filingsQuery.data?.items) {
+      filingsQuery.data.items.forEach((filing) => {
+        // Use dueDate if available, otherwise skip filings without due dates
+        const dueDate = filing.dueDate ? new Date(filing.dueDate) : null;
+
+        if (dueDate) {
+          const daysUntilDue = Math.ceil((dueDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
+
+          // Only show upcoming or recently overdue (within 30 days past)
+          if (daysUntilDue >= -30 && daysUntilDue <= 180) {
+            // Skip already filed/completed
+            if (filing.status === 'FILED' || filing.status === 'EFFECTIVE') {
+              return;
+            }
+
+            let status: DeadlineItem['status'] = 'UPCOMING';
+            if (daysUntilDue < 0) {
+              status = 'OVERDUE';
+            } else if (daysUntilDue <= 7) {
+              status = 'DUE_SOON';
+            }
+
+            // Map filing type to deadline type
+            const filingTypeMap: Record<string, DeadlineItem['type']> = {
+              'FORM_10K': 'SEC_FILING',
+              'FORM_10Q': 'SEC_FILING',
+              'FORM_8K': 'SEC_FILING',
+              'S1': 'SEC_FILING',
+              'S4': 'SEC_FILING',
+              'DEFA14A': 'PROXY',
+              'DEFM14A': 'PROXY',
+              'PROXY': 'PROXY',
+            };
+
+            deadlines.push({
+              id: `filing-deadline-${filing.id}`,
+              title: filing.title || `${filing.type?.replace(/_/g, '-')} Filing`,
+              type: filingTypeMap[filing.type] || 'SEC_FILING',
+              dueDate,
+              status,
+              description: `Status: ${filing.status?.replace(/_/g, ' ')}`,
+              relatedSpac: filing.spac ? {
+                id: filing.spac.id,
+                name: filing.spac.name,
+                href: `/spacs/${filing.spac.id}`,
+              } : undefined,
+              urgency: getUrgencyFromDays(daysUntilDue),
+              priority: daysUntilDue <= 7 ? 'critical' : daysUntilDue <= 14 ? 'high' : 'medium',
+              filingType: filing.type,
+              href: `/filings/${filing.id}`,
             });
           }
         }
@@ -776,7 +866,6 @@ export default function DashboardPage() {
         // Expected close date as a deadline
         if (fullTarget.expectedCloseDate) {
           const closeDate = new Date(fullTarget.expectedCloseDate);
-          const now = new Date();
           const daysUntilClose = Math.ceil((closeDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24));
 
           if (daysUntilClose > -30 && daysUntilClose <= 180) {
@@ -794,19 +883,27 @@ export default function DashboardPage() {
               dueDate: closeDate,
               status,
               description: `Target in ${target.status?.replace(/_/g, ' ').toLowerCase() || 'evaluation'}`,
+              urgency: getUrgencyFromDays(daysUntilClose),
               priority: daysUntilClose <= 30 ? 'high' : 'medium',
+              href: `/targets/${target.id}`,
             });
           }
         }
       });
     }
 
-    // Sort by due date
-    return deadlines.sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime());
-  }, [spacsQuery.data, targetsQuery.data]);
+    // Sort by urgency first (critical > warning > normal), then by due date
+    const urgencyOrder: Record<string, number> = { critical: 0, warning: 1, normal: 2 };
+    return deadlines.sort((a, b) => {
+      const urgencyDiff = (urgencyOrder[a.urgency || 'normal'] || 2) - (urgencyOrder[b.urgency || 'normal'] || 2);
+      if (urgencyDiff !== 0) {return urgencyDiff;}
+      return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+    });
+  }, [spacsQuery.data, targetsQuery.data, filingsQuery.data]);
 
   // ============================================================================
-  // DERIVED DATA: RECENT ACTIVITY FROM REAL DATA
+  // DERIVED DATA: RECENT ACTIVITY FROM REAL DATA (TD-012 Fix)
+  // Aggregates activities from: targets, SPACs, filings, interactions, documents
   // ============================================================================
 
   const recentActivities = useMemo((): ActivityItem[] => {
@@ -863,9 +960,96 @@ export default function DashboardPage() {
       });
     }
 
-    // Sort by timestamp (most recent first)
-    return activities.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
-  }, [spacsQuery.data, targetsQuery.data]);
+    // Generate activities from recent filings
+    if (filingsQuery.data?.items) {
+      filingsQuery.data.items.slice(0, 5).forEach((filing) => {
+        const filedDate = filing.filedDate ? new Date(filing.filedDate) : new Date(filing.createdAt);
+        const isNew = filedDate.getTime() > Date.now() - 24 * 60 * 60 * 1000;
+
+        activities.push({
+          id: `filing-${filing.id}`,
+          type: 'FILING',
+          title: filing.status === 'FILED'
+            ? `Filed ${filing.type?.replace(/_/g, ' ') || 'document'}: ${filing.title || 'SEC Filing'}`
+            : `Filing updated: ${filing.title || filing.type?.replace(/_/g, ' ') || 'SEC Filing'}`,
+          description: filing.spac?.name ? `SPAC: ${filing.spac.name}` : filing.description || undefined,
+          timestamp: filedDate,
+          relatedItem: {
+            type: 'filing',
+            id: filing.id,
+            name: filing.title || filing.type || 'Filing',
+            href: `/filings/${filing.id}`,
+          },
+          isNew,
+          priority: filing.status === 'SEC_COMMENT' ? 'high' : undefined,
+        });
+      });
+    }
+
+    // Generate activities from recent interactions (meetings, calls, emails)
+    if (interactionsQuery.data) {
+      interactionsQuery.data.slice(0, 5).forEach((interaction) => {
+        const contactName = interaction.contact
+          ? `${interaction.contact.firstName} ${interaction.contact.lastName}`.trim()
+          : 'Contact';
+
+        // Map interaction type to activity type
+        const interactionTypeMap: Record<string, ActivityItem['type']> = {
+          'MEETING': 'MEETING',
+          'CALL': 'CALL',
+          'EMAIL': 'EMAIL',
+          'NOTE': 'NOTE',
+          'LINKEDIN': 'LINKEDIN',
+          'TASK': 'TASK',
+        };
+
+        activities.push({
+          id: `interaction-${interaction.id}`,
+          type: interactionTypeMap[interaction.type] || 'NOTE',
+          title: interaction.subject || `${interaction.type.toLowerCase()} with ${contactName}`,
+          description: interaction.outcome || interaction.contact?.company || undefined,
+          timestamp: interaction.date,
+          user: interaction.createdBy ? {
+            name: interaction.createdBy.name || 'Team Member',
+            avatar: interaction.createdBy.image || undefined,
+          } : undefined,
+          relatedItem: {
+            type: 'contact',
+            id: interaction.contact?.id || interaction.id,
+            name: contactName,
+            href: interaction.contact?.id ? `/contacts/${interaction.contact.id}` : undefined,
+          },
+        });
+      });
+    }
+
+    // Generate activities from recent document uploads
+    if (documentsQuery.data) {
+      documentsQuery.data.slice(0, 3).forEach((doc) => {
+        const isNew = new Date(doc.createdAt).getTime() > Date.now() - 24 * 60 * 60 * 1000;
+
+        activities.push({
+          id: `document-${doc.id}`,
+          type: 'DOCUMENT',
+          title: `Document ${isNew ? 'uploaded' : 'updated'}: ${doc.name}`,
+          description: doc.spac?.name ? `SPAC: ${doc.spac.name}` : doc.category || undefined,
+          timestamp: doc.createdAt,
+          relatedItem: {
+            type: 'document',
+            id: doc.id,
+            name: doc.name,
+            href: `/documents/${doc.id}`,
+          },
+          isNew,
+        });
+      });
+    }
+
+    // Sort by timestamp (most recent first) and limit to top 15
+    return activities
+      .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+      .slice(0, 15);
+  }, [spacsQuery.data, targetsQuery.data, filingsQuery.data, interactionsQuery.data, documentsQuery.data]);
 
   // ============================================================================
   // DERIVED DATA: PIPELINE CHART DATA (for PipelineChart component)
@@ -1067,6 +1251,15 @@ export default function DashboardPage() {
   const isLoadingStats = spacStatsQuery.isLoading;
   const isLoadingSpacs = spacsQuery.isLoading;
   const isLoadingTargets = targetsQuery.isLoading;
+  const isLoadingFilings = filingsQuery.isLoading;
+  const isLoadingInteractions = interactionsQuery.isLoading;
+  const isLoadingDocuments = documentsQuery.isLoading;
+
+  // Combined loading for activity feed (needs multiple data sources)
+  const isLoadingActivity = isLoadingSpacs || isLoadingTargets || isLoadingFilings || isLoadingInteractions || isLoadingDocuments;
+
+  // Combined loading for deadlines/milestones
+  const isLoadingDeadlines = isLoadingSpacs || isLoadingTargets || isLoadingFilings;
 
   const isRefetchingStats = spacStatsQuery.isFetching && !spacStatsQuery.isLoading;
   const isRefetchingSpacs = spacsQuery.isFetching && !spacsQuery.isLoading;
@@ -1277,10 +1470,11 @@ export default function DashboardPage() {
           ) : (
             <UpcomingDeadlines
               deadlines={hasDeadlines ? upcomingDeadlines : undefined}
-              isLoading={isLoadingSpacs || isLoadingTargets}
+              isLoading={isLoadingDeadlines}
               maxItems={4}
               onViewAll={handleViewAllDeadlines}
               onDeadlineClick={handleUpcomingDeadlineClick}
+              showUrgencyBadges={true}
             />
           )}
         </div>
@@ -1297,7 +1491,7 @@ export default function DashboardPage() {
           ) : (
             <RecentActivity
               activities={hasRecentActivity ? recentActivities : undefined}
-              isLoading={isLoadingSpacs || isLoadingTargets}
+              isLoading={isLoadingActivity}
               maxItems={5}
               onViewAll={handleViewAllRecentActivity}
               onActivityClick={handleRecentActivityClick}
@@ -1338,28 +1532,46 @@ export default function DashboardPage() {
         </Card>
         <ActivityFeed
           data={{
-            activities: recentActivities.slice(0, 5).map(activity => ({
-              id: activity.id,
-              type: activity.type === 'TARGET_ADDED' ? 'TARGET_UPDATE' as const
-                : activity.type === 'TARGET_UPDATE' ? 'TARGET_UPDATE' as const
-                : activity.type === 'DOCUMENT_UPLOAD' ? 'DOCUMENT_UPLOAD' as const
-                : 'COMMENT' as const, // Default to COMMENT for DEAL_UPDATE and others
-              user: {
-                name: activity.user?.name || currentUser.name,
-                role: currentUser.role,
-              },
-              action: activity.title,
-              subject: activity.relatedItem?.name || activity.description || '',
-              subjectLink: activity.relatedItem?.href,
-              timestamp: activity.timestamp,
-              isNew: activity.isNew,
-            })),
-            hasMore: recentActivities.length > 5,
+            activities: recentActivities.slice(0, 8).map(activity => {
+              // Map our activity types to ActivityFeed component types
+              const typeMap: Record<string, 'DOCUMENT_UPLOAD' | 'DOCUMENT_EDIT' | 'TARGET_UPDATE' | 'TASK_COMPLETE' | 'COMMENT' | 'MESSAGE' | 'MEETING' | 'FILING'> = {
+                'TARGET_ADDED': 'TARGET_UPDATE',
+                'TARGET_UPDATE': 'TARGET_UPDATE',
+                'DOCUMENT_UPLOAD': 'DOCUMENT_UPLOAD',
+                'DOCUMENT': 'DOCUMENT_UPLOAD',
+                'FILING_SUBMITTED': 'FILING',
+                'FILING': 'FILING',
+                'MEETING_SCHEDULED': 'MEETING',
+                'MEETING': 'MEETING',
+                'CALL': 'MESSAGE',
+                'EMAIL': 'MESSAGE',
+                'NOTE': 'COMMENT',
+                'LINKEDIN': 'MESSAGE',
+                'TASK': 'TASK_COMPLETE',
+                'DEAL_UPDATE': 'TARGET_UPDATE',
+              };
+
+              return {
+                id: activity.id,
+                type: typeMap[activity.type] || 'COMMENT',
+                user: {
+                  name: activity.user?.name || currentUser.name,
+                  role: currentUser.role,
+                },
+                action: activity.title,
+                subject: activity.relatedItem?.name || activity.description || '',
+                subjectLink: activity.relatedItem?.href,
+                timestamp: activity.timestamp,
+                isNew: activity.isNew,
+              };
+            }),
+            hasMore: recentActivities.length > 8,
             totalCount: recentActivities.length,
           }}
+          isLoading={isLoadingActivity}
           onViewAll={handleViewAllActivity}
           onActivityClick={handleActivityClick}
-          maxItems={5}
+          maxItems={8}
           showFilters={true}
         />
       </div>

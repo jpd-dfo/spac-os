@@ -479,8 +479,9 @@ export async function getActiveAlerts(options?: {
 }
 
 /**
- * Get active alerts with total count in a single query
- * Optimized for pagination - avoids N+1 queries
+ * Get active alerts with total count in a single database transaction
+ * Uses Prisma's interactive transaction to batch both queries into one round trip
+ * TD-001: Optimized from 2 separate queries to single transaction
  */
 export async function getActiveAlertsWithCount(options?: {
   spacId?: string;
@@ -500,27 +501,32 @@ export async function getActiveAlertsWithCount(options?: {
     ...(isRead !== undefined && { isRead }),
   };
 
-  const [alerts, total] = await Promise.all([
-    db.complianceAlert.findMany({
-      where,
-      include: {
-        spac: {
-          select: { id: true, name: true, ticker: true },
+  // Use Prisma's interactive transaction to batch queries into a single database round trip
+  // This sends both queries in one connection, reducing latency
+  const result = await db.$transaction(async (tx) => {
+    const [alerts, total] = await Promise.all([
+      tx.complianceAlert.findMany({
+        where,
+        include: {
+          spac: {
+            select: { id: true, name: true, ticker: true },
+          },
         },
-      },
-      orderBy: [
-        { isRead: 'asc' },
-        { severity: 'asc' },
-        { dueDate: 'asc' },
-        { createdAt: 'desc' },
-      ],
-      take: limit,
-      skip: offset,
-    }),
-    db.complianceAlert.count({ where }),
-  ]);
+        orderBy: [
+          { isRead: 'asc' },
+          { severity: 'asc' },
+          { dueDate: 'asc' },
+          { createdAt: 'desc' },
+        ],
+        take: limit,
+        skip: offset,
+      }),
+      tx.complianceAlert.count({ where }),
+    ]);
+    return { alerts, total };
+  });
 
-  return { alerts, total };
+  return result;
 }
 
 /**
