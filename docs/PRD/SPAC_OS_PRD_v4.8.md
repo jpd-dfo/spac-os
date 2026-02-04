@@ -56,7 +56,7 @@ Build the definitive operating system for SPAC sponsors and teams, enabling effi
 **Completed Deliverables:**
 1. **Connect Pipeline to tRPC Backend (P0)**
 2. **Implement Edit Target (P1)**
-3. **Wire Quick Actions (P1)**
+3. **Wire Quick Actions (P1)** - PARTIAL: Move Stage and Archive work; Add Note, Change Priority, and Assign not implemented (no backend mutations)
 4. **Export Functionality (P2)**
 5. **Bulk Operations (P2)**
 
@@ -103,7 +103,7 @@ Build the definitive operating system for SPAC sponsors and teams, enabling effi
 6. **SEC EDGAR Integration (P0)** - Rate-limited API client
 7. **Filing Deadline Tracker (P0)** - Urgency color coding
 8. **Compliance Alerts (P1)** - Header notifications
-9. **Filing Status Monitoring (P1)** - Timeline visualization
+9. **Filing Status Monitoring (P1)** - PARTIAL: Timeline visualization works; Status change notifications not fully implemented
 10. **Regulatory Calendar (P2)** - Month/week views
 
 ---

@@ -126,6 +126,17 @@
 
 ---
 
+## Deferred Items
+
+Items planned but not completed in this sprint:
+- **Add Note quick action** - Requires notes table and API endpoint (not yet built)
+- **Change Priority quick action** - Requires dedicated priority mutation (not yet built)
+- **Assign quick action** - Requires user assignment system (not yet built)
+
+*Note: All three deferred items were completed in Sprint 4.*
+
+---
+
 ## Carryover for Next Sprint
 
 ### Incomplete Items

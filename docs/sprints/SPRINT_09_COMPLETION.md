@@ -220,13 +220,16 @@ npx prisma db push --skip-generate  # PASSED (schema changes applied)
 
 ## Carryover to Sprint 10
 
-### Deferred Items
-- Gmail API integration (requires credentials)
-- Google Calendar API integration (requires credentials)
-- Dedicated /companies page
-- Pagination UI for long lists
-- Dashboard activity feed (real aggregated data)
-- Dashboard AI insights (real analysis data)
+## Deferred Items
+
+Items planned but not completed in this sprint:
+- **Orphan component integration** - Track D items (CreateFilingModal, DeadlineAlerts, ComplianceCalendar, DeadlineCountdown) not integrated into pages - *Now complete as of Sprint 10*
+- **Gmail API integration** - Requires Google Cloud credentials setup
+- **Google Calendar API integration** - Requires Google Cloud credentials setup
+- **Dedicated /companies page** - Deferred for future sprint
+- **Pagination UI for long lists** - Deferred for future sprint
+- **Dashboard activity feed (real aggregated data)** - Placeholder implemented, real aggregation deferred
+- **Dashboard AI insights (real analysis data)** - Placeholder implemented, real analysis deferred
 
 ### Known Issues (P3)
 - S9-001 to S9-008: Minor issues logged in QA report

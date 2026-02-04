@@ -178,6 +178,14 @@ New test file: `e2e/sprint-6-features.spec.ts`
 
 ---
 
+## Deferred Items
+
+Items planned but not completed in this sprint:
+- **PDF save to documents system** - PDF export only downloads locally; saving to documents system deferred to future sprint
+- **Real-time status change notifications** - Filing status is tracked but push notifications not implemented
+
+---
+
 ## Carryover for Next Sprint
 
 ### P1 Items (Should Address Soon)
