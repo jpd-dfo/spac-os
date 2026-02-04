@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { format, differenceInDays, differenceInBusinessDays } from 'date-fns';
+import { differenceInDays, differenceInBusinessDays } from 'date-fns';
 import {
   FileText,
   Calendar,
@@ -16,7 +16,6 @@ import {
   CheckCircle2,
   ChevronRight,
   Edit,
-  History,
   Paperclip,
   Send,
   X,
@@ -24,9 +23,9 @@ import {
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Textarea } from '@/components/ui/Input';
-import { FILING_DEFINITIONS, type ChecklistItem, type ChecklistItemStatus } from '@/lib/compliance/complianceRules';
+import { FILING_DEFINITIONS, type ChecklistItemStatus } from '@/lib/compliance/complianceRules';
 import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn, formatDate, formatDateTime } from '@/lib/utils';
 import type { FilingType, FilingStatus } from '@/types';

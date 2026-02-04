@@ -2,19 +2,17 @@
 
 import { useState, useMemo } from 'react';
 
-import { format, differenceInBusinessDays, addBusinessDays, isBefore } from 'date-fns';
+import { differenceInBusinessDays, isBefore } from 'date-fns';
 import {
   MessageSquare,
   AlertTriangle,
   Clock,
   CheckCircle2,
-  Calendar,
   FileText,
   ExternalLink,
   ChevronRight,
   ChevronDown,
   Filter,
-  Plus,
   Send,
   Download,
   Eye,
@@ -22,8 +20,8 @@ import {
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
-import { type CommentLetterStatus, COMMENT_LETTER_TYPES } from '@/lib/compliance/complianceRules';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { type CommentLetterStatus } from '@/lib/compliance/complianceRules';
 import { FILING_TYPE_LABELS } from '@/lib/constants';
 import { cn, formatDate } from '@/lib/utils';
 import type { FilingType } from '@/types';
@@ -156,13 +154,13 @@ export function CommentLetterTracker({
   commentLetters,
   onLetterClick,
   onCommentUpdate,
-  onAddResponse,
+  onAddResponse: _onAddResponse,
   onViewDocument,
   className,
 }: CommentLetterTrackerProps) {
   const [expandedLetterId, setExpandedLetterId] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<CommentLetterStatus | 'all'>('all');
-  const [selectedCommentId, setSelectedCommentId] = useState<string | null>(null);
+  const [selectedCommentId, _setSelectedCommentId] = useState<string | null>(null);
 
   // Filter letters
   const filteredLetters = useMemo(() => {

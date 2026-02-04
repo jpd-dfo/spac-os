@@ -7,7 +7,6 @@ import {
   Clock,
   AlertCircle,
   XCircle,
-  Filter,
   ChevronDown,
   ChevronRight,
   User,
@@ -16,9 +15,9 @@ import {
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Input } from '@/components/ui/Input';
+import '@/components/ui/Input';
 import { Select } from '@/components/ui/Select';
 import { cn, formatDate } from '@/lib/utils';
 
@@ -40,7 +39,7 @@ interface ChecklistItem {
   requirement?: string;
 }
 
-interface CategoryGroup {
+interface _CategoryGroup {
   category: ChecklistCategory;
   items: ChecklistItem[];
   isExpanded: boolean;

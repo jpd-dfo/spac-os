@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import 'react';
 
 import {
   Shield,
@@ -15,9 +15,7 @@ import {
   ArrowRight,
   Lock,
   Unlock,
-  AlertCircle,
   Activity,
-  BarChart3,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';

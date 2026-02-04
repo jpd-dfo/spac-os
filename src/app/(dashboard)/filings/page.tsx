@@ -92,11 +92,11 @@ function calculateAlertType(dueDate: Date, status: string): DeadlineAlert['alert
   const due = startOfDay(dueDate);
   const days = differenceInDays(due, today);
 
-  if (days < 0) return 'OVERDUE';
-  if (days <= 3) return '3_DAYS';
-  if (days <= 7) return '7_DAYS';
-  if (days <= 14) return '14_DAYS';
-  if (days <= 30) return '30_DAYS';
+  if (days < 0) { return 'OVERDUE'; }
+  if (days <= 3) { return '3_DAYS'; }
+  if (days <= 7) { return '7_DAYS'; }
+  if (days <= 14) { return '14_DAYS'; }
+  if (days <= 30) { return '30_DAYS'; }
   return null;
 }
 
@@ -256,7 +256,7 @@ export default function FilingsPage() {
       .filter((filing) => {
         // Only include filings with due dates that have alerts
         const dueDate = filing.filedDate || filing.dueDate;
-        if (!dueDate) return false;
+        if (!dueDate) { return false; }
         const alertType = calculateAlertType(new Date(dueDate), filing.status);
         return alertType !== null;
       })

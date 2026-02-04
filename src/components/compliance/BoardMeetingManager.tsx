@@ -10,9 +10,7 @@ import {
   Plus,
   ChevronRight,
   CheckCircle2,
-  AlertCircle,
   Edit2,
-  Trash2,
   Video,
   MapPin,
   Download,
@@ -21,10 +19,10 @@ import {
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { Input, Textarea } from '@/components/ui/Input';
+import '@/components/ui/Input';
 import { Modal, ModalHeader, ModalTitle, ModalFooter } from '@/components/ui/Modal';
 import { Select } from '@/components/ui/Select';
-import { cn, formatDate, formatDateTime } from '@/lib/utils';
+import { cn, formatDate } from '@/lib/utils';
 
 // Types
 type MeetingType = 'Board' | 'Audit Committee' | 'Compensation Committee' | 'Nominating Committee' | 'Special';
@@ -234,7 +232,7 @@ const mockMeetings: BoardMeeting[] = [
   },
 ];
 
-const meetingTypeOptions = [
+const _meetingTypeOptions = [
   { value: 'Board', label: 'Board Meeting' },
   { value: 'Audit Committee', label: 'Audit Committee' },
   { value: 'Compensation Committee', label: 'Compensation Committee' },
@@ -248,7 +246,7 @@ function getMeetingTypeBadge(type: MeetingType) {
     'Audit Committee': 'secondary',
     'Compensation Committee': 'success',
     'Nominating Committee': 'warning',
-    Special: 'danger' as any,
+    Special: 'danger' as const,
   };
   return <Badge variant={variants[type]}>{type}</Badge>;
 }
@@ -284,7 +282,7 @@ function getResolutionStatusBadge(status: ResolutionStatus) {
 }
 
 export function BoardMeetingManager() {
-  const [meetings, setMeetings] = useState<BoardMeeting[]>(mockMeetings);
+  const [meetings, _setMeetings] = useState<BoardMeeting[]>(mockMeetings);
   const [selectedMeeting, setSelectedMeeting] = useState<BoardMeeting | null>(null);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'agenda' | 'attendance' | 'resolutions' | 'minutes'>('agenda');

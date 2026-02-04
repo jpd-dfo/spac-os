@@ -54,7 +54,7 @@ export async function POST(request: NextRequest) {
   try {
     // Get webhook signature for verification
     const signature = request.headers.get('x-webhook-signature');
-    const source = request.headers.get('x-webhook-source') || 'unknown';
+    const _source = request.headers.get('x-webhook-source') || 'unknown';
 
     // Read raw body for signature verification
     const rawBody = await request.text();
@@ -97,7 +97,7 @@ export async function POST(request: NextRequest) {
     });
 
     // Process webhook based on source and event
-    let processingResult: any = null;
+    let processingResult: unknown = null;
     let processingError: string | null = null;
 
     try {
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
  */
 async function processWebhook(
   payload: z.infer<typeof IncomingWebhookSchema>
-): Promise<any> {
+): Promise<unknown> {
   switch (payload.source) {
     case 'sec_edgar':
       return processSecEdgarWebhook(payload as z.infer<typeof SecEdgarWebhookSchema>);
@@ -161,7 +161,7 @@ async function processWebhook(
  */
 async function processSecEdgarWebhook(
   payload: z.infer<typeof SecEdgarWebhookSchema>
-): Promise<any> {
+): Promise<unknown> {
   const { event, filingId, accessionNumber, data } = payload;
 
   // Find the filing by external ID or accession number
@@ -245,7 +245,7 @@ async function processSecEdgarWebhook(
  */
 async function processPaymentWebhook(
   payload: z.infer<typeof PaymentWebhookSchema>
-): Promise<any> {
+): Promise<unknown> {
   const { event, transactionId, amount, currency } = payload;
 
   // Log the payment webhook since the Transaction model doesn't support payment fields

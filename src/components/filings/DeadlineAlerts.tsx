@@ -2,15 +2,13 @@
 
 import { useState, useMemo } from 'react';
 
-import { format, differenceInDays, startOfDay, addDays, isBefore, isAfter } from 'date-fns';
+import { differenceInDays, startOfDay } from 'date-fns';
 import {
   AlertTriangle,
   Bell,
-  BellOff,
   Calendar,
   Clock,
   CheckCircle2,
-  FileText,
   ChevronRight,
   Settings,
   Mail,
@@ -126,7 +124,7 @@ function getPriorityConfig(priority: DeadlineAlert['priority']) {
   return configs[priority];
 }
 
-function calculateAlertType(dueDate: Date, status: FilingStatus): DeadlineAlert['alertType'] | null {
+function _calculateAlertType(dueDate: Date, status: FilingStatus): DeadlineAlert['alertType'] | null {
   if (['COMPLETE', 'EFFECTIVE', 'SUBMITTED'].includes(status)) {
     return null;
   }

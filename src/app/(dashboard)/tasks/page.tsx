@@ -18,14 +18,14 @@ import {
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
-import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
+import { Card, CardContent } from '@/components/ui/Card';
 import { TASK_STATUS_LABELS, TASK_PRIORITY_LABELS } from '@/lib/constants';
 import { trpc } from '@/lib/trpc';
 import { formatDate, cn } from '@/lib/utils';
 
 // Types - must match Prisma TaskStatus enum
 type TaskStatus = 'NOT_STARTED' | 'IN_PROGRESS' | 'BLOCKED' | 'COMPLETED' | 'CANCELLED';
-type TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
+type _TaskPriority = 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL';
 
 const statusFilters: Array<'all' | TaskStatus> = ['all', 'NOT_STARTED', 'IN_PROGRESS', 'BLOCKED', 'COMPLETED'];
 

@@ -2,10 +2,9 @@
 
 import { useState, useMemo } from 'react';
 
-import { format, differenceInDays, startOfDay } from 'date-fns';
+import { differenceInDays, startOfDay } from 'date-fns';
 import {
   Search,
-  Filter,
   Download,
   Plus,
   ExternalLink,
@@ -15,7 +14,6 @@ import {
   Calendar,
   AlertTriangle,
   CheckCircle2,
-  Clock,
   FileText,
   Eye,
   Edit,
@@ -31,7 +29,7 @@ import { Dropdown, DropdownItem } from '@/components/ui/Dropdown';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
 import { FilingStatusBadge } from '@/components/filings/FilingStatusBadge';
 import { FILING_TYPE_LABELS } from '@/lib/constants';
-import { cn, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import type { FilingType, FilingStatus } from '@/types';
 
 // ============================================================================
@@ -108,7 +106,7 @@ type SortDirection = 'asc' | 'desc';
 // HELPER FUNCTIONS
 // ============================================================================
 
-function getStatusBadge(status: FilingStatus) {
+function _getStatusBadge(status: FilingStatus) {
   const variants: Record<FilingStatus, 'secondary' | 'warning' | 'primary' | 'success' | 'danger'> = {
     DRAFT: 'secondary',
     INTERNAL_REVIEW: 'warning',

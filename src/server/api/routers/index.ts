@@ -3,6 +3,7 @@
  * Exports all routers for use in the root router
  */
 
+export { aiRouter } from './ai.router';
 export { alertRouter } from './alert.router';
 export { emailRouter } from './email.router';
 export { spacRouter } from './spac.router';
@@ -15,3 +16,4 @@ export { financialRouter } from './financial.router';
 export { analyticsRouter } from './analytics.router';
 export { webhookRouter } from './webhook.router';
 export { calendarRouter } from './calendar.router';
+export { integrationsRouter } from './integrations.router';

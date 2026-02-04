@@ -6,16 +6,13 @@ import {
   ZoomIn,
   ZoomOut,
   Maximize2,
-  Move,
-  Filter,
-  RefreshCw,
   Info,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
-import { cn } from '@/lib/utils';
+import '@/lib/utils';
 
 import type { ExtendedContact, ContactCategory } from './contact.types';
 
@@ -56,7 +53,6 @@ const categoryColors: Record<ContactCategory, { bg: string; border: string; text
 
 function generateLinks(contacts: ExtendedContact[]): Link[] {
   const links: Link[] = [];
-  const contactMap = new Map(contacts.map((c) => [c.id, c]));
 
   // Generate links based on same company
   const companyGroups = new Map<string, string[]>();
@@ -287,7 +283,7 @@ export function RelationshipGraph({
         cancelAnimationFrame(animationRef.current);
       }
     };
-  }, [links]);
+  }, [links, nodes.length]);
 
   // Draw on canvas
   useEffect(() => {

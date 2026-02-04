@@ -8,14 +8,13 @@ import {
   CheckCircle2,
   AlertTriangle,
   AlertCircle,
-  FileText,
   ChevronRight,
   ExternalLink,
   Bell,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { cn, formatDate, daysUntil } from '@/lib/utils';
 

@@ -20,10 +20,9 @@ import { useUser } from '@clerk/nextjs';
 import {
   ActivityFeed,
 } from '@/components/dashboard/ActivityFeed';
-// AIInsightsWidget commented out until AI insights endpoint is available
-// import {
-//   AIInsightsWidget,
-// } from '@/components/dashboard/AIInsightsWidget';
+import {
+  AIInsightsWidget,
+} from '@/components/dashboard/AIInsightsWidget';
 import {
   ComplianceCalendarWidget,
 } from '@/components/dashboard/ComplianceCalendarWidget';
@@ -399,6 +398,16 @@ export default function DashboardPage() {
       enabled: !!primarySpacId,
       refetchOnWindowFocus: false,
       retry: 1,
+    }
+  );
+
+  // Fetch AI insights for dashboard (TD-013)
+  const aiInsightsQuery = trpc.ai.getInsights.useQuery(
+    { spacId: primarySpacId ?? undefined, limit: 10 },
+    {
+      refetchOnWindowFocus: false,
+      retry: 1,
+      staleTime: 5 * 60 * 1000, // Cache for 5 minutes
     }
   );
 
@@ -1215,18 +1224,36 @@ export default function DashboardPage() {
     // TODO: Navigate to activity
   };
 
-  // AI Insights handlers - commented out until AI insights endpoint is available
-  // const handleViewAllInsights = () => {
-  //   // TODO: Navigate to AI insights
-  // };
+  // AI Insights handlers (TD-013)
+  const acknowledgeInsightMutation = trpc.ai.acknowledgeInsight.useMutation({
+    onSuccess: () => {
+      aiInsightsQuery.refetch();
+    },
+  });
 
-  // const handleInsightAction = (_insightId: string, _action: 'acknowledge' | 'dismiss' | 'resolve') => {
-  //   // TODO: Handle insight action
-  // };
+  const dismissInsightMutation = trpc.ai.dismissInsight.useMutation({
+    onSuccess: () => {
+      aiInsightsQuery.refetch();
+    },
+  });
 
-  // const handleRefreshInsights = () => {
-  //   // TODO: Refresh AI insights
-  // };
+  const handleViewAllInsights = useCallback(() => {
+    // Navigate to AI insights page (could be /ai or /insights)
+    window.location.href = '/ai';
+  }, []);
+
+  const handleInsightAction = useCallback((insightId: string, action: 'acknowledge' | 'dismiss' | 'resolve') => {
+    if (action === 'acknowledge') {
+      acknowledgeInsightMutation.mutate({ insightId });
+    } else if (action === 'dismiss') {
+      dismissInsightMutation.mutate({ insightId });
+    }
+    // 'resolve' action could be handled if we add a resolveInsight mutation
+  }, [acknowledgeInsightMutation, dismissInsightMutation]);
+
+  const handleRefreshInsights = useCallback(() => {
+    aiInsightsQuery.refetch();
+  }, [aiInsightsQuery]);
 
   const handleRecentActivityClick = (_activity: any) => {
     // TODO: Navigate to activity
@@ -1508,28 +1535,25 @@ export default function DashboardPage() {
 
       {/* AI Insights Section */}
       <div className="grid gap-6 lg:grid-cols-2">
-        {/* AI Insights - Placeholder until AI insights endpoint is available */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <AlertCircle className="h-5 w-5 text-primary-600" />
-              AI Insights
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="flex h-32 items-center justify-center rounded-lg border-2 border-dashed border-slate-200 bg-slate-50">
-              <div className="text-center">
-                <AlertCircle className="mx-auto h-8 w-8 text-slate-300" />
-                <p className="mt-2 text-sm font-medium text-slate-600">
-                  AI Insights coming soon
-                </p>
-                <p className="mt-1 text-xs text-slate-400">
-                  Intelligent analysis and recommendations will be displayed here
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {/* AI Insights - Real data from AI analysis (TD-013) */}
+        <AIInsightsWidget
+          data={aiInsightsQuery.data ? {
+            insights: aiInsightsQuery.data.insights.map(insight => ({
+              ...insight,
+              timestamp: new Date(insight.timestamp),
+            })),
+            marketIntelligence: aiInsightsQuery.data.marketIntelligence.map(intel => ({
+              ...intel,
+              timestamp: new Date(intel.timestamp),
+            })),
+            lastUpdated: new Date(aiInsightsQuery.data.lastUpdated),
+            aiStatus: aiInsightsQuery.data.aiStatus,
+          } : null}
+          isLoading={aiInsightsQuery.isLoading}
+          onViewAll={handleViewAllInsights}
+          onInsightAction={handleInsightAction}
+          onRefresh={handleRefreshInsights}
+        />
         <ActivityFeed
           data={{
             activities: recentActivities.slice(0, 8).map(activity => {

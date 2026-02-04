@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 
-import { format, differenceInDays, startOfDay } from 'date-fns';
+import { differenceInDays, startOfDay } from 'date-fns';
 import {
   X,
   FileText,
@@ -10,13 +10,10 @@ import {
   Clock,
   CheckCircle2,
   AlertTriangle,
-  User,
-  Users,
   Paperclip,
   MessageSquare,
   ExternalLink,
   Edit,
-  ChevronRight,
   Download,
   History,
   Send,

@@ -212,7 +212,7 @@ function ConversionFunnel({ metrics }: { metrics: StageMetrics[] }) {
 
   return (
     <div className="space-y-2">
-      {metrics.map((metric, index) => {
+      {metrics.map((metric, _index) => {
         const config = stageConfig[metric.stage];
         const widthPercent = Math.max((metric.count / maxCount) * 100, 10);
         const Icon = config.icon;

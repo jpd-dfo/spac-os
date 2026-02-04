@@ -2,10 +2,9 @@
 
 import { useState, useMemo } from 'react';
 
-import { format, differenceInDays, isBefore, isAfter, parseISO } from 'date-fns';
+import { differenceInDays } from 'date-fns';
 import {
   Search,
-  Filter,
   Download,
   Plus,
   ExternalLink,
@@ -14,8 +13,6 @@ import {
   ChevronDown,
   Calendar,
   AlertTriangle,
-  CheckCircle2,
-  Clock,
   FileText,
   Eye,
   Edit,
@@ -26,10 +23,10 @@ import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/Card';
 import { Dropdown, DropdownItem } from '@/components/ui/Dropdown';
-import { Input } from '@/components/ui/Input';
+import '@/components/ui/Input';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
 import { FILING_TYPE_LABELS } from '@/lib/constants';
-import { cn, formatDate } from '@/lib/utils';
+import { formatDate } from '@/lib/utils';
 import type { FilingType, FilingStatus } from '@/types';
 
 // ============================================================================

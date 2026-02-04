@@ -3,7 +3,7 @@
  * Handles invitee.created and invitee.canceled events
  */
 
-import { NextRequest, NextResponse } from 'next/server';
+import { type NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 
 import { db } from '@/server/db';

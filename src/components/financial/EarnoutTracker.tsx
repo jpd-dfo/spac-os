@@ -12,7 +12,6 @@ import {
   Calendar,
   Award,
   Percent,
-  ChevronRight,
   Info,
 } from 'lucide-react';
 import {
@@ -30,10 +29,10 @@ import {
 } from 'recharts';
 
 import { Badge } from '@/components/ui/Badge';
-import { Button } from '@/components/ui/Button';
+import '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/Card';
-import { Tooltip as UITooltip } from '@/components/ui/Tooltip';
-import { cn, formatLargeNumber, formatPercent, formatDate, formatCurrency } from '@/lib/utils';
+import '@/components/ui/Tooltip';
+import { cn, formatLargeNumber, formatDate, formatCurrency } from '@/lib/utils';
 
 // ============================================================================
 // TYPES
@@ -714,7 +713,7 @@ export function EarnoutTracker({
                 </tr>
               </thead>
               <tbody>
-                {milestones.map((milestone, index) => (
+                {milestones.map((milestone, _index) => (
                   <tr
                     key={milestone.id}
                     className={cn(

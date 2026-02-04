@@ -5,6 +5,29 @@ import toast from 'react-hot-toast';
 // Types
 // ============================================================================
 
+export interface SaveToDocumentsOptions {
+  /** Target ID to associate the document with */
+  targetId?: string;
+  /** SPAC ID to associate the document with */
+  spacId?: string;
+  /** Document category */
+  category?: string;
+}
+
+export interface SaveToDocumentsResult {
+  success: boolean;
+  document?: {
+    id: string;
+    name: string;
+    type: string;
+    fileSize: number;
+    mimeType: string;
+    fileUrl: string;
+    createdAt: Date;
+  };
+  error?: string;
+}
+
 export interface MemoData {
   companyName: string;
   executiveSummary: string;
@@ -313,5 +336,76 @@ export function downloadMemoPDF(
     const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
     console.error('PDF export failed:', error);
     toast.error(`Failed to export PDF: ${errorMessage}`);
+  }
+}
+
+/**
+ * Generates a PDF and saves it to the documents system via API
+ * @param memoData - The memo data to include in the PDF
+ * @param options - Options for saving to documents (targetId, spacId, category)
+ * @returns Result object with success status and document details
+ */
+export async function saveMemoPDFToDocuments(
+  memoData: MemoData,
+  options: SaveToDocumentsOptions = {}
+): Promise<SaveToDocumentsResult> {
+  try {
+    const blob = generateMemoPDF(memoData);
+
+    // Create filename
+    const sanitizedCompanyName = memoData.companyName
+      .replace(/[^a-zA-Z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .toLowerCase();
+
+    const date = new Date().toISOString().split('T')[0];
+    const filename = `investment-memo-${sanitizedCompanyName}-${date}.pdf`;
+
+    // Create a File object from the blob
+    const file = new File([blob], filename, { type: 'application/pdf' });
+
+    // Create form data matching the upload API expectations
+    const formData = new FormData();
+    formData.append('file', file);
+    formData.append(
+      'metadata',
+      JSON.stringify({
+        name: filename,
+        type: 'INVESTOR_PRESENTATION', // Investment memo is closest to investor presentation
+        category: options.category || 'Investment Memos',
+        spacId: options.spacId,
+        targetId: options.targetId,
+        status: 'FINAL',
+      })
+    );
+
+    // Upload via the documents API
+    const response = await fetch('/api/documents/upload', {
+      method: 'POST',
+      body: formData,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || 'Failed to save document');
+    }
+
+    const data = await response.json();
+
+    toast.success(`Investment memo saved to documents: ${filename}`);
+
+    return {
+      success: true,
+      document: data.document,
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
+    console.error('Failed to save PDF to documents:', error);
+    toast.error(`Failed to save to documents: ${errorMessage}`);
+
+    return {
+      success: false,
+      error: errorMessage,
+    };
   }
 }

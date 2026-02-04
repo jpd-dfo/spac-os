@@ -1577,3 +1577,21 @@ model FilingChecklist {
   @@index([isCompleted])
   @@map("filing_checklists")
 }
+
+// ============================================================================
+// RATE LIMITING MODELS
+// ============================================================================
+
+/// RateLimitState - Tracks rate limiter state for serverless deployments
+/// Used to persist rate limiting across serverless function invocations
+model RateLimitState {
+  id                String   @id
+  lastRequestTime   BigInt   // Unix timestamp in milliseconds
+  requestCount      Int      @default(0) // Requests in current window (for future token bucket)
+  windowStart       BigInt?  // Start of rate limit window (for future token bucket)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@map("rate_limit_states")
+}

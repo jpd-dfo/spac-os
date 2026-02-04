@@ -227,11 +227,12 @@ export async function PUT(
     }
 
     // Calculate changes for audit log
-    const changes: Record<string, { old: any; new: any }> = {};
+    const changes: Record<string, { old: unknown; new: unknown }> = {};
     for (const [key, value] of Object.entries(updateData)) {
-      if (value !== undefined && (existingSpac as any)[key] !== value) {
+      const existingValue = (existingSpac as Record<string, unknown>)[key];
+      if (value !== undefined && existingValue !== value) {
         changes[key] = {
-          old: (existingSpac as any)[key],
+          old: existingValue,
           new: value,
         };
       }
@@ -242,8 +243,8 @@ export async function PUT(
       name: updateData.name,
       ticker: updateData.ticker,
       cik: updateData.cik,
-      status: updateData.status as any, // Cast to handle enum differences
-      phase: updateData.phase as any, // Cast to handle enum differences
+      status: updateData.status, // Cast to handle enum differences
+      phase: updateData.phase, // Cast to handle enum differences
       ipoDate: updateData.ipoDate,
       ipoSize: updateData.ipoSize,
       trustAmount: updateData.trustSize,
@@ -259,7 +260,7 @@ export async function PUT(
 
     // Remove undefined values
     const cleanedData = Object.fromEntries(
-      Object.entries(prismaUpdateData).filter(([_, v]) => v !== undefined)
+      Object.entries(prismaUpdateData).filter(([_key, v]) => v !== undefined)
     );
 
     // Update SPAC

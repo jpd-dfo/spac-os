@@ -5,7 +5,7 @@ import { useState, useMemo } from 'react';
 import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 
-import { differenceInDays, startOfDay, subDays, addDays } from 'date-fns';
+import { differenceInDays, startOfDay, addDays } from 'date-fns';
 import {
   ArrowLeft,
   FileText,
@@ -411,7 +411,7 @@ export default function FilingDetailPage() {
   }, [filing]);
 
   // Derived values - safe to compute even with null filing (used after early return)
-  const statusConfig = filing ? getStatusConfig(filing.status) : { icon: FileText, label: 'Unknown', colorClass: 'text-slate-500', bgClass: 'bg-slate-100' };
+  const _statusConfig = filing ? getStatusConfig(filing.status) : { icon: FileText, label: 'Unknown', colorClass: 'text-slate-500', bgClass: 'bg-slate-100' };
   const priorityConfig = filing ? getPriorityConfig(filing.priority) : { label: 'Unknown', variant: 'secondary' as const };
   const filingDefinition = filing ? FILING_DEFINITIONS[filing.type] : null;
 

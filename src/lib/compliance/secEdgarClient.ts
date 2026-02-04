@@ -2,6 +2,7 @@
 // SEC EDGAR API Integration Client
 // ============================================================================
 
+import { db } from '@/lib/db';
 import { logger } from '@/lib/logger';
 import type { FilingType, FilingStatus } from '@/types';
 
@@ -126,32 +127,85 @@ const SEC_USER_AGENT = 'SPAC-OS/1.0 (contact@spacos.com)';
 // Rate limiting: SEC allows max 10 requests per second
 const RATE_LIMIT_MS = 100;
 
-// NOTE: Serverless Environment Limitation
-// This module-level state does not persist across serverless function instances.
-// Each cold start creates a new instance with lastRequestTime = 0.
-// This is acceptable for SEC EDGAR because:
-// 1. SEC's limit is generous (10 req/sec) and our 100ms delay is conservative
-// 2. Serverless instances typically handle one request at a time
-// 3. Cold starts are infrequent enough that we won't hit rate limits
-// For high-volume scenarios, consider using Redis or a distributed rate limiter.
-let lastRequestTime = 0;
+// Rate limiter identifier for SEC EDGAR
+const SEC_RATE_LIMIT_ID = 'sec-edgar';
+
+// Fallback: in-memory last request time for when DB is unavailable
+let inMemoryLastRequestTime = 0;
 
 // ============================================================================
-// RATE LIMITED FETCH
+// RATE LIMITED FETCH (Serverless-safe with Database persistence)
 // ============================================================================
 
 /**
- * Performs a rate-limited fetch request to comply with SEC's 10 req/sec limit
+ * Gets the last request timestamp from the database.
+ * Falls back to in-memory state if database is unavailable.
+ */
+async function getLastRequestTime(): Promise<number> {
+  try {
+    const state = await db.rateLimitState.findUnique({
+      where: { id: SEC_RATE_LIMIT_ID },
+    });
+
+    if (state) {
+      return Number(state.lastRequestTime);
+    }
+    return 0;
+  } catch (error) {
+    // Database unavailable or model doesn't exist yet
+    // Fall back to in-memory state
+    logger.warn('Rate limit DB unavailable, using in-memory fallback:', error);
+    return inMemoryLastRequestTime;
+  }
+}
+
+/**
+ * Updates the last request timestamp in the database.
+ * Falls back to in-memory state if database is unavailable.
+ */
+async function updateLastRequestTime(timestamp: number): Promise<void> {
+  // Always update in-memory as a fallback
+  inMemoryLastRequestTime = timestamp;
+
+  try {
+    await db.rateLimitState.upsert({
+      where: { id: SEC_RATE_LIMIT_ID },
+      update: {
+        lastRequestTime: BigInt(timestamp),
+        requestCount: { increment: 1 },
+      },
+      create: {
+        id: SEC_RATE_LIMIT_ID,
+        lastRequestTime: BigInt(timestamp),
+        requestCount: 1,
+      },
+    });
+  } catch (error) {
+    // Database unavailable or model doesn't exist yet
+    // In-memory fallback is already set above
+    logger.warn('Rate limit DB update failed, using in-memory fallback:', error);
+  }
+}
+
+/**
+ * Performs a rate-limited fetch request to comply with SEC's 10 req/sec limit.
+ *
+ * This implementation persists rate limit state to the database to work correctly
+ * across serverless function invocations. If the database is unavailable, it falls
+ * back to in-memory rate limiting (which may not be effective across cold starts).
  */
 async function rateLimitedFetch(url: string, options: RequestInit = {}): Promise<Response> {
   const now = Date.now();
+  const lastRequestTime = await getLastRequestTime();
   const timeSinceLastRequest = now - lastRequestTime;
 
   if (timeSinceLastRequest < RATE_LIMIT_MS) {
-    await new Promise(resolve => setTimeout(resolve, RATE_LIMIT_MS - timeSinceLastRequest));
+    const waitTime = RATE_LIMIT_MS - timeSinceLastRequest;
+    await new Promise(resolve => setTimeout(resolve, waitTime));
   }
 
-  lastRequestTime = Date.now();
+  // Update timestamp before making request (optimistic)
+  await updateLastRequestTime(Date.now());
 
   const response = await fetch(url, {
     ...options,

@@ -36,7 +36,7 @@ const UploadMetadataSchema = z.object({
 export async function POST(request: NextRequest) {
   try {
     // Authenticate user using Clerk
-    const { userId, orgId } = await auth();
+    const { userId, orgId: _orgId } = await auth();
     if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
@@ -187,10 +187,10 @@ export async function POST(request: NextRequest) {
         id: documentId,
         spacId: metadata.spacId || null,
         targetId: metadata.targetId || null,
-        type: metadata.type as any,
+        type: metadata.type,
         name: metadata.name || file.name,
         category: metadata.category || null,
-        status: (metadata.status as any) || 'DRAFT',
+        status: metadata.status || 'DRAFT',
         fileSize: file.size,
         mimeType: file.type,
         fileUrl,

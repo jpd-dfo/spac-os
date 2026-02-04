@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Fetch data based on entity type
-    let data: any[];
+    let data: Record<string, unknown>[];
     const filters = params.filters || {};
 
     switch (params.entityType) {
@@ -87,7 +87,7 @@ export async function POST(request: NextRequest) {
           where: {
             organizationId: params.organizationId,
             deletedAt: null,
-            ...(filters.status && { status: filters.status as any }),
+            ...(filters.status && { status: filters.status }),
             ...(filters.startDate && { createdAt: { gte: filters.startDate } }),
             ...(filters.endDate && { createdAt: { lte: filters.endDate } }),
           },
@@ -103,7 +103,7 @@ export async function POST(request: NextRequest) {
             spac: { organizationId: params.organizationId },
             deletedAt: null,
             ...(filters.spacId && { spacId: filters.spacId }),
-            ...(filters.status && { status: filters.status as any }),
+            ...(filters.status && { status: filters.status }),
           },
           include: {
             spac: { select: { name: true, ticker: true } },
@@ -117,7 +117,7 @@ export async function POST(request: NextRequest) {
             spac: { organizationId: params.organizationId },
             deletedAt: null,
             ...(filters.spacId && { spacId: filters.spacId }),
-            ...(filters.status && { status: filters.status as any }),
+            ...(filters.status && { status: filters.status }),
           },
           include: {
             spac: { select: { name: true, ticker: true } },
@@ -144,7 +144,7 @@ export async function POST(request: NextRequest) {
           where: {
             spac: { organizationId: params.organizationId },
             ...(filters.spacId && { spacId: filters.spacId }),
-            ...(filters.status && { status: filters.status as any }),
+            ...(filters.status && { status: filters.status }),
           },
           include: {
             spac: { select: { name: true, ticker: true } },
@@ -157,7 +157,7 @@ export async function POST(request: NextRequest) {
           where: {
             spac: { organizationId: params.organizationId },
             ...(filters.spacId && { spacId: filters.spacId }),
-            ...(filters.status && { status: filters.status as any }),
+            ...(filters.status && { status: filters.status }),
           },
           include: {
             spac: { select: { name: true, ticker: true } },
@@ -210,10 +210,10 @@ export async function POST(request: NextRequest) {
     // Filter fields if specified
     if (params.fields && params.fields.length > 0) {
       data = data.map((item) => {
-        const filtered: any = {};
+        const filtered: Record<string, unknown> = {};
         for (const field of params.fields!) {
           if (field in item) {
-            filtered[field] = item[field];
+            filtered[field] = (item as Record<string, unknown>)[field];
           }
         }
         return filtered;
@@ -265,7 +265,7 @@ export async function POST(request: NextRequest) {
 /**
  * Convert array of objects to CSV string
  */
-function convertToCSV(data: any[]): string {
+function convertToCSV(data: Record<string, unknown>[]): string {
   if (data.length === 0) {
     return '';
   }
@@ -299,8 +299,8 @@ function convertToCSV(data: any[]): string {
 /**
  * Flatten nested objects for CSV export
  */
-function flattenObject(obj: any, prefix = ''): Record<string, any> {
-  const result: Record<string, any> = {};
+function flattenObject(obj: Record<string, unknown>, prefix = ''): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
 
   for (const key of Object.keys(obj)) {
     const value = obj[key];
@@ -325,7 +325,7 @@ function flattenObject(obj: any, prefix = ''): Record<string, any> {
 /**
  * Escape value for CSV
  */
-function escapeCSV(value: any): string {
+function escapeCSV(value: unknown): string {
   if (value === null || value === undefined) {
     return '';
   }

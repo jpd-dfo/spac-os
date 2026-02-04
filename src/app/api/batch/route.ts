@@ -196,11 +196,11 @@ export async function POST(request: NextRequest) {
  */
 async function handleCreate(
   entityType: string,
-  data: Record<string, any>,
+  data: Record<string, unknown>,
   organizationId: string,
-  userId: string
+  _userId: string
 ): Promise<BatchResult> {
-  let entity: any;
+  let entity: { id: string };
 
   switch (entityType) {
     case 'task':
@@ -213,10 +213,11 @@ async function handleCreate(
           return { id: '', success: false, entityType, error: 'Invalid spacId' };
         }
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       entity = await prisma.task.create({
         data: {
           ...data,
-          creatorId: userId,
+          creatorId: _userId,
         } as any,
       });
       break;
@@ -230,10 +231,12 @@ async function handleCreate(
           return { id: '', success: false, entityType, error: 'Invalid spacId' };
         }
       }
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       entity = await prisma.milestone.create({ data: data as any });
       break;
 
     case 'contact':
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       entity = await prisma.contact.create({ data: data as any });
       break;
 
@@ -250,11 +253,11 @@ async function handleCreate(
 async function handleUpdate(
   entityType: string,
   entityId: string,
-  data: Record<string, any>,
+  data: Record<string, unknown>,
   organizationId: string,
-  userId: string
+  _userId: string
 ): Promise<BatchResult> {
-  let entity: any;
+  let entity: { id: string };
 
   switch (entityType) {
     case 'task': {
@@ -327,7 +330,7 @@ async function handleDelete(
   entityType: string,
   entityId: string,
   organizationId: string,
-  userId: string
+  _userId: string
 ): Promise<BatchResult> {
   switch (entityType) {
     case 'task': {

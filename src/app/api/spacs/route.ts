@@ -71,7 +71,12 @@ export async function GET(request: NextRequest) {
     }
 
     // Build query
-    const where: any = {
+    const where: {
+      organizationId: string;
+      deletedAt: null;
+      status?: string;
+      OR?: Array<{ name?: { contains: string; mode: 'insensitive' }; ticker?: { contains: string; mode: 'insensitive' }; description?: { contains: string; mode: 'insensitive' } }>;
+    } = {
       organizationId: params.organizationId,
       deletedAt: null,
     };
@@ -204,8 +209,8 @@ export async function POST(request: NextRequest) {
       name: data.name,
       ticker: data.ticker,
       cik: data.cik,
-      status: data.status as any, // Handle enum differences
-      phase: data.phase as any, // Handle enum differences
+      status: data.status, // Handle enum differences
+      phase: data.phase, // Handle enum differences
       ipoDate: data.ipoDate,
       ipoSize: data.ipoSize,
       trustAmount: data.trustSize,
@@ -221,11 +226,12 @@ export async function POST(request: NextRequest) {
 
     // Remove undefined values
     const cleanedData = Object.fromEntries(
-      Object.entries(prismaData).filter(([_, v]) => v !== undefined)
+      Object.entries(prismaData).filter(([_key, v]) => v !== undefined)
     );
 
     // Create SPAC
     const spac = await prisma.spac.create({
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       data: cleanedData as any,
       include: {
         organization: {

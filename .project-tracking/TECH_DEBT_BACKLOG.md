@@ -178,15 +178,29 @@ PDF export currently only triggers browser download. Should also support saving 
 ### TD-009: Real-time Status Notifications
 **Source:** Sprint 6 Product Review
 **Effort:** L (3-5 days)
+**Status:** RESOLVED (Sprint 10 - Feb 3, 2026)
 
 **Description:**
 Filing status changes currently rely on polling. WebSocket implementation would provide real-time updates.
 
+**Implementation Notes:**
+Implemented using Server-Sent Events (SSE) instead of WebSocket for better Vercel compatibility:
+- Created `/api/notifications/stream` SSE endpoint with authentication
+- Created `useNotificationStream` React hook with automatic reconnection
+- Integrated with Header component with toast notifications
+- Graceful fallback to polling when SSE fails
+
+**Files Created/Modified:**
+- `src/app/api/notifications/stream/route.ts` - SSE endpoint
+- `src/hooks/useNotificationStream.ts` - React hook for SSE
+- `src/hooks/index.ts` - Export new hook
+- `src/components/layout/Header.tsx` - Integration with toast notifications
+
 **Acceptance Criteria:**
-- [ ] WebSocket connection established on app load
-- [ ] Real-time push for filing status changes
-- [ ] Real-time push for compliance alerts
-- [ ] Graceful fallback to polling if WebSocket fails
+- [x] SSE connection established on app load (auto-connect via hook)
+- [x] Real-time push for compliance alerts (with toast notifications)
+- [ ] Real-time push for filing status changes (infrastructure ready, needs filing router integration)
+- [x] Graceful fallback to polling if SSE fails (automatic with exponential backoff)
 
 ---
 
@@ -339,6 +353,7 @@ Uses fetch directly instead of tRPC, inconsistent with rest of app.
 | TD-001 | Alert Router Efficiency | Sprint 9 | Feb 3, 2026 |
 | TD-006 | Quick Actions Implementation | Already Complete (verified) | Feb 3, 2026 |
 | TD-007 | Legacy Mock Data Blocks | Sprint 9 | Feb 3, 2026 |
+| TD-009 | Real-time Status Notifications (SSE) | Sprint 10 | Feb 3, 2026 |
 | TD-011 | ContactList Mock Data Import | Sprint 9 | Feb 3, 2026 |
 | TD-012 | Dashboard Activity Feed Placeholder | Sprint 9 | Feb 3, 2026 |
 | TD-014 | Dashboard Milestones Placeholder | Sprint 9 | Feb 3, 2026 |
@@ -371,7 +386,7 @@ Focus on data integrity and UX:
 Focus on integrations:
 - TD-010: Gmail/Calendar Credentials (M)
 - TD-002: SEC EDGAR Rate Limiter (M)
-- TD-009: WebSocket Notifications (L)
+- ~~TD-009: WebSocket Notifications (L)~~ RESOLVED (Sprint 10)
 
 **Total Effort:** ~15 story points
 

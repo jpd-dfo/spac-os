@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react';
 
-import { TrendingUp, Filter, ChevronDown, Target } from 'lucide-react';
+import { TrendingUp, Target } from 'lucide-react';
 import {
   BarChart,
   Bar,

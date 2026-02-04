@@ -32,7 +32,7 @@ const DocumentViewer = dynamic(
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
-import { Dropdown, DropdownItem, DropdownLabel } from '@/components/ui/Dropdown';
+import { Dropdown, DropdownItem } from '@/components/ui/Dropdown';
 import {
   Modal,
   ModalHeader,
@@ -43,7 +43,7 @@ import {
 } from '@/components/ui/Modal';
 import { useDebounce } from '@/hooks';
 import { trpc } from '@/lib/trpc/client';
-import { cn, formatFileSize, formatDate, formatRelativeTime } from '@/lib/utils';
+import { cn, formatFileSize, formatRelativeTime } from '@/lib/utils';
 
 // ============================================================================
 // TYPES

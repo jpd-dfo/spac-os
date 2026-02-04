@@ -26,9 +26,8 @@ import { ProgressIndicator } from '@/components/shared';
 
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
+import { trpc } from '@/lib/trpc';
 import { cn, formatDate } from '@/lib/utils';
-
-import type { AnalysisData, CachedAnalysis } from '@/lib/cache/analysisCache';
 
 import type { DocumentData } from './DocumentCard';
 
@@ -257,6 +256,42 @@ function transformAPIResponse(apiData: APIData): AIAnalysis {
 }
 
 // ============================================================================
+// Cache Response Transformation
+// ============================================================================
+
+interface CachedAnalysisData {
+  id: string;
+  documentId: string;
+  summary: string | null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  keyTerms: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  riskFlags: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  actionItems: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  insights: any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  financialHighlights: any;
+  riskLevel: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+  expiresAt: Date | null;
+}
+
+function cachedToUIFormat(cached: CachedAnalysisData): AIAnalysis {
+  return {
+    summary: cached.summary || '',
+    keyTerms: (cached.keyTerms as AIAnalysis['keyTerms']) || [],
+    riskFlags: (cached.riskFlags as AIAnalysis['riskFlags']) || [],
+    relatedDocuments: [],
+    actionItems: (cached.actionItems as AIAnalysis['actionItems']) || [],
+    insights: (cached.insights as AIAnalysis['insights']) || [],
+    financialHighlights: (cached.financialHighlights as AIAnalysis['financialHighlights']) || undefined,
+  };
+}
+
+// ============================================================================
 // Analysis Steps for Progress Tracking
 // ============================================================================
 
@@ -273,7 +308,6 @@ const ANALYSIS_STEPS = [
 // ============================================================================
 
 export function AIAnalysisPanel({ document, documentContent, isOpen, onClose }: AIAnalysisPanelProps) {
-  const [isLoading, setIsLoading] = useState(false);
   const [analysis, setAnalysis] = useState<AIAnalysis | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -291,77 +325,99 @@ export function AIAnalysisPanel({ document, documentContent, isOpen, onClose }: 
   // Track if initial load has been done to avoid double-fetch on mount
   const initialLoadDone = useRef(false);
 
-  // AbortController for cancellation
-  const abortControllerRef = useRef<AbortController | null>(null);
+  // Progress simulation interval ref
   const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
 
-  /**
-   * Fetches cached analysis from the API endpoint
-   */
-  const fetchCachedAnalysis = useCallback(async (): Promise<CachedAnalysis | null> => {
-    try {
-      const response = await fetch(`/api/ai/analysis-cache?documentId=${document.id}`);
-      if (!response.ok) {
-        return null;
-      }
-      const result = await response.json();
-      if (result.success && result.data && result.isFresh) {
-        return result.data as CachedAnalysis;
-      }
-      return null;
-    } catch {
-      // Cache fetch failed, proceed without cache
-      return null;
-    }
-  }, [document.id]);
+  // tRPC utilities
+  const utils = trpc.useUtils();
 
-  /**
-   * Saves analysis to cache via API endpoint
-   */
-  const saveToCache = useCallback(async (analysisData: AIAnalysis): Promise<void> => {
-    try {
-      await fetch('/api/ai/analysis-cache', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          documentId: document.id,
-          analysis: analysisData,
-        }),
+  // Query for cached analysis - enabled only when panel is open
+  const cachedAnalysisQuery = trpc.ai.getCachedAnalysis.useQuery(
+    { documentId: document.id },
+    {
+      enabled: isOpen && !initialLoadDone.current,
+      staleTime: 5 * 60 * 1000, // Consider fresh for 5 minutes
+      refetchOnWindowFocus: false,
+    }
+  );
+
+  // Mutation for document analysis
+  const analyzeMutation = trpc.ai.analyzeDocument.useMutation({
+    onSuccess: (result) => {
+      // Clear progress interval
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
+
+      const transformedAnalysis = transformAPIResponse(result.data as APIData);
+      setAnalysis(transformedAnalysis);
+      setIsCached(false);
+      setCacheTimestamp(null);
+
+      // Complete progress
+      setCurrentStep(ANALYSIS_STEPS.length - 1);
+      setProgress(100);
+      setStatusMessage('Analysis complete');
+      setEstimatedTime(undefined);
+
+      // Cache the analysis in background
+      cacheAnalysisMutation.mutate({
+        documentId: document.id,
+        analysis: {
+          summary: transformedAnalysis.summary,
+          keyTerms: transformedAnalysis.keyTerms,
+          riskFlags: transformedAnalysis.riskFlags,
+          actionItems: transformedAnalysis.actionItems.map((item) => ({
+            ...item,
+            dueDate: item.dueDate || undefined,
+          })),
+          insights: transformedAnalysis.insights,
+          financialHighlights: transformedAnalysis.financialHighlights,
+        },
       });
-    } catch {
-      // Cache save failed, non-critical
-      console.warn('Failed to save analysis to cache');
-    }
-  }, [document.id]);
+    },
+    onError: (err) => {
+      // Clear progress interval on error
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
 
-  /**
-   * Converts cached analysis to the AIAnalysis format used by the UI
-   */
-  const cachedToUIFormat = useCallback((cached: CachedAnalysis): AIAnalysis => {
-    return {
-      summary: cached.summary || '',
-      keyTerms: (cached.keyTerms as AIAnalysis['keyTerms']) || [],
-      riskFlags: (cached.riskFlags as AIAnalysis['riskFlags']) || [],
-      relatedDocuments: [],
-      actionItems: (cached.actionItems as AIAnalysis['actionItems']) || [],
-      insights: (cached.insights as AIAnalysis['insights']) || [],
-      financialHighlights: (cached.financialHighlights as AIAnalysis['financialHighlights']) || undefined,
-    };
-  }, []);
+      console.error('AI Analysis error:', err);
+      setError(err.message || 'An unexpected error occurred');
+      setProgress(0);
+      setCurrentStep(0);
+      setStatusMessage('');
+      setEstimatedTime(undefined);
+    },
+  });
+
+  // Mutation for caching analysis (fire-and-forget, non-critical)
+  const cacheAnalysisMutation = trpc.ai.cacheAnalysis.useMutation({
+    onSuccess: () => {
+      // Invalidate the cache query so next time it fetches fresh
+      utils.ai.getCachedAnalysis.invalidate({ documentId: document.id });
+    },
+    onError: (err) => {
+      // Non-critical, just log
+      console.warn('Failed to cache analysis:', err.message);
+    },
+  });
+
+  // Determine if we're loading
+  const isLoading = analyzeMutation.isPending || (cachedAnalysisQuery.isLoading && !initialLoadDone.current);
 
   /**
    * Handles cancellation of ongoing analysis
    */
   const handleCancel = useCallback(() => {
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-      abortControllerRef.current = null;
-    }
     if (progressIntervalRef.current) {
       clearInterval(progressIntervalRef.current);
       progressIntervalRef.current = null;
     }
-    setIsLoading(false);
+    // Note: tRPC mutations don't have built-in abort support in React Query v4/v5
+    // The mutation will complete in background but we reset the UI state
     setCurrentStep(0);
     setProgress(0);
     setStatusMessage('');
@@ -369,71 +425,14 @@ export function AIAnalysisPanel({ document, documentContent, isOpen, onClose }: 
   }, []);
 
   /**
-   * Fetches fresh analysis from the AI API
+   * Start fresh analysis
    */
-  const fetchFreshAnalysis = useCallback(async (signal?: AbortSignal): Promise<AIAnalysis | null> => {
-    if (!documentContent) {
-      throw new Error('Document content is required for AI analysis.');
-    }
-
-    const response = await fetch('/api/ai/analyze', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        content: documentContent,
-        metadata: {
-          id: document.id,
-          name: document.name,
-          type: document.fileType,
-        },
-        operation: 'full',
-        options: {
-          includeRisks: true,
-          generateActionItems: true,
-          includeFinancials: true,
-        },
-      }),
-      signal,
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
-      throw new Error(errorData.error || errorData.message || `Analysis failed with status ${response.status}`);
-    }
-
-    const result = await response.json();
-
-    if (!result.success) {
-      throw new Error(result.error || 'Analysis failed');
-    }
-
-    return transformAPIResponse(result.data);
-  }, [document.id, document.name, document.fileType, documentContent]);
-
-  /**
-   * Main analysis fetching function - checks cache first, then fetches fresh if needed
-   */
-  const fetchAnalysis = useCallback(async (forceRefresh: boolean = false) => {
+  const startFreshAnalysis = useCallback(() => {
     if (!documentContent) {
       setError('Document content is required for AI analysis.');
       return;
     }
 
-    // Cancel any existing request
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-    }
-
-    // Create new AbortController
-    abortControllerRef.current = new AbortController();
-    const signal = abortControllerRef.current.signal;
-
-    setIsLoading(true);
     setError(null);
     setIsCached(false);
     setCacheTimestamp(null);
@@ -442,96 +441,126 @@ export function AIAnalysisPanel({ document, documentContent, isOpen, onClose }: 
     setCurrentStep(0);
     setProgress(0);
     setStatusMessage(ANALYSIS_STEPS[0] ?? 'Initializing');
-    setEstimatedTime(30); // Initial estimate: 30 seconds
+    setEstimatedTime(30);
 
-    try {
-      // Check cache first unless forcing refresh
-      if (!forceRefresh) {
-        const cachedAnalysis = await fetchCachedAnalysis();
-        if (cachedAnalysis) {
-          const analysisData = cachedToUIFormat(cachedAnalysis);
-          setAnalysis(analysisData);
-          setIsCached(true);
-          setCacheTimestamp(cachedAnalysis.createdAt);
-          setIsLoading(false);
-          setCurrentStep(ANALYSIS_STEPS.length - 1);
-          setProgress(100);
-          setStatusMessage('Loaded from cache');
-          setEstimatedTime(undefined);
-          return;
-        }
-      }
+    // Start progress simulation
+    let stepIndex = 0;
+    progressIntervalRef.current = setInterval(() => {
+      stepIndex = Math.min(stepIndex + 1, ANALYSIS_STEPS.length - 1);
+      setCurrentStep(stepIndex);
+      setStatusMessage(ANALYSIS_STEPS[stepIndex] ?? 'Analyzing...');
+      setProgress((prev) => Math.min(prev + 20, 90));
+      setEstimatedTime((prev) => (prev !== undefined && prev > 5 ? prev - 5 : undefined));
+    }, 3000);
 
-      // Start progress simulation for fresh analysis
-      let stepIndex = 0;
-      progressIntervalRef.current = setInterval(() => {
-        stepIndex = Math.min(stepIndex + 1, ANALYSIS_STEPS.length - 1);
-        setCurrentStep(stepIndex);
-        setStatusMessage(ANALYSIS_STEPS[stepIndex] ?? 'Analyzing...');
-        setProgress((prev) => Math.min(prev + 20, 90)); // Max out at 90% until complete
-        setEstimatedTime((prev) => (prev !== undefined && prev > 5 ? prev - 5 : undefined));
-      }, 3000);
+    // Start the analysis mutation
+    analyzeMutation.mutate({
+      content: documentContent,
+      metadata: {
+        id: document.id,
+        name: document.name,
+        type: document.fileType,
+      },
+      operation: 'full',
+      options: {
+        includeRisks: true,
+        generateActionItems: true,
+        includeFinancials: true,
+      },
+    });
+  }, [documentContent, document.id, document.name, document.fileType, analyzeMutation]);
 
-      // Fetch fresh analysis from AI
-      const freshAnalysis = await fetchFreshAnalysis(signal);
-
-      // Clear progress interval
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
-
-      if (freshAnalysis) {
-        setAnalysis(freshAnalysis);
-        setIsCached(false);
-        setCacheTimestamp(null);
-
-        // Complete progress
-        setCurrentStep(ANALYSIS_STEPS.length - 1);
-        setProgress(100);
-        setStatusMessage('Analysis complete');
-        setEstimatedTime(undefined);
-
-        // Save to cache in background
-        saveToCache(freshAnalysis);
-      }
-    } catch (err) {
-      // Clear progress interval on error
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
-
-      // Don't show error if cancelled
-      if (err instanceof Error && err.name === 'AbortError') {
-        console.log('Analysis cancelled by user');
+  /**
+   * Fetch analysis - checks cache first, then fetches fresh if needed
+   */
+  const fetchAnalysis = useCallback(
+    (forceRefresh: boolean = false) => {
+      if (!documentContent) {
+        setError('Document content is required for AI analysis.');
         return;
       }
 
-      console.error('AI Analysis error:', err);
-      setError(err instanceof Error ? err.message : 'An unexpected error occurred');
-    } finally {
-      setIsLoading(false);
-      abortControllerRef.current = null;
-    }
-  }, [documentContent, fetchCachedAnalysis, cachedToUIFormat, fetchFreshAnalysis, saveToCache]);
+      // Clear any existing progress interval
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
 
+      setError(null);
+
+      // If forcing refresh, skip cache and start fresh analysis
+      if (forceRefresh) {
+        startFreshAnalysis();
+        return;
+      }
+
+      // Check if we have fresh cached data
+      if (cachedAnalysisQuery.data?.data && cachedAnalysisQuery.data.isFresh) {
+        const cachedData = cachedAnalysisQuery.data.data;
+        const analysisData = cachedToUIFormat(cachedData);
+        setAnalysis(analysisData);
+        setIsCached(true);
+        setCacheTimestamp(cachedData.createdAt);
+        setCurrentStep(ANALYSIS_STEPS.length - 1);
+        setProgress(100);
+        setStatusMessage('Loaded from cache');
+        setEstimatedTime(undefined);
+        return;
+      }
+
+      // No fresh cache, start fresh analysis
+      startFreshAnalysis();
+    },
+    [documentContent, cachedAnalysisQuery.data, startFreshAnalysis]
+  );
+
+  // Effect: Handle initial load when panel opens
   useEffect(() => {
     if (isOpen && documentContent && !initialLoadDone.current) {
-      initialLoadDone.current = true;
-      fetchAnalysis(false);
+      // Wait for cache query to complete before deciding what to do
+      if (!cachedAnalysisQuery.isLoading) {
+        initialLoadDone.current = true;
+
+        if (cachedAnalysisQuery.data?.data && cachedAnalysisQuery.data.isFresh) {
+          // Use cached data
+          const cachedData = cachedAnalysisQuery.data.data;
+          const analysisData = cachedToUIFormat(cachedData);
+          setAnalysis(analysisData);
+          setIsCached(true);
+          setCacheTimestamp(cachedData.createdAt);
+          setCurrentStep(ANALYSIS_STEPS.length - 1);
+          setProgress(100);
+          setStatusMessage('Loaded from cache');
+        } else {
+          // Start fresh analysis
+          startFreshAnalysis();
+        }
+      }
     } else if (isOpen && !documentContent) {
       setError('Document content is required for AI analysis.');
-      setIsLoading(false);
     }
-  }, [isOpen, documentContent, fetchAnalysis]);
+  }, [isOpen, documentContent, cachedAnalysisQuery.isLoading, cachedAnalysisQuery.data, startFreshAnalysis]);
 
   // Reset initial load tracking when panel closes
   useEffect(() => {
     if (!isOpen) {
       initialLoadDone.current = false;
+      // Clear progress interval when panel closes
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+        progressIntervalRef.current = null;
+      }
     }
   }, [isOpen]);
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      if (progressIntervalRef.current) {
+        clearInterval(progressIntervalRef.current);
+      }
+    };
+  }, []);
 
   const toggleSection = (section: string) => {
     setExpandedSections((prev) => {

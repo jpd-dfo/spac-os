@@ -7,11 +7,6 @@ import {
   X,
   Clock,
   FileText,
-  Filter,
-  ChevronDown,
-  Calendar,
-  User,
-  Tag,
   Folder,
   SlidersHorizontal,
 } from 'lucide-react';
