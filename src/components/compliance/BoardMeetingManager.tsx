@@ -246,7 +246,7 @@ function getMeetingTypeBadge(type: MeetingType) {
     'Audit Committee': 'secondary',
     'Compensation Committee': 'success',
     'Nominating Committee': 'warning',
-    Special: 'danger' as const,
+    Special: 'warning',
   };
   return <Badge variant={variants[type]}>{type}</Badge>;
 }
@@ -262,9 +262,9 @@ function getStatusBadge(status: MeetingStatus) {
 }
 
 function getAttendanceStatusBadge(status: AttendanceStatus) {
-  const variants: Record<AttendanceStatus, 'success' | 'danger' | 'warning' | 'secondary'> = {
+  const variants: Record<AttendanceStatus, 'success' | 'secondary' | 'warning'> = {
     Present: 'success',
-    Absent: 'danger',
+    Absent: 'secondary',
     Excused: 'warning',
     Pending: 'secondary',
   };

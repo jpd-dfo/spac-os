@@ -5,6 +5,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 
+import { type SpacStatus } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 
@@ -74,7 +75,7 @@ export async function GET(request: NextRequest) {
     const where: {
       organizationId: string;
       deletedAt: null;
-      status?: string;
+      status?: SpacStatus;
       OR?: Array<{ name?: { contains: string; mode: 'insensitive' }; ticker?: { contains: string; mode: 'insensitive' }; description?: { contains: string; mode: 'insensitive' } }>;
     } = {
       organizationId: params.organizationId,
@@ -82,7 +83,7 @@ export async function GET(request: NextRequest) {
     };
 
     if (params.status) {
-      where.status = params.status;
+      where.status = params.status as SpacStatus;
     }
 
     if (params.search) {

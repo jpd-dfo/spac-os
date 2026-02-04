@@ -5,6 +5,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 
+import { Prisma } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { type z } from 'zod';
 
@@ -283,7 +284,7 @@ export async function PUT(
           entityId: spacId,
           userId: session.user.id,
           organizationId: existingSpac.organizationId,
-          metadata: changes,
+          metadata: changes as Prisma.InputJsonValue,
         },
       });
     }

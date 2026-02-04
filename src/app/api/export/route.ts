@@ -5,6 +5,7 @@
 
 import { type NextRequest, NextResponse } from 'next/server';
 
+import { type SpacStatus, type TargetStatus, type TaskStatus, type FilingStatus, type ComplianceStatus } from '@prisma/client';
 import { getServerSession } from 'next-auth';
 import { z } from 'zod';
 
@@ -87,7 +88,7 @@ export async function POST(request: NextRequest) {
           where: {
             organizationId: params.organizationId,
             deletedAt: null,
-            ...(filters.status && { status: filters.status }),
+            ...(filters.status && { status: filters.status as SpacStatus }),
             ...(filters.startDate && { createdAt: { gte: filters.startDate } }),
             ...(filters.endDate && { createdAt: { lte: filters.endDate } }),
           },
@@ -103,7 +104,7 @@ export async function POST(request: NextRequest) {
             spac: { organizationId: params.organizationId },
             deletedAt: null,
             ...(filters.spacId && { spacId: filters.spacId }),
-            ...(filters.status && { status: filters.status }),
+            ...(filters.status && { status: filters.status as TargetStatus }),
           },
           include: {
             spac: { select: { name: true, ticker: true } },
@@ -117,7 +118,7 @@ export async function POST(request: NextRequest) {
             spac: { organizationId: params.organizationId },
             deletedAt: null,
             ...(filters.spacId && { spacId: filters.spacId }),
-            ...(filters.status && { status: filters.status }),
+            ...(filters.status && { status: filters.status as TaskStatus }),
           },
           include: {
             spac: { select: { name: true, ticker: true } },
@@ -144,7 +145,7 @@ export async function POST(request: NextRequest) {
           where: {
             spac: { organizationId: params.organizationId },
             ...(filters.spacId && { spacId: filters.spacId }),
-            ...(filters.status && { status: filters.status }),
+            ...(filters.status && { status: filters.status as FilingStatus }),
           },
           include: {
             spac: { select: { name: true, ticker: true } },
@@ -157,7 +158,7 @@ export async function POST(request: NextRequest) {
           where: {
             spac: { organizationId: params.organizationId },
             ...(filters.spacId && { spacId: filters.spacId }),
-            ...(filters.status && { status: filters.status }),
+            ...(filters.status && { status: filters.status as ComplianceStatus }),
           },
           include: {
             spac: { select: { name: true, ticker: true } },
@@ -313,7 +314,7 @@ function flattenObject(obj: Record<string, unknown>, prefix = ''): Record<string
     } else if (Array.isArray(value)) {
       result[newKey] = JSON.stringify(value);
     } else if (typeof value === 'object') {
-      Object.assign(result, flattenObject(value, newKey));
+      Object.assign(result, flattenObject(value as Record<string, unknown>, newKey));
     } else {
       result[newKey] = value;
     }

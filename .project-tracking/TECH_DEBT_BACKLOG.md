@@ -383,10 +383,32 @@ Uses fetch directly instead of tRPC, inconsistent with rest of app.
 **Key Achievements:**
 - 64 unit tests added for tRPC routers
 - 32 E2E tests added for SPAC CRUD
-- ESLint warnings reduced by 69%
+- ESLint warnings reduced by 69% (from ~51 to ~16 `no-explicit-any` warnings)
 - Real-time notifications via SSE
 - Database-backed rate limiting for serverless
 - Full AI router with tRPC integration
+
+---
+
+## Remaining Acceptable Technical Decisions
+
+### ESLint `no-explicit-any` Warnings (~16 remaining)
+
+**Decision:** Keep as-is. These are acceptable edge cases.
+
+**Location of remaining `any` types:**
+| File | Count | Reason |
+|------|-------|--------|
+| `src/server/websocket/index.ts` | ~10 | WebSocket event handlers with dynamic payloads |
+| `src/server/api/routers/webhook.router.ts` | ~4 | External webhook payload validation |
+| `src/app/(dashboard)/dashboard/page.tsx` | ~2 | Dynamic Prisma query results |
+
+**Rationale:**
+1. WebSocket handlers receive unpredictable external data - strict typing would require runtime validation that adds complexity
+2. Webhook payloads from external services (Gmail, Calendly) vary by event type
+3. Dynamic Prisma queries with conditional includes return union types that TypeScript can't narrow
+
+**Future Option:** If stricter typing is desired, implement Zod schemas for all external data boundaries. Estimated effort: 2-3 days.
 
 ---
 

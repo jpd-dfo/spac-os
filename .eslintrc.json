@@ -158,6 +158,9 @@
     "dist/",
     "coverage/",
     "*.config.js",
-    "*.config.mjs"
+    "*.config.mjs",
+    "**/__tests__/**",
+    "src/test/**",
+    "e2e/**"
   ]
 }

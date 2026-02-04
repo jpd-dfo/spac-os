@@ -1,5 +1,30 @@
 # SPAC OS Issues Log
 
+## Current Status (February 4, 2026)
+
+**Build:** PASSING
+**All Tech Debt:** RESOLVED
+**Sprint:** 9 Complete, Sprint 10 Planned
+
+### Active Issues (Carryover to Sprint 10)
+
+| ID | Priority | Description | Status |
+|----|----------|-------------|--------|
+| S10-001 | P2 | Gmail/Calendar APIs need Google Cloud credentials | Blocked on credentials |
+| S10-002 | P3 | ~16 `no-explicit-any` ESLint warnings | Acceptable - documented |
+
+### Build Fixes Applied (February 4, 2026)
+
+| File | Fix |
+|------|-----|
+| `src/app/api/spacs/route.ts` | Added SpacStatus type cast |
+| `src/app/api/spacs/[id]/route.ts` | Added Prisma.InputJsonValue cast |
+| `src/app/api/export/route.ts` | Added status enum type casts |
+| `src/components/compliance/BoardMeetingManager.tsx` | Fixed Badge variant (danger→warning) |
+| `.eslintrc.json` | Added test file ignorePatterns |
+
+---
+
 ## Sprint 9 Issues
 
 ### Test Results

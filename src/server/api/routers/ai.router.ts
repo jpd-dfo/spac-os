@@ -173,8 +173,12 @@ function calculateRiskLevel(
   const hasHigh = riskFlags.some((r) => r.severity === 'high');
   const hasMedium = riskFlags.some((r) => r.severity === 'medium');
 
-  if (hasHigh) return 'high';
-  if (hasMedium) return 'medium';
+  if (hasHigh) {
+    return 'high';
+  }
+  if (hasMedium) {
+    return 'medium';
+  }
   return 'low';
 }
 
@@ -812,10 +816,14 @@ export const aiRouter = createTRPCRouter({
 
       insights.sort((a, b) => {
         const statusDiff = statusOrder[a.status] - statusOrder[b.status];
-        if (statusDiff !== 0) return statusDiff;
+        if (statusDiff !== 0) {
+          return statusDiff;
+        }
 
         const priorityDiff = priorityOrder[a.priority] - priorityOrder[b.priority];
-        if (priorityDiff !== 0) return priorityDiff;
+        if (priorityDiff !== 0) {
+          return priorityDiff;
+        }
 
         return new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime();
       });
