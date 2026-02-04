@@ -336,7 +336,15 @@ Uses fetch directly instead of tRPC, inconsistent with rest of app.
 
 | ID | Description | Resolved In | Date |
 |----|-------------|-------------|------|
-| - | - | - | - |
+| TD-001 | Alert Router Efficiency | Sprint 9 | Feb 3, 2026 |
+| TD-006 | Quick Actions Implementation | Already Complete (verified) | Feb 3, 2026 |
+| TD-007 | Legacy Mock Data Blocks | Sprint 9 | Feb 3, 2026 |
+| TD-011 | ContactList Mock Data Import | Sprint 9 | Feb 3, 2026 |
+| TD-012 | Dashboard Activity Feed Placeholder | Sprint 9 | Feb 3, 2026 |
+| TD-014 | Dashboard Milestones Placeholder | Sprint 9 | Feb 3, 2026 |
+| TD-015 | PDF Export Error Handling | Sprint 9 | Feb 3, 2026 |
+| TD-016 | ScoreHistory Sparkline Colors | Sprint 9 | Feb 3, 2026 |
+| TD-018 | memoExporter Currency Edge Cases | Sprint 9 | Feb 3, 2026 |
 
 ---
 
