@@ -68,9 +68,13 @@ Required in `.env.local`:
 Core models in Prisma:
 - `User` - Clerk-synced users
 - `Spac` - SPAC entities with lifecycle tracking
-- `Deal` - Individual deals/transactions
+- `Organization` - PE firms, IBs, and other ecosystem entities (Sprint 10)
+- `OwnershipStake` - PE portfolio ownership tracking (Sprint 10)
+- `Contact` - CRM contacts with organization links
+- `Company` - CRM companies
 - `Document` - Uploaded files and analysis
-- `Activity` - Audit trail
+- `ActivityFeed` - Unified activity timeline (Sprint 10)
+- `Filing` - SEC filings with workflow and review tracking
 
 ### Deployment
 - **Vercel** - Auto-deploys from `main` branch
@@ -78,9 +82,14 @@ Core models in Prisma:
 - Build command: `prisma generate && next build`
 
 ## Current Sprint Status
-- ✅ Sprint 1: Foundation (Auth, DB, UI framework)
-- ✅ Sprint 2: SPAC Management (CRUD, listings, details)
-- 🔄 Sprint 3: Deals & Documents (upcoming)
+- ✅ Sprints 1-10: Complete (Foundation through PE Firm Management)
+- 🔄 Sprint 11: Upcoming (IB Firm Management, Mandate Tracking)
+
+### Sprint 10 Routes (PE Firm Management)
+- `/organizations` - PE firms, IBs, and ecosystem entities list
+- `/organizations/[id]` - Organization detail with Portfolio, Contacts, Activity tabs
+- `/companies` - CRM companies list
+- `/companies/[id]` - Company detail with Contacts, Deal History tabs
 
 ## Credentials
 See `.credentials/SPAC_OS_CREDENTIALS.md` for all API keys and service configs (DO NOT commit to git).
