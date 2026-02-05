@@ -7,8 +7,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================================================
@@ -843,6 +844,10 @@ model Contact {
   emails        Email[]
   activities    ActivityFeed[]
 
+  // Sprint 11 - IB mandate and coverage relations
+  mandates      IBMandate[]       @relation("MandateContacts")
+  coverageAreas IBCoverage[]      @relation("CoverageContacts")
+
   @@index([email])
   @@index([companyId])
   @@index([ownerId])
@@ -1471,6 +1476,10 @@ model Organization {
   spacs         Spac[]
   webhooks      Webhook[]
 
+  // Sprint 11 - IB-specific relations
+  ibMandates    IBMandate[]         @relation("IBMandates")
+  ibCoverage    IBCoverage[]        @relation("IBCoverage")
+
   @@index([slug])
   @@index([type])
   @@index([subType])
@@ -1783,4 +1792,94 @@ model ActivityFeed {
   @@index([type])
   @@index([createdAt])
   @@map("activity_feeds")
+}
+
+// ============================================================================
+// SPRINT 11 - IB FIRM MANAGEMENT MODELS
+// ============================================================================
+
+/// IBMandate - Tracks IB mandates to sell/advise companies
+model IBMandate {
+  id                String   @id @default(cuid())
+
+  // IB Organization
+  organizationId    String
+  organization      Organization @relation("IBMandates", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Mandate details
+  clientName        String           // Company/client being advised
+  serviceType       MandateServiceType
+  status            MandateStatus    @default(ACTIVE)
+  dealValue         Decimal?         @db.Decimal(18, 2)
+  expectedFee       Decimal?         @db.Decimal(18, 2)
+
+  // Dates
+  mandateDate       DateTime?
+  expectedCloseDate DateTime?
+  actualCloseDate   DateTime?
+
+  // Details
+  description       String?          @db.Text
+  notes             String?          @db.Text
+
+  // Relations - IB contacts working on this mandate
+  contacts          Contact[]        @relation("MandateContacts")
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("ib_mandates")
+}
+
+/// IBCoverage - Tracks IB sector/industry coverage and expertise
+model IBCoverage {
+  id              String   @id @default(cuid())
+
+  organizationId  String
+  organization    Organization @relation("IBCoverage", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  sector          String           // "Healthcare", "Technology", "Industrials"
+  subSector       String?          // "Medical Devices", "Enterprise Software"
+  geography       String?          // "North America", "Europe"
+
+  // Coverage strength
+  expertise       CoverageExpertise @default(MODERATE)
+
+  // Key contacts for this coverage area
+  contacts        Contact[]        @relation("CoverageContacts")
+
+  notes           String?          @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organizationId, sector, subSector, geography])
+  @@index([organizationId])
+  @@map("ib_coverage")
+}
+
+enum MandateServiceType {
+  MA_SELLSIDE       // M&A - representing seller
+  MA_BUYSIDE        // M&A - representing buyer
+  CAPITAL_RAISE     // Equity or debt raise
+  RESTRUCTURING     // Financial restructuring
+  FAIRNESS_OPINION  // Valuation/opinion
+  SPAC_ADVISORY     // SPAC-specific advisory
+  OTHER
+}
+
+enum MandateStatus {
+  ACTIVE
+  WON
+  LOST
+  COMPLETED
+  ON_HOLD
+}
+
+enum CoverageExpertise {
+  LEADING    // Top tier, many deals
+  STRONG     // Well established
+  MODERATE   // Some presence
+  EMERGING   // Building capability
 }

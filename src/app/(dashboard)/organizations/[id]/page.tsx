@@ -24,6 +24,9 @@ import {
   RefreshCw,
   TrendingUp,
   Clock,
+  FileText,
+  Compass,
+  Plus,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
@@ -39,7 +42,7 @@ import { formatLargeNumber, formatDate, formatRelativeTime, cn } from '@/lib/uti
 // TYPES
 // ============================================================================
 
-type TabType = 'overview' | 'portfolio' | 'contacts' | 'activity';
+type TabType = 'overview' | 'portfolio' | 'contacts' | 'activity' | 'mandates' | 'coverage';
 
 // Type for organization data with counts (extends router return type)
 type OrganizationWithCounts = {
@@ -737,6 +740,321 @@ function ActivityTab({ organizationId }: { organizationId: string }) {
 }
 
 // ============================================================================
+// IB-SPECIFIC TABS - MANDATES & COVERAGE
+// ============================================================================
+
+// Service type labels for mandates
+const MANDATE_SERVICE_TYPE_LABELS: Record<string, string> = {
+  MA_SELLSIDE: 'M&A Sell-Side',
+  MA_BUYSIDE: 'M&A Buy-Side',
+  CAPITAL_RAISE: 'Capital Raise',
+  RESTRUCTURING: 'Restructuring',
+  FAIRNESS_OPINION: 'Fairness Opinion',
+  SPAC_ADVISORY: 'SPAC Advisory',
+  OTHER: 'Other',
+};
+
+// Status configuration for mandates
+const MANDATE_STATUS_CONFIG: Record<string, { label: string; variant: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' }> = {
+  ACTIVE: { label: 'Active', variant: 'primary' },
+  WON: { label: 'Won', variant: 'success' },
+  LOST: { label: 'Lost', variant: 'danger' },
+  COMPLETED: { label: 'Completed', variant: 'secondary' },
+  ON_HOLD: { label: 'On Hold', variant: 'warning' },
+};
+
+// Expertise level configuration for coverage
+const EXPERTISE_LEVEL_CONFIG: Record<string, { label: string; variant: 'primary' | 'secondary' | 'success' | 'warning' }> = {
+  LEADING: { label: 'Leading', variant: 'primary' },
+  STRONG: { label: 'Strong', variant: 'success' },
+  MODERATE: { label: 'Moderate', variant: 'warning' },
+  EMERGING: { label: 'Emerging', variant: 'secondary' },
+};
+
+function MandatesTab({ organizationId }: { organizationId: string }) {
+  const { data, isLoading, isError, error } = trpc.mandate.listByOrganization.useQuery(
+    { organizationId },
+    { retry: 1 }
+  );
+
+  const handleCreateMandate = () => {
+    toast('Mandate creation coming soon', { icon: '🚧' });
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Mandates</CardTitle>
+            <CardDescription>Active and historical mandates for this investment bank</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 animate-pulse">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-24 bg-slate-100 rounded-lg" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Mandates</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8">
+            <AlertCircle className="h-10 w-10 text-danger-400 mb-3" />
+            <p className="text-sm text-danger-600">{error?.message || 'Failed to load mandates'}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const mandates = data?.items || [];
+
+  if (mandates.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Mandates</CardTitle>
+            <CardDescription>Active and historical mandates for this investment bank</CardDescription>
+          </div>
+          <Button variant="primary" size="sm" onClick={handleCreateMandate}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Mandate
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <EmptyState
+            icon={<FileText className="h-12 w-12" />}
+            title="No mandates"
+            description="This investment bank has no mandates recorded yet."
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>Mandates ({mandates.length})</CardTitle>
+          <CardDescription>Active and historical mandates for this investment bank</CardDescription>
+        </div>
+        <Button variant="primary" size="sm" onClick={handleCreateMandate}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Mandate
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <div className="divide-y divide-slate-200">
+          {mandates.map((mandate) => {
+            const statusConfig = MANDATE_STATUS_CONFIG[mandate.status] || { label: mandate.status, variant: 'secondary' as const };
+            const serviceLabel = MANDATE_SERVICE_TYPE_LABELS[mandate.serviceType] || mandate.serviceType;
+
+            return (
+              <div key={mandate.id} className="py-4 first:pt-0 last:pb-0">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+                      <FileText className="h-5 w-5 text-slate-600" />
+                    </div>
+                    <div>
+                      <p className="font-medium text-slate-900">{mandate.clientName}</p>
+                      <div className="mt-1 flex flex-wrap gap-1.5">
+                        <Badge variant="secondary" size="sm">
+                          {serviceLabel}
+                        </Badge>
+                        <Badge variant={statusConfig.variant} size="sm">
+                          {statusConfig.label}
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {mandate.dealValue && (
+                      <p className="font-semibold text-slate-900">{formatLargeNumber(mandate.dealValue)}</p>
+                    )}
+                    {mandate.expectedCloseDate && (
+                      <p className="text-xs text-slate-500 mt-1">
+                        Expected close: {formatDate(mandate.expectedCloseDate)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+                {mandate.description && (
+                  <p className="mt-2 text-sm text-slate-500 line-clamp-2">{mandate.description}</p>
+                )}
+                <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
+                  {mandate.mandateDate && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Mandate date: {formatDate(mandate.mandateDate)}
+                    </span>
+                  )}
+                  {mandate.contacts && mandate.contacts.length > 0 && (
+                    <span className="flex items-center gap-1">
+                      <Users className="h-3 w-3" />
+                      {mandate.contacts.length} contact{mandate.contacts.length !== 1 ? 's' : ''}
+                    </span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {data?.hasMore && (
+          <p className="mt-4 text-center text-sm text-slate-500">
+            Showing {mandates.length} most recent mandates
+          </p>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
+function CoverageTab({ organizationId }: { organizationId: string }) {
+  const { data, isLoading, isError, error } = trpc.coverage.listByOrganization.useQuery(
+    { organizationId },
+    { retry: 1 }
+  );
+
+  const handleAddCoverage = () => {
+    toast('Coverage management coming soon', { icon: '🚧' });
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Coverage Areas</CardTitle>
+            <CardDescription>Sectors and industries covered by this investment bank</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 animate-pulse">
+            {[1, 2, 3, 4, 5, 6].map((i) => (
+              <div key={i} className="h-32 bg-slate-100 rounded-lg" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Coverage Areas</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8">
+            <AlertCircle className="h-10 w-10 text-danger-400 mb-3" />
+            <p className="text-sm text-danger-600">{error?.message || 'Failed to load coverage areas'}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const coverageAreas = data?.coverageAreas || [];
+
+  if (coverageAreas.length === 0) {
+    return (
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Coverage Areas</CardTitle>
+            <CardDescription>Sectors and industries covered by this investment bank</CardDescription>
+          </div>
+          <Button variant="primary" size="sm" onClick={handleAddCoverage}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Coverage
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <EmptyState
+            icon={<Compass className="h-12 w-12" />}
+            title="No coverage areas"
+            description="No coverage areas have been defined for this investment bank yet."
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader className="flex flex-row items-center justify-between">
+        <div>
+          <CardTitle>Coverage Areas ({coverageAreas.length})</CardTitle>
+          <CardDescription>Sectors and industries covered by this investment bank</CardDescription>
+        </div>
+        <Button variant="primary" size="sm" onClick={handleAddCoverage}>
+          <Plus className="mr-2 h-4 w-4" />
+          Add Coverage
+        </Button>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {coverageAreas.map((coverage) => {
+            const expertiseConfig = EXPERTISE_LEVEL_CONFIG[coverage.expertise] || { label: coverage.expertise, variant: 'secondary' as const };
+            const contactCount = coverage.contacts?.length || 0;
+
+            return (
+              <div
+                key={coverage.id}
+                className="rounded-lg border border-slate-200 p-4 hover:border-slate-300 hover:shadow-sm transition-all"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100">
+                    <Compass className="h-5 w-5 text-primary-600" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-900 truncate">{coverage.sector}</p>
+                    {coverage.subSector && (
+                      <p className="text-sm text-slate-500 truncate">{coverage.subSector}</p>
+                    )}
+                    {coverage.geography && (
+                      <p className="text-xs text-slate-400 truncate flex items-center gap-1 mt-0.5">
+                        <Globe className="h-3 w-3" />
+                        {coverage.geography}
+                      </p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      <Badge variant={expertiseConfig.variant} size="sm">
+                        {expertiseConfig.label}
+                      </Badge>
+                    </div>
+                    {contactCount > 0 && (
+                      <p className="mt-2 text-xs text-slate-500 flex items-center gap-1">
+                        <Users className="h-3 w-3" />
+                        {contactCount} contact{contactCount !== 1 ? 's' : ''}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+// ============================================================================
 // MAIN PAGE COMPONENT
 // ============================================================================
 
@@ -812,15 +1130,27 @@ export default function OrganizationDetailPage() {
   }
 
   // ============================================================================
-  // TAB DEFINITIONS
+  // TAB DEFINITIONS (conditional based on organization type)
   // ============================================================================
 
-  const tabs: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }[] = [
-    { id: 'overview', label: 'Overview', icon: Building2 },
-    { id: 'portfolio', label: 'Portfolio', icon: Briefcase, count: organization._count?.ownedStakes || 0 },
-    { id: 'contacts', label: 'Contacts', icon: Users, count: organization._count?.contacts || 0 },
-    { id: 'activity', label: 'Activity', icon: Activity },
-  ];
+  // For PE_FIRM: Overview, Portfolio, Contacts, Activity
+  // For IB: Overview, Mandates, Coverage, Contacts, Activity (no Portfolio)
+  const isIB = organization.type === 'IB';
+
+  const tabs: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }[] = isIB
+    ? [
+        { id: 'overview', label: 'Overview', icon: Building2 },
+        { id: 'mandates', label: 'Mandates', icon: FileText },
+        { id: 'coverage', label: 'Coverage', icon: Compass },
+        { id: 'contacts', label: 'Contacts', icon: Users, count: organization._count?.contacts || 0 },
+        { id: 'activity', label: 'Activity', icon: Activity },
+      ]
+    : [
+        { id: 'overview', label: 'Overview', icon: Building2 },
+        { id: 'portfolio', label: 'Portfolio', icon: Briefcase, count: organization._count?.ownedStakes || 0 },
+        { id: 'contacts', label: 'Contacts', icon: Users, count: organization._count?.contacts || 0 },
+        { id: 'activity', label: 'Activity', icon: Activity },
+      ];
 
   // ============================================================================
   // RENDER
@@ -1230,15 +1560,38 @@ export default function OrganizationDetailPage() {
                   <CardTitle>Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  <Button
-                    variant="secondary"
-                    className="w-full justify-start"
-                    size="sm"
-                    onClick={() => setActiveTab('portfolio')}
-                  >
-                    <Briefcase className="mr-2 h-4 w-4" />
-                    View Portfolio
-                  </Button>
+                  {isIB ? (
+                    <>
+                      <Button
+                        variant="secondary"
+                        className="w-full justify-start"
+                        size="sm"
+                        onClick={() => setActiveTab('mandates')}
+                      >
+                        <FileText className="mr-2 h-4 w-4" />
+                        View Mandates
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="w-full justify-start"
+                        size="sm"
+                        onClick={() => setActiveTab('coverage')}
+                      >
+                        <Compass className="mr-2 h-4 w-4" />
+                        View Coverage
+                      </Button>
+                    </>
+                  ) : (
+                    <Button
+                      variant="secondary"
+                      className="w-full justify-start"
+                      size="sm"
+                      onClick={() => setActiveTab('portfolio')}
+                    >
+                      <Briefcase className="mr-2 h-4 w-4" />
+                      View Portfolio
+                    </Button>
+                  )}
                   <Button
                     variant="secondary"
                     className="w-full justify-start"
@@ -1264,11 +1617,31 @@ export default function OrganizationDetailPage() {
         </TabContent>
 
         {/* ================================================================== */}
-        {/* PORTFOLIO TAB */}
+        {/* PORTFOLIO TAB (PE_FIRM only) */}
         {/* ================================================================== */}
-        <TabContent value="portfolio">
-          <PortfolioTab organizationId={id} />
-        </TabContent>
+        {!isIB && (
+          <TabContent value="portfolio">
+            <PortfolioTab organizationId={id} />
+          </TabContent>
+        )}
+
+        {/* ================================================================== */}
+        {/* MANDATES TAB (IB only) */}
+        {/* ================================================================== */}
+        {isIB && (
+          <TabContent value="mandates">
+            <MandatesTab organizationId={id} />
+          </TabContent>
+        )}
+
+        {/* ================================================================== */}
+        {/* COVERAGE TAB (IB only) */}
+        {/* ================================================================== */}
+        {isIB && (
+          <TabContent value="coverage">
+            <CoverageTab organizationId={id} />
+          </TabContent>
+        )}
 
         {/* ================================================================== */}
         {/* CONTACTS TAB */}

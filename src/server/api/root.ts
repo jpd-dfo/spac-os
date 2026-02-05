@@ -10,12 +10,14 @@ import { calendarRouter } from './routers/calendar.router';
 import { companyRouter } from './routers/company.router';
 import { complianceRouter } from './routers/compliance.router';
 import { contactRouter } from './routers/contact.router';
+import { coverageRouter } from './routers/coverage.router';
 import { documentRouter } from './routers/document.router';
 import { emailRouter } from './routers/email.router';
 import { filingRouter } from './routers/filing.router';
 import { financialRouter } from './routers/financial.router';
 import { integrationsRouter } from './routers/integrations.router';
 import { interactionRouter } from './routers/interaction.router';
+import { mandateRouter } from './routers/mandate.router';
 import { noteRouter } from './routers/note.router';
 import { organizationRouter } from './routers/organization.router';
 import { ownershipRouter } from './routers/ownership.router';
@@ -51,12 +53,14 @@ export const appRouter = createTRPCRouter({
   company: companyRouter,
   compliance: complianceRouter,
   contact: contactRouter,
+  coverage: coverageRouter,
   document: documentRouter,
   email: emailRouter,
   filing: filingRouter,
   financial: financialRouter,
   integrations: integrationsRouter,
   interaction: interactionRouter,
+  mandate: mandateRouter,
   note: noteRouter,
   organization: organizationRouter,
   ownership: ownershipRouter,

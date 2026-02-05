@@ -364,7 +364,7 @@ function ActivitySkeleton() {
 // ============================================================================
 
 export function ActivityFeed({
-  data = mockActivityData,
+  data,
   isLoading = false,
   className,
   onViewAll,
@@ -397,7 +397,10 @@ export function ActivityFeed({
         <CardContent className="flex flex-col items-center justify-center py-12">
           <Activity className="h-12 w-12 text-slate-300" />
           <p className="mt-4 text-sm font-medium text-slate-600">
-            No activity data available
+            No activity yet
+          </p>
+          <p className="mt-1 text-sm text-slate-500">
+            No recent activity to display
           </p>
         </CardContent>
       </Card>

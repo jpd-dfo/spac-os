@@ -399,6 +399,17 @@ export default function DashboardPage() {
     }
   );
 
+  // Fetch recent activity feed items from the unified activity table
+  const activityFeedQuery = trpc.activity.listRecent.useQuery(
+    {
+      limit: 20,
+    },
+    {
+      refetchOnWindowFocus: false,
+      retry: 1,
+    }
+  );
+
   // Fetch trust account balance history for primary SPAC
   const balanceHistoryQuery = trpc.financial.trustAccountGetBalanceHistory.useQuery(
     { spacId: primarySpacId! },
@@ -1069,6 +1080,132 @@ export default function DashboardPage() {
   }, [spacsQuery.data, targetsQuery.data, filingsQuery.data, interactionsQuery.data, documentsQuery.data]);
 
   // ============================================================================
+  // DERIVED DATA: UNIFIED ACTIVITY FEED (from activity.listRecent tRPC query)
+  // Maps API ActivityType enum to component ActivityType
+  // ============================================================================
+
+  // Type for ActivityFeed component's expected activity type
+  type ComponentActivityType =
+    | 'DOCUMENT_UPLOAD'
+    | 'DOCUMENT_EDIT'
+    | 'TARGET_UPDATE'
+    | 'TASK_COMPLETE'
+    | 'COMMENT'
+    | 'MESSAGE'
+    | 'MEETING'
+    | 'FILING';
+
+  const unifiedActivityFeedData = useMemo(() => {
+    if (!activityFeedQuery.data?.items) {
+      return null;
+    }
+
+    const { items, total } = activityFeedQuery.data;
+
+    // Map API ActivityType enum to component's expected ActivityType
+    const mapActivityType = (apiType: string): ComponentActivityType => {
+      const typeMap: Record<string, ComponentActivityType> = {
+        'EMAIL_SENT': 'MESSAGE',
+        'EMAIL_RECEIVED': 'MESSAGE',
+        'MEETING_SCHEDULED': 'MEETING',
+        'MEETING_COMPLETED': 'MEETING',
+        'CALL_MADE': 'MESSAGE',
+        'CALL_RECEIVED': 'MESSAGE',
+        'NOTE_ADDED': 'COMMENT',
+        'DEAL_DISCUSSED': 'TARGET_UPDATE',
+        'DOCUMENT_SHARED': 'DOCUMENT_UPLOAD',
+        'CONTACT_ADDED': 'TARGET_UPDATE',
+        'RELATIONSHIP_UPDATED': 'TARGET_UPDATE',
+      };
+      return typeMap[apiType] || 'COMMENT';
+    };
+
+    // Generate action string from activity type and title
+    const generateAction = (apiType: string, title: string): string => {
+      // Try to extract action from title, or generate based on type
+      const actionMap: Record<string, string> = {
+        'EMAIL_SENT': 'sent email',
+        'EMAIL_RECEIVED': 'received email',
+        'MEETING_SCHEDULED': 'scheduled meeting',
+        'MEETING_COMPLETED': 'completed meeting',
+        'CALL_MADE': 'made call',
+        'CALL_RECEIVED': 'received call',
+        'NOTE_ADDED': 'added note',
+        'DEAL_DISCUSSED': 'discussed deal',
+        'DOCUMENT_SHARED': 'shared document',
+        'CONTACT_ADDED': 'added contact',
+        'RELATIONSHIP_UPDATED': 'updated relationship',
+      };
+      return actionMap[apiType] || title;
+    };
+
+    // Check if activity is new (within last 24 hours)
+    const isNewActivity = (createdAt: Date | string): boolean => {
+      const activityTime = new Date(createdAt).getTime();
+      const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+      return activityTime > oneDayAgo;
+    };
+
+    // Transform API items to component format
+    const activities = items.map((item) => {
+      // Get user info - prioritize the user relation, fallback to contact
+      const userName = item.user?.name
+        || (item.contact ? `${item.contact.firstName} ${item.contact.lastName}`.trim() : 'System');
+      const userAvatar = item.user?.image || item.contact?.avatarUrl || undefined;
+      const userRole = item.contact?.title || undefined;
+
+      // Build subject and link from organization or contact
+      let subject = item.description || item.title;
+      let subjectLink: string | undefined;
+
+      if (item.organization) {
+        subject = item.organization.name;
+        subjectLink = `/organizations/${item.organization.id}`;
+      } else if (item.contact) {
+        subject = `${item.contact.firstName} ${item.contact.lastName}`.trim();
+        subjectLink = `/contacts/${item.contact.id}`;
+      }
+
+      // Use sourceId/sourceType for more specific links if available
+      if (item.sourceType && item.sourceId) {
+        const sourceLinks: Record<string, string> = {
+          'target': `/targets/${item.sourceId}`,
+          'spac': `/spacs/${item.sourceId}`,
+          'filing': `/filings/${item.sourceId}`,
+          'document': `/documents/${item.sourceId}`,
+          'contact': `/contacts/${item.sourceId}`,
+          'organization': `/organizations/${item.sourceId}`,
+        };
+        if (sourceLinks[item.sourceType]) {
+          subjectLink = sourceLinks[item.sourceType];
+        }
+      }
+
+      return {
+        id: item.id,
+        type: mapActivityType(item.type),
+        user: {
+          name: userName,
+          avatar: userAvatar,
+          role: userRole,
+        },
+        action: generateAction(item.type, item.title),
+        subject,
+        subjectLink,
+        metadata: item.metadata as Record<string, unknown> | undefined,
+        timestamp: item.createdAt,
+        isNew: isNewActivity(item.createdAt),
+      };
+    });
+
+    return {
+      activities,
+      hasMore: total > items.length,
+      totalCount: total,
+    };
+  }, [activityFeedQuery.data]);
+
+  // ============================================================================
   // DERIVED DATA: PIPELINE CHART DATA (for PipelineChart component)
   // ============================================================================
 
@@ -1317,9 +1454,13 @@ export default function DashboardPage() {
   const isLoadingFilings = filingsQuery.isLoading;
   const isLoadingInteractions = interactionsQuery.isLoading;
   const isLoadingDocuments = documentsQuery.isLoading;
+  const isLoadingActivityFeed = activityFeedQuery.isLoading;
 
   // Combined loading for activity feed (needs multiple data sources)
   const isLoadingActivity = isLoadingSpacs || isLoadingTargets || isLoadingFilings || isLoadingInteractions || isLoadingDocuments;
+
+  // Loading state for the unified ActivityFeed component
+  const isLoadingUnifiedActivityFeed = isLoadingActivityFeed;
 
   // Combined loading for deadlines/milestones
   const isLoadingDeadlines = isLoadingSpacs || isLoadingTargets || isLoadingFilings;
@@ -1591,44 +1732,8 @@ export default function DashboardPage() {
           onRefresh={handleRefreshInsights}
         />
         <ActivityFeed
-          data={{
-            activities: recentActivities.slice(0, 8).map(activity => {
-              // Map our activity types to ActivityFeed component types
-              const typeMap: Record<string, 'DOCUMENT_UPLOAD' | 'DOCUMENT_EDIT' | 'TARGET_UPDATE' | 'TASK_COMPLETE' | 'COMMENT' | 'MESSAGE' | 'MEETING' | 'FILING'> = {
-                'TARGET_ADDED': 'TARGET_UPDATE',
-                'TARGET_UPDATE': 'TARGET_UPDATE',
-                'DOCUMENT_UPLOAD': 'DOCUMENT_UPLOAD',
-                'DOCUMENT': 'DOCUMENT_UPLOAD',
-                'FILING_SUBMITTED': 'FILING',
-                'FILING': 'FILING',
-                'MEETING_SCHEDULED': 'MEETING',
-                'MEETING': 'MEETING',
-                'CALL': 'MESSAGE',
-                'EMAIL': 'MESSAGE',
-                'NOTE': 'COMMENT',
-                'LINKEDIN': 'MESSAGE',
-                'TASK': 'TASK_COMPLETE',
-                'DEAL_UPDATE': 'TARGET_UPDATE',
-              };
-
-              return {
-                id: activity.id,
-                type: typeMap[activity.type] || 'COMMENT',
-                user: {
-                  name: activity.user?.name || currentUser.name,
-                  role: currentUser.role,
-                },
-                action: activity.title,
-                subject: activity.relatedItem?.name || activity.description || '',
-                subjectLink: activity.relatedItem?.href,
-                timestamp: activity.timestamp,
-                isNew: activity.isNew,
-              };
-            }),
-            hasMore: recentActivities.length > 8,
-            totalCount: recentActivities.length,
-          }}
-          isLoading={isLoadingActivity}
+          data={unifiedActivityFeedData}
+          isLoading={isLoadingUnifiedActivityFeed}
           onViewAll={handleViewAllActivity}
           onActivityClick={handleActivityClick}
           maxItems={8}

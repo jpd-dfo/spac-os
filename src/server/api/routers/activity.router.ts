@@ -210,6 +210,61 @@ export const activityRouter = createTRPCRouter({
       };
     }),
 
+  /**
+   * Get recent activities across all entities (for dashboard)
+   * No organization or contact filter - returns global recent activity
+   */
+  listRecent: protectedProcedure
+    .input(
+      z.object({
+        limit: z.number().int().min(1).max(100).default(20),
+      })
+    )
+    .query(async ({ ctx, input }) => {
+      const { limit } = input;
+
+      const [activities, total] = await Promise.all([
+        ctx.db.activityFeed.findMany({
+          include: {
+            contact: {
+              select: {
+                id: true,
+                firstName: true,
+                lastName: true,
+                email: true,
+                title: true,
+                avatarUrl: true,
+              },
+            },
+            organization: {
+              select: {
+                id: true,
+                name: true,
+                type: true,
+                logoUrl: true,
+              },
+            },
+            user: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+                image: true,
+              },
+            },
+          },
+          orderBy: { createdAt: 'desc' },
+          take: limit,
+        }),
+        ctx.db.activityFeed.count(),
+      ]);
+
+      return {
+        items: activities,
+        total,
+      };
+    }),
+
   // ============================================================================
   // CREATE OPERATIONS
   // ============================================================================
