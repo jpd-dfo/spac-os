@@ -8,6 +8,8 @@ import { usePathname } from 'next/navigation';
 import {
   LayoutDashboard,
   Building2,
+  Landmark,
+  Briefcase,
   Target,
   CheckSquare,
   FolderOpen,
@@ -45,12 +47,14 @@ const navigation: NavSection[] = [
     items: [
       { name: 'SPACs', href: '/spacs', icon: Building2 },
       { name: 'Pipeline', href: '/pipeline', icon: Target },
+      { name: 'Organizations', href: '/organizations', icon: Landmark },
+      { name: 'Companies', href: '/companies', icon: Briefcase },
+      { name: 'Contacts', href: '/contacts', icon: Users },
       { name: 'Tasks', href: '/tasks', icon: CheckSquare },
       { name: 'Documents', href: '/documents', icon: FolderOpen },
       { name: 'Filings', href: '/filings', icon: FileText },
       { name: 'Compliance', href: '/compliance', icon: Shield },
       { name: 'Financial', href: '/financial', icon: DollarSign },
-      { name: 'Contacts', href: '/contacts', icon: Users },
     ],
   },
   {

@@ -68,9 +68,15 @@ Required in `.env.local`:
 Core models in Prisma:
 - `User` - Clerk-synced users
 - `Spac` - SPAC entities with lifecycle tracking
-- `Deal` - Individual deals/transactions
+- `Organization` - PE firms, IBs, and other ecosystem entities (Sprint 10)
+- `OwnershipStake` - PE portfolio ownership tracking (Sprint 10)
+- `IBMandate` - IB mandate tracking for deal flow (Sprint 11)
+- `IBCoverage` - IB sector/industry coverage (Sprint 11)
+- `Contact` - CRM contacts with organization links
+- `Company` - CRM companies
 - `Document` - Uploaded files and analysis
-- `Activity` - Audit trail
+- `ActivityFeed` - Unified activity timeline (Sprint 10)
+- `Filing` - SEC filings with workflow and review tracking
 
 ### Deployment
 - **Vercel** - Auto-deploys from `main` branch
@@ -78,9 +84,21 @@ Core models in Prisma:
 - Build command: `prisma generate && next build`
 
 ## Current Sprint Status
-- ✅ Sprint 1: Foundation (Auth, DB, UI framework)
-- ✅ Sprint 2: SPAC Management (CRUD, listings, details)
-- 🔄 Sprint 3: Deals & Documents (upcoming)
+- ✅ Sprints 1-10: Complete (Foundation through PE Firm Management)
+- ✅ Sprint 11: Complete (IB Firm Management, Mandate Tracking, Dashboard Real Data)
+
+### Sprint 11 Routes (IB Firm Management)
+- `/organizations` - PE firms, IBs, and ecosystem entities list
+- `/organizations/[id]` - Organization detail with:
+  - PE_FIRM: Overview, Portfolio, Contacts, Activity tabs
+  - IB: Overview, Mandates, Coverage, Contacts, Activity tabs
+- `/companies` - CRM companies list
+- `/companies/[id]` - Company detail with Contacts, Deal History tabs
+
+### Sprint 11 API Routes
+- `trpc.mandate.*` - IB mandate CRUD (list, listByOrganization, getById, create, update, delete)
+- `trpc.coverage.*` - IB coverage CRUD (listByOrganization, create, update, delete, assignContact, removeContact)
+- `trpc.activity.listRecent` - Global recent activity for dashboard
 
 ## Credentials
 See `.credentials/SPAC_OS_CREDENTIALS.md` for all API keys and service configs (DO NOT commit to git).

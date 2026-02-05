@@ -7,8 +7,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
 }
 
 // ============================================================================
@@ -276,6 +277,78 @@ enum SponsorTier {
   EMERGING
 }
 
+// Sprint 10 - PE Firm Management Enums
+enum OrganizationType {
+  PE_FIRM
+  IB
+  TARGET_COMPANY
+  SERVICE_PROVIDER
+  LAW_FIRM
+  ACCOUNTING_FIRM
+  OTHER
+}
+
+enum OrganizationSubType {
+  // PE sub-types
+  BUYOUT
+  GROWTH_EQUITY
+  VENTURE_CAPITAL
+  FAMILY_OFFICE
+  SOVEREIGN_WEALTH
+  HEDGE_FUND
+  // IB sub-types
+  BULGE_BRACKET
+  MIDDLE_MARKET
+  BOUTIQUE
+  REGIONAL
+}
+
+enum StakeType {
+  MAJORITY
+  MINORITY
+  CONTROL
+  GROWTH_EQUITY
+  CO_INVEST
+}
+
+enum ExitStatus {
+  ACTIVE
+  PARTIALLY_EXITED
+  FULLY_EXITED
+  WRITTEN_OFF
+}
+
+enum SeniorityLevel {
+  C_LEVEL
+  PARTNER
+  MANAGING_DIRECTOR
+  VP
+  DIRECTOR
+  ASSOCIATE
+  ANALYST
+}
+
+enum RelationshipStrength {
+  COLD
+  WARM
+  HOT
+  ADVOCATE
+}
+
+enum ActivityType {
+  EMAIL_SENT
+  EMAIL_RECEIVED
+  MEETING_SCHEDULED
+  MEETING_COMPLETED
+  CALL_MADE
+  CALL_RECEIVED
+  NOTE_ADDED
+  DEAL_DISCUSSED
+  DOCUMENT_SHARED
+  CONTACT_ADDED
+  RELATIONSHIP_UPDATED
+}
+
 // ============================================================================
 // MODELS
 // ============================================================================
@@ -308,6 +381,9 @@ model User {
   meetingAttendances MeetingAttendee[]   @relation("MeetingAttendees")
   calendarConnection CalendarConnection?
   emailConnection    EmailConnection?
+
+  // Sprint 10 - Activity Feed
+  activities ActivityFeed[]
 
   @@index([clerkId])
   @@index([email])
@@ -748,22 +824,36 @@ model Contact {
   lastInteractionAt DateTime?
   ownerId           String?
 
+  // Sprint 10 - Organization link and relationship fields
+  organizationId       String?
+  seniorityLevel       SeniorityLevel?
+  relationshipStrength RelationshipStrength @default(COLD)
+  dealRoles            String[]             @default([]) // e.g., ["Decision Maker", "Influencer"]
+
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
   companyRef    Company?          @relation(fields: [companyId], references: [id])
   owner         User?             @relation("ContactOwner", fields: [ownerId], references: [id])
+  organization  Organization?     @relation("OrganizationContacts", fields: [organizationId], references: [id])
   targets       TargetContact[]
   interactions  Interaction[]
   meetings      MeetingAttendee[]
   contactNotes  ContactNote[]
   emails        Email[]
+  activities    ActivityFeed[]
+
+  // Sprint 11 - IB mandate and coverage relations
+  mandates      IBMandate[]       @relation("MandateContacts")
+  coverageAreas IBCoverage[]      @relation("CoverageContacts")
 
   @@index([email])
   @@index([companyId])
   @@index([ownerId])
   @@index([status])
+  @@index([organizationId])
+  @@index([relationshipStrength])
   @@map("contacts")
 }
 
@@ -1345,22 +1435,54 @@ model WebhookDelivery {
   @@map("webhook_deliveries")
 }
 
-/// Organization - Multi-tenant organization for SPAC OS
+/// Organization - Multi-tenant organization for SPAC OS (enhanced for PE/IB tracking)
 model Organization {
-  id   String @id @default(cuid())
-  name String
-  slug String @unique
+  id        String              @id @default(cuid())
+  name      String
+  legalName String?
+  slug      String              @unique
+  type      OrganizationType    @default(OTHER)
+  subType   OrganizationSubType?
+
+  // PE-specific fields
+  aum            Decimal? @db.Decimal(18, 2) // Assets Under Management
+  fundVintage    Int?                        // Most recent fund year
+  industryFocus  String[] @default([])       // e.g., ["Healthcare", "Technology"]
+  geographyFocus String[] @default([])       // e.g., ["North America", "Europe"]
+  dealSizeMin    Decimal? @db.Decimal(18, 2) // Min deal size
+  dealSizeMax    Decimal? @db.Decimal(18, 2) // Max deal size
+
+  // General fields
+  website       String?
+  description   String?  @db.Text
+  headquarters  String?
+  logoUrl       String?
+  foundedYear   Int?
+  employeeCount Int?
+
+  // Soft delete
+  deletedAt DateTime?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
   // Relations
-  users     OrganizationUser[]
-  auditLogs AuditLog[]
-  spacs     Spac[]
-  webhooks  Webhook[]
+  users         OrganizationUser[]
+  contacts      Contact[]           @relation("OrganizationContacts")
+  ownedStakes   OwnershipStake[]    @relation("Owner")
+  ownedByStakes OwnershipStake[]    @relation("OwnedEntity")
+  activities    ActivityFeed[]
+  auditLogs     AuditLog[]
+  spacs         Spac[]
+  webhooks      Webhook[]
+
+  // Sprint 11 - IB-specific relations
+  ibMandates    IBMandate[]         @relation("IBMandates")
+  ibCoverage    IBCoverage[]        @relation("IBCoverage")
 
   @@index([slug])
+  @@index([type])
+  @@index([subType])
   @@map("organizations")
 }
 
@@ -1594,4 +1716,170 @@ model RateLimitState {
   updatedAt DateTime @updatedAt
 
   @@map("rate_limit_states")
+}
+
+// ============================================================================
+// SPRINT 10 - PE FIRM MANAGEMENT MODELS
+// ============================================================================
+
+/// OwnershipStake - Tracks PE firm ownership in portfolio companies
+model OwnershipStake {
+  id String @id @default(cuid())
+
+  // Owner (who owns)
+  ownerId String
+  owner   Organization @relation("Owner", fields: [ownerId], references: [id], onDelete: Cascade)
+
+  // Owned entity (what is owned)
+  ownedId String
+  owned   Organization @relation("OwnedEntity", fields: [ownedId], references: [id], onDelete: Cascade)
+
+  // Ownership details
+  ownershipPct   Decimal   @db.Decimal(10, 4) // Ownership percentage
+  stakeType      StakeType                    // MAJORITY, MINORITY, CONTROL, etc.
+  investmentDate DateTime?
+  entryValuation Decimal?  @db.Decimal(18, 2) // Entry valuation
+  entryMultiple  Decimal?  @db.Decimal(10, 2) // Entry EV/EBITDA multiple
+  boardSeats     Int?                         // Number of board seats
+
+  // Exit tracking
+  exitWindow         DateTime?  // Expected exit date
+  estimatedHoldYears Int?       // Typical hold period
+  exitStatus         ExitStatus @default(ACTIVE)
+  exitDate           DateTime?
+  exitValuation      Decimal?   @db.Decimal(18, 2)
+  exitMultiple       Decimal?   @db.Decimal(10, 2)
+
+  notes String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([ownerId, ownedId])
+  @@index([ownerId])
+  @@index([ownedId])
+  @@index([exitStatus])
+  @@map("ownership_stakes")
+}
+
+/// ActivityFeed - Unified activity timeline for organizations and contacts
+model ActivityFeed {
+  id String @id @default(cuid())
+
+  // Context
+  organizationId String?
+  organization   Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  contactId      String?
+  contact        Contact?      @relation(fields: [contactId], references: [id], onDelete: Cascade)
+  userId         String?
+  user           User?         @relation(fields: [userId], references: [id])
+
+  // Activity details
+  type        ActivityType
+  title       String
+  description String?      @db.Text
+  metadata    Json?        // Flexible storage for type-specific data
+
+  // Reference to source record
+  sourceType String? // "email", "meeting", "call", "note", "deal"
+  sourceId   String?
+
+  createdAt DateTime @default(now())
+
+  @@index([organizationId])
+  @@index([contactId])
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+  @@map("activity_feeds")
+}
+
+// ============================================================================
+// SPRINT 11 - IB FIRM MANAGEMENT MODELS
+// ============================================================================
+
+/// IBMandate - Tracks IB mandates to sell/advise companies
+model IBMandate {
+  id                String   @id @default(cuid())
+
+  // IB Organization
+  organizationId    String
+  organization      Organization @relation("IBMandates", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  // Mandate details
+  clientName        String           // Company/client being advised
+  serviceType       MandateServiceType
+  status            MandateStatus    @default(ACTIVE)
+  dealValue         Decimal?         @db.Decimal(18, 2)
+  expectedFee       Decimal?         @db.Decimal(18, 2)
+
+  // Dates
+  mandateDate       DateTime?
+  expectedCloseDate DateTime?
+  actualCloseDate   DateTime?
+
+  // Details
+  description       String?          @db.Text
+  notes             String?          @db.Text
+
+  // Relations - IB contacts working on this mandate
+  contacts          Contact[]        @relation("MandateContacts")
+
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  @@index([organizationId])
+  @@index([status])
+  @@map("ib_mandates")
+}
+
+/// IBCoverage - Tracks IB sector/industry coverage and expertise
+model IBCoverage {
+  id              String   @id @default(cuid())
+
+  organizationId  String
+  organization    Organization @relation("IBCoverage", fields: [organizationId], references: [id], onDelete: Cascade)
+
+  sector          String           // "Healthcare", "Technology", "Industrials"
+  subSector       String?          // "Medical Devices", "Enterprise Software"
+  geography       String?          // "North America", "Europe"
+
+  // Coverage strength
+  expertise       CoverageExpertise @default(MODERATE)
+
+  // Key contacts for this coverage area
+  contacts        Contact[]        @relation("CoverageContacts")
+
+  notes           String?          @db.Text
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@unique([organizationId, sector, subSector, geography])
+  @@index([organizationId])
+  @@map("ib_coverage")
+}
+
+enum MandateServiceType {
+  MA_SELLSIDE       // M&A - representing seller
+  MA_BUYSIDE        // M&A - representing buyer
+  CAPITAL_RAISE     // Equity or debt raise
+  RESTRUCTURING     // Financial restructuring
+  FAIRNESS_OPINION  // Valuation/opinion
+  SPAC_ADVISORY     // SPAC-specific advisory
+  OTHER
+}
+
+enum MandateStatus {
+  ACTIVE
+  WON
+  LOST
+  COMPLETED
+  ON_HOLD
+}
+
+enum CoverageExpertise {
+  LEADING    // Top tier, many deals
+  STRONG     // Well established
+  MODERATE   // Some presence
+  EMERGING   // Building capability
 }

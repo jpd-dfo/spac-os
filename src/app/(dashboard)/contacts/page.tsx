@@ -28,7 +28,8 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '@/components/ui/Modal';
-import { CONTACT_TYPE_LABELS } from '@/lib/constants';
+import { Pagination } from '@/components/ui/Pagination';
+import { CONTACT_TYPE_LABELS, DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import { trpc } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -404,14 +405,18 @@ export default function ContactsPage() {
   const [starredFilter, setStarredFilter] = useState(false);
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
   // tRPC utilities
   const utils = trpc.useUtils();
 
   // tRPC Queries
   const contactsQuery = trpc.contact.list.useQuery(
     {
-      page: 1,
-      pageSize: 50,
+      page,
+      pageSize,
       status: statusFilter !== 'all' ? [statusFilter] : undefined,
       type: typeFilter !== 'all' ? [typeFilter] : undefined,
       search: searchQuery || undefined,
@@ -421,6 +426,7 @@ export default function ContactsPage() {
     },
     {
       refetchOnWindowFocus: false,
+      keepPreviousData: true,
     }
   );
 
@@ -655,7 +661,7 @@ export default function ContactsPage() {
             type="text"
             placeholder="Search contacts..."
             value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
+            onChange={(e) => { setSearchQuery(e.target.value); setPage(1); }}
             className="input pl-10"
           />
         </div>
@@ -665,7 +671,7 @@ export default function ContactsPage() {
           {statusFilters.map((status) => (
             <button
               key={status}
-              onClick={() => setStatusFilter(status)}
+              onClick={() => { setStatusFilter(status); setPage(1); }}
               className={cn(
                 'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
                 statusFilter === status
@@ -689,7 +695,7 @@ export default function ContactsPage() {
           align="right"
         >
           {typeFilters.map((type) => (
-            <DropdownItem key={type} onClick={() => setTypeFilter(type)}>
+            <DropdownItem key={type} onClick={() => { setTypeFilter(type); setPage(1); }}>
               <span className={typeFilter === type ? 'font-medium text-primary-600' : ''}>
                 {type === 'all' ? 'All Types' : TYPE_LABELS[type]}
               </span>
@@ -701,7 +707,7 @@ export default function ContactsPage() {
         <Button
           variant={starredFilter ? 'primary' : 'secondary'}
           size="md"
-          onClick={() => setStarredFilter(!starredFilter)}
+          onClick={() => { setStarredFilter(!starredFilter); setPage(1); }}
         >
           <Star className={cn('mr-2 h-4 w-4', starredFilter && 'fill-current')} />
           Starred
@@ -851,6 +857,7 @@ export default function ContactsPage() {
                     setStatusFilter('all');
                     setTypeFilter('all');
                     setStarredFilter(false);
+                    setPage(1);
                   }}
                 >
                   Clear Filters
@@ -871,6 +878,21 @@ export default function ContactsPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Pagination */}
+      {contactsQuery.data && contactsQuery.data.totalPages > 0 && contactsQuery.data.total > 0 && (
+        <Pagination
+          currentPage={page}
+          totalPages={contactsQuery.data.totalPages}
+          pageSize={pageSize}
+          totalItems={contactsQuery.data.total}
+          onPageChange={(newPage) => setPage(newPage)}
+          onPageSizeChange={(newSize) => {
+            setPageSize(newSize);
+            setPage(1);
+          }}
+        />
+      )}
 
       {/* Add Contact Modal */}
       <AddContactForm

@@ -3,19 +3,24 @@
  * Combines all tRPC routers into a single API
  */
 
+import { activityRouter } from './routers/activity.router';
 import { aiRouter } from './routers/ai.router';
 import { alertRouter } from './routers/alert.router';
 import { calendarRouter } from './routers/calendar.router';
 import { companyRouter } from './routers/company.router';
 import { complianceRouter } from './routers/compliance.router';
 import { contactRouter } from './routers/contact.router';
+import { coverageRouter } from './routers/coverage.router';
 import { documentRouter } from './routers/document.router';
 import { emailRouter } from './routers/email.router';
 import { filingRouter } from './routers/filing.router';
 import { financialRouter } from './routers/financial.router';
 import { integrationsRouter } from './routers/integrations.router';
 import { interactionRouter } from './routers/interaction.router';
+import { mandateRouter } from './routers/mandate.router';
 import { noteRouter } from './routers/note.router';
+import { organizationRouter } from './routers/organization.router';
+import { ownershipRouter } from './routers/ownership.router';
 import { spacRouter } from './routers/spac';
 import { targetRouter } from './routers/target.router';
 import { taskRouter } from './routers/task.router';
@@ -26,11 +31,14 @@ import { createTRPCRouter } from './trpc';
  *
  * API Structure:
  *
+ * - activity.*       - Activity feed/timeline (listByOrganization, listByContact, create)
  * - ai.*             - AI document analysis (analyzeDocument, getCachedAnalysis, cacheAnalysis, invalidateCache, getStatus)
  * - alert.*          - Compliance alerts (list, getById, create, markAsRead, dismiss, generate)
  * - calendar.*       - Calendar integration (connectGoogle, disconnectGoogle, getGoogleStatus, getGoogleEvents, createGoogleEvent, updateGoogleEvent, deleteGoogleEvent, connectCalendly, disconnectCalendly, getCalendlyStatus, getCalendlyLinks, createCalendlyLink, list, getById, create, update, delete, addAttendee, removeAttendee)
  * - email.*          - Gmail integration (connect, disconnect, getStatus, sync, list, getThread, send, reply, markRead, toggleStar)
  * - filing.*         - SEC filing management (list, getById, create, update, delete, syncFilingsFromEdgar, getEdgarFilings)
+ * - organization.*   - Organization management for PE Firms, IBs, etc. (list, getById, create, update, delete, listPEFirms)
+ * - ownership.*      - Ownership stake management for PE portfolio companies (listByOwner, listByOwned, create, update, delete)
  * - spac.*           - SPAC management (list, getById, create, update, delete)
  * - target.*         - Acquisition target management (list, getById, create, update, delete, updateStatus)
  * - note.*           - Note management (list, getById, create, update, delete, getByTarget, getBySpac)
@@ -38,19 +46,24 @@ import { createTRPCRouter } from './trpc';
  * - integrations.*   - Integration health checks (healthCheck, getConnectionStatus, getSetupRequirements, validateGoogleCredentials)
  */
 export const appRouter = createTRPCRouter({
+  activity: activityRouter,
   ai: aiRouter,
   alert: alertRouter,
   calendar: calendarRouter,
   company: companyRouter,
   compliance: complianceRouter,
   contact: contactRouter,
+  coverage: coverageRouter,
   document: documentRouter,
   email: emailRouter,
   filing: filingRouter,
   financial: financialRouter,
   integrations: integrationsRouter,
   interaction: interactionRouter,
+  mandate: mandateRouter,
   note: noteRouter,
+  organization: organizationRouter,
+  ownership: ownershipRouter,
   spac: spacRouter,
   target: targetRouter,
   task: taskRouter,

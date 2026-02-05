@@ -12,6 +12,7 @@
 |----|----------|-------------|--------|
 | S10-001 | P2 | Gmail/Calendar APIs need Google Cloud credentials | Blocked on credentials |
 | S10-002 | P3 | ~16 `no-explicit-any` ESLint warnings | Acceptable - documented |
+| S10-003 | P1 | Supabase connection pool saturated - prisma db push fails with MaxClientsInSessionMode | **RESOLVED** - Connection pool cleared, schema pushed |
 
 ### Build Fixes Applied (February 4, 2026)
 
