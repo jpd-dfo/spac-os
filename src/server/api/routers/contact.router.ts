@@ -312,6 +312,9 @@ export const contactRouter = createTRPCRouter({
         }
       }
 
+      // Use provided organizationId, fall back to user's organization from context
+      const organizationId = input.organizationId ?? ctx.user?.organizationId ?? undefined;
+
       // Map schema fields to Prisma model
       const contact = await ctx.db.contact.create({
         data: {
@@ -335,6 +338,7 @@ export const contactRouter = createTRPCRouter({
           isStarred: false,
           relationshipScore: 0,
           ownerId: ctx.user?.id,
+          organizationId,
         },
         include: {
           companyRef: true,

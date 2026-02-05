@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
 
 import {
   Plus,
@@ -208,6 +209,8 @@ function applyFilters(targets: Target[], filters: PipelineFiltersState): Target[
 // ============================================================================
 
 export default function PipelinePage() {
+  const router = useRouter();
+
   // tRPC Queries and Mutations
   const utils = trpc.useUtils();
 
@@ -341,7 +344,7 @@ export default function PipelinePage() {
         case 'edit':
           // Navigate to target detail page for editing
           setSelectedTarget(target);
-          window.location.href = `/pipeline/${target.id}`;
+          router.push(`/pipeline/${target.id}`);
           break;
         case 'move':
           // Open stage picker modal
@@ -807,7 +810,7 @@ export default function PipelinePage() {
         onReject={handleRejectTarget}
         onEdit={() => {
           if (selectedTarget) {
-            window.location.href = `/pipeline/${selectedTarget.id}`;
+            router.push(`/pipeline/${selectedTarget.id}`);
           }
         }}
       />

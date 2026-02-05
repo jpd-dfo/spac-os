@@ -493,7 +493,7 @@ export default function ContactsPage() {
   const handleCreateContact = useCallback(
     (data: NewContactData) => {
       createContactMutation.mutate({
-        organizationId: '00000000-0000-0000-0000-000000000001', // Default org - would come from context in production
+        // organizationId is optional - backend will use user's organization from context
         firstName: data.firstName,
         lastName: data.lastName,
         email: data.email || undefined,

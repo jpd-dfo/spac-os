@@ -759,6 +759,7 @@ export function DocumentBrowser({ className }: DocumentBrowserProps) {
           onDownload={handleDownloadDocument}
           onShare={handleShareDocument}
           onShowAIAnalysis={handleShowAIAnalysis}
+          pdfUrl={viewingDocument.fileUrl}
         />
       )}
 

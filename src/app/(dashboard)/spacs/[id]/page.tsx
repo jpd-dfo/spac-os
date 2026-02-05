@@ -364,9 +364,10 @@ export default function SPACDetailPage() {
   type SpacRelations = {
     targets?: Array<{ id: string; name: string; status: string; enterpriseValue: number | null; evaluationScore: number | null; industry: string | null }>;
     documents?: Array<{ id: string; name: string; status: string; fileUrl: string | null; createdAt: Date; category?: string | null; mimeType?: string | null; fileSize?: number | null; type?: string | null }>;
-    filings?: Array<{ id: string; formType: string; filedDate: Date; dueDate: Date | null; description: string | null; edgarUrl: string | null; status: string | null }>;
+    filings?: Array<{ id: string; type: string; filedDate: Date | null; dueDate: Date | null; description: string | null; edgarUrl: string | null; status: string | null }>;
     financials?: Array<{ id: string; type: string; period: string | null; periodEnd?: Date; revenue?: number | null; netIncome?: number | null; totalAssets?: number | null; totalLiabilities?: number | null; createdAt: Date; updatedAt: Date; data?: unknown }>;
     tasks?: Array<{ id: string; dueDate: Date | null; createdAt: Date; status: string; title: string; description: string | null; priority?: string | null }>;
+    trustAccounts?: Array<{ id: string; currentBalance: unknown; perShareValue: unknown | null; balanceDate: Date }>;
     _count?: { documents?: number; financials?: number; targets?: number; filings?: number; tasks?: number; milestones?: number };
   };
   const spac = spacData as (typeof spacData & SpacRelations) | undefined;
@@ -385,8 +386,26 @@ export default function SPACDetailPage() {
     return Number(spac.trustAmount);
   }, [spac?.trustAmount]);
 
-  // Get trust per share (default SPAC unit price since sharesOutstanding is not in schema)
-  const trustPerShare = 10.0;
+  // Calculate trust per share from actual data
+  const trustPerShare = useMemo(() => {
+    // First, try to use perShareValue from trust account if available
+    const trustAccount = spac?.trustAccounts?.[0];
+    if (trustAccount?.perShareValue) {
+      return Number(trustAccount.perShareValue);
+    }
+
+    // Calculate from currentBalance / sharesOutstanding if both are available
+    if (trustAccount?.currentBalance && spac?.sharesOutstanding) {
+      const balance = Number(trustAccount.currentBalance);
+      const shares = Number(spac.sharesOutstanding);
+      if (shares > 0) {
+        return balance / shares;
+      }
+    }
+
+    // Fall back to default SPAC unit price of $10
+    return 10.0;
+  }, [spac?.trustAccounts, spac?.sharesOutstanding]);
 
   // Derive timeline events from tasks and key dates
   const timelineEvents = useMemo(() => {
@@ -1410,8 +1429,48 @@ export default function SPACDetailPage() {
         isOpen={isUploadModalOpen}
         onClose={() => setIsUploadModalOpen(false)}
         onUpload={async (files, metadata) => {
-          // TODO: Implement actual file upload with spacId
-          console.log('Upload files for SPAC:', spac.id, { files, metadata });
+          // Map category ID to document type
+          const categoryToType: Record<string, string> = {
+            'formation': 'LEGAL',
+            'sec-filings': 'SEC_FILING',
+            'transaction': 'DEFINITIVE_AGREEMENT',
+            'due-diligence': 'DUE_DILIGENCE',
+            'governance': 'BOARD_PRESENTATION',
+            'investor-relations': 'INVESTOR_PRESENTATION',
+            'templates': 'OTHER',
+          };
+
+          const documentType = categoryToType[metadata.category] || 'OTHER';
+
+          // Upload each file via the API
+          for (const file of files) {
+            try {
+              const formData = new FormData();
+              formData.append('file', file);
+              formData.append('metadata', JSON.stringify({
+                name: file.name,
+                type: documentType,
+                category: metadata.category,
+                status: 'DRAFT',
+                spacId: spac.id,
+              }));
+
+              const response = await fetch('/api/documents/upload', {
+                method: 'POST',
+                body: formData,
+              });
+
+              if (!response.ok) {
+                const errorData = await response.json();
+                throw new Error(errorData.error || 'Upload failed');
+              }
+
+              toast.success(`Uploaded ${file.name}`);
+            } catch (error) {
+              toast.error(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            }
+          }
+
           // After upload completes, refetch the SPAC data
           refetch();
         }}

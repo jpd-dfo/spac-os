@@ -2,6 +2,7 @@
 
 import { useState, useMemo } from 'react';
 
+import Link from 'next/link';
 import {
   Sparkles,
   AlertTriangle,
@@ -326,10 +327,19 @@ function InsightCard({
 
             <div className="flex items-center gap-1">
               {insight.action && (
-                <Button variant="link" size="sm" className="h-auto p-1 text-xs">
-                  {insight.action.label}
-                  <ExternalLink className="ml-1 h-3 w-3" />
-                </Button>
+                insight.action.href ? (
+                  <Link href={insight.action.href}>
+                    <Button variant="link" size="sm" className="h-auto p-1 text-xs">
+                      {insight.action.label}
+                      <ExternalLink className="ml-1 h-3 w-3" />
+                    </Button>
+                  </Link>
+                ) : (
+                  <Button variant="link" size="sm" className="h-auto p-1 text-xs">
+                    {insight.action.label}
+                    <ExternalLink className="ml-1 h-3 w-3" />
+                  </Button>
+                )
               )}
               {insight.status === 'NEW' && (
                 <>

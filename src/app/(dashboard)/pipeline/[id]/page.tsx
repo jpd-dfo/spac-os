@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 
 import Image from 'next/image';
 import Link from 'next/link';
@@ -434,10 +434,11 @@ const PRIORITY_OPTIONS = [
 // ============================================================================
 
 interface PageProps {
-  params: { id: string };
+  params: Promise<{ id: string }>;
 }
 
 export default function TargetDetailPage({ params }: PageProps) {
+  const resolvedParams = React.use(params);
   const router = useRouter();
   const [activeTab, setActiveTab] = useState<'overview' | 'financials' | 'diligence' | 'documents' | 'activity'>('overview');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
@@ -453,20 +454,20 @@ export default function TargetDetailPage({ params }: PageProps) {
     isLoading,
     error,
   } = trpc.target.getById.useQuery(
-    { id: params.id },
-    { enabled: !!params.id }
+    { id: resolvedParams.id },
+    { enabled: !!resolvedParams.id }
   );
 
   // Notes Query
   const { data: notesData, refetch: refetchNotes } = trpc.note.getByTarget.useQuery(
-    { targetId: params.id },
-    { enabled: !!params.id }
+    { targetId: resolvedParams.id },
+    { enabled: !!resolvedParams.id }
   );
 
   // Documents Query - fetch real documents for this target
   const { data: documentsData, refetch: refetchDocuments } = trpc.document.list.useQuery(
-    { targetId: params.id, page: 1, pageSize: 50 },
-    { enabled: !!params.id }
+    { targetId: resolvedParams.id, page: 1, pageSize: 50 },
+    { enabled: !!resolvedParams.id }
   );
 
   // tRPC Mutations
@@ -474,7 +475,7 @@ export default function TargetDetailPage({ params }: PageProps) {
 
   const updateStatusMutation = trpc.target.updateStatus.useMutation({
     onSuccess: () => {
-      utils.target.getById.invalidate({ id: params.id });
+      utils.target.getById.invalidate({ id: resolvedParams.id });
     },
   });
 
@@ -486,14 +487,14 @@ export default function TargetDetailPage({ params }: PageProps) {
 
   const updateTargetMutation = trpc.target.update.useMutation({
     onSuccess: () => {
-      utils.target.getById.invalidate({ id: params.id });
+      utils.target.getById.invalidate({ id: resolvedParams.id });
       setIsEditModalOpen(false);
     },
   });
 
   const updatePriorityMutation = trpc.target.updatePriority.useMutation({
     onSuccess: () => {
-      utils.target.getById.invalidate({ id: params.id });
+      utils.target.getById.invalidate({ id: resolvedParams.id });
       toast.success('Priority updated successfully');
     },
     onError: (err) => {
@@ -627,19 +628,53 @@ export default function TargetDetailPage({ params }: PageProps) {
     if (!target) {
       return;
     }
-    // For each file, create a document entry
+
+    // Map category ID to document type
+    const categoryToType: Record<string, string> = {
+      'formation': 'LEGAL',
+      'sec-filings': 'SEC_FILING',
+      'transaction': 'DEFINITIVE_AGREEMENT',
+      'due-diligence': 'DUE_DILIGENCE',
+      'governance': 'BOARD_PRESENTATION',
+      'investor-relations': 'INVESTOR_PRESENTATION',
+      'templates': 'OTHER',
+    };
+
+    const documentType = categoryToType[metadata.category] || 'OTHER';
+
+    // Upload each file via the API
     for (const file of files) {
-      uploadDocumentMutation.mutate({
-        name: file.name,
-        targetId: target.id,
-        category: metadata.category,
-        fileSize: file.size,
-        mimeType: file.type,
-        // In a real implementation, the file would be uploaded to storage first
-        // and the fileUrl would be set to the storage URL
-      });
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('metadata', JSON.stringify({
+          name: file.name,
+          type: documentType,
+          category: metadata.category,
+          status: 'DRAFT',
+          targetId: target.id,
+        }));
+
+        const response = await fetch('/api/documents/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Upload failed');
+        }
+
+        toast.success(`Uploaded ${file.name}`);
+      } catch (error) {
+        toast.error(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
     }
-  }, [target, uploadDocumentMutation]);
+
+    // Refresh documents list
+    refetchDocuments();
+    setIsUploadModalOpen(false);
+  }, [target, refetchDocuments]);
 
   if (isLoading) {
     return (

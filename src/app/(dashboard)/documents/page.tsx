@@ -20,6 +20,7 @@ import {
   Clock,
   X,
 } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 import { DocumentCard, type DocumentData, type RiskLevel } from '@/components/documents/DocumentCard';
 import { UploadModal } from '@/components/documents/UploadModal';
@@ -135,6 +136,7 @@ function transformDocumentToUI(dbDoc: {
     updatedAt: new Date(dbDoc.updatedAt),
     tags: [], // TODO: Add tags support
     description: undefined,
+    fileUrl: dbDoc.fileUrl || undefined,
   };
 }
 
@@ -322,11 +324,46 @@ export default function DocumentsPage() {
     description?: string;
     isConfidential: boolean;
   }) => {
-    // TODO: Implement actual file upload to storage
-    // This would:
-    // 1. Upload files to Supabase Storage
-    // 2. Create document records via tRPC
-    console.log('Upload:', { files, metadata });
+    // Map category ID to document type
+    const categoryToType: Record<string, string> = {
+      'formation': 'LEGAL',
+      'sec-filings': 'SEC_FILING',
+      'transaction': 'DEFINITIVE_AGREEMENT',
+      'due-diligence': 'DUE_DILIGENCE',
+      'governance': 'BOARD_PRESENTATION',
+      'investor-relations': 'INVESTOR_PRESENTATION',
+      'templates': 'OTHER',
+    };
+
+    const documentType = categoryToType[metadata.category] || 'OTHER';
+
+    // Upload each file via the API
+    for (const file of files) {
+      try {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('metadata', JSON.stringify({
+          name: file.name,
+          type: documentType,
+          category: metadata.category,
+          status: 'DRAFT',
+        }));
+
+        const response = await fetch('/api/documents/upload', {
+          method: 'POST',
+          body: formData,
+        });
+
+        if (!response.ok) {
+          const errorData = await response.json();
+          throw new Error(errorData.error || 'Upload failed');
+        }
+
+        toast.success(`Uploaded ${file.name}`);
+      } catch (error) {
+        toast.error(`Failed to upload ${file.name}: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      }
+    }
 
     // Refresh the document list after upload
     utils.document.list.invalidate();
@@ -639,6 +676,7 @@ export default function DocumentsPage() {
             setSelectedDocument(null);
           }}
           onDownload={handleDownload}
+          pdfUrl={selectedDocument.fileUrl}
         />
       )}
 

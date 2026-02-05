@@ -47,6 +47,7 @@ export interface DocumentData {
   tags?: string[];
   description?: string;
   riskLevel?: RiskLevel;
+  fileUrl?: string;
 }
 
 interface DocumentCardProps {

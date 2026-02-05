@@ -26,27 +26,81 @@ const SpacListSchema = z.object({
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
 });
 
+// Phase enum schema - matches Prisma SpacPhase enum
+const SpacPhaseSchema = z.enum([
+  'PRE_IPO',
+  'IPO',
+  'TARGET_SEARCH',
+  'LOI',
+  'DUE_DILIGENCE',
+  'DA_NEGOTIATION',
+  'SEC_REVIEW',
+  'PROXY',
+  'VOTE',
+  'CLOSING',
+  'POST_CLOSE',
+  'LIQUIDATION',
+]);
+
 // Create input schema - all required Spac fields from Prisma schema
 const SpacCreateSchema = z.object({
+  // Basic Information
   name: z.string().min(1, 'Name is required').max(255),
   ticker: z.string().min(1).max(10).regex(/^[A-Z0-9.]+$/, 'Ticker must be uppercase letters, numbers, or dots').optional().nullable(),
   status: SpacStatusSchema.default('SEARCHING'),
+  phase: SpacPhaseSchema.default('TARGET_SEARCH'),
+  description: z.string().optional().nullable(),
+
+  // Financial Information
   trustAmount: z.number().min(0).optional().nullable(),
+  trustBalance: z.number().min(0).optional().nullable(),
+  ipoSize: z.number().min(0).optional().nullable(),
+  sharesOutstanding: z.number().int().min(0).optional().nullable(),
+
+  // Dates
   ipoDate: z.coerce.date().optional().nullable(),
   deadlineDate: z.coerce.date().optional().nullable(),
+
+  // Extensions
+  maxExtensions: z.number().int().min(0).max(12).default(6),
+
+  // Redemption
   redemptionRate: z.number().min(0).max(1).optional().nullable(),
+
+  // Target criteria
+  targetSectors: z.array(z.string()).default([]),
+  targetGeographies: z.array(z.string()).default([]),
 });
 
 // Update input schema - all fields optional except id
 const SpacUpdateSchema = z.object({
   id: UuidSchema,
+  // Basic Information
   name: z.string().min(1).max(255).optional(),
   ticker: z.string().min(1).max(10).regex(/^[A-Z0-9.]+$/).optional().nullable(),
   status: SpacStatusSchema.optional(),
+  phase: SpacPhaseSchema.optional(),
+  description: z.string().optional().nullable(),
+
+  // Financial Information
   trustAmount: z.number().min(0).optional().nullable(),
+  trustBalance: z.number().min(0).optional().nullable(),
+  ipoSize: z.number().min(0).optional().nullable(),
+  sharesOutstanding: z.number().int().min(0).optional().nullable(),
+
+  // Dates
   ipoDate: z.coerce.date().optional().nullable(),
   deadlineDate: z.coerce.date().optional().nullable(),
+
+  // Extensions
+  maxExtensions: z.number().int().min(0).max(12).optional(),
+
+  // Redemption
   redemptionRate: z.number().min(0).max(1).optional().nullable(),
+
+  // Target criteria
+  targetSectors: z.array(z.string()).optional(),
+  targetGeographies: z.array(z.string()).optional(),
 });
 
 // Update status input schema with audit reason
@@ -228,13 +282,33 @@ export const spacRouter = createTRPCRouter({
       // Create the SPAC
       const spac = await ctx.db.spac.create({
         data: {
+          // Basic Information
           name: input.name,
           ticker: input.ticker,
           status: input.status,
+          phase: input.phase,
+          description: input.description,
+
+          // Financial Information
           trustAmount: input.trustAmount,
+          trustBalance: input.trustBalance,
+          ipoSize: input.ipoSize,
+          sharesOutstanding: input.sharesOutstanding,
+
+          // Dates
           ipoDate: input.ipoDate,
           deadlineDate: input.deadlineDate,
+          deadline: input.deadlineDate, // Also set deadline field
+
+          // Extensions
+          maxExtensions: input.maxExtensions,
+
+          // Redemption
           redemptionRate: input.redemptionRate,
+
+          // Target criteria
+          targetSectors: input.targetSectors,
+          targetGeographies: input.targetGeographies,
         },
         include: {
           _count: {

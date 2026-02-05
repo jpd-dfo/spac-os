@@ -365,6 +365,254 @@ function AddCompanyForm({ isOpen, onClose, onSubmit, isLoading }: AddCompanyForm
 }
 
 // ============================================================================
+// Edit Company Form Component
+// ============================================================================
+
+interface EditCompanyData {
+  id: string;
+  name: string;
+  industry: string | null;
+  type: string | null;
+  size: string | null;
+  headquarters: string | null;
+  website: string | null;
+  description: string | null;
+  foundedYear: number | null;
+  logoUrl?: string | null;
+}
+
+interface EditCompanyFormProps {
+  isOpen: boolean;
+  onClose: () => void;
+  company: EditCompanyData;
+  onSuccess: () => void;
+}
+
+function EditCompanyForm({ isOpen, onClose, company, onSuccess }: EditCompanyFormProps) {
+  const [formData, setFormData] = useState({
+    name: company.name,
+    industry: company.industry || '',
+    type: company.type || '',
+    size: company.size || '',
+    headquarters: company.headquarters || '',
+    website: company.website || '',
+    description: company.description || '',
+    foundedYear: company.foundedYear || undefined as number | undefined,
+  });
+
+  const utils = trpc.useUtils();
+
+  const updateCompanyMutation = trpc.company.update.useMutation({
+    onSuccess: () => {
+      utils.company.list.invalidate();
+      utils.company.getStatistics.invalidate();
+      toast.success('Company updated successfully');
+      onSuccess();
+      onClose();
+    },
+    onError: (error) => {
+      toast.error(`Failed to update company: ${error.message}`);
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!formData.name.trim()) {
+      toast.error('Company name is required');
+      return;
+    }
+    updateCompanyMutation.mutate({
+      id: company.id,
+      data: {
+        name: formData.name.trim(),
+        industry: formData.industry || null,
+        type: formData.type || null,
+        size: formData.size || null,
+        headquarters: formData.headquarters || null,
+        website: formData.website || null,
+        description: formData.description || null,
+        foundedYear: formData.foundedYear || null,
+      },
+    });
+  };
+
+  return (
+    <Modal
+      isOpen={isOpen}
+      onClose={onClose}
+      size="lg"
+    >
+      <form onSubmit={handleSubmit}>
+        <ModalHeader>
+          <ModalTitle>Edit Company</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          <div className="space-y-4">
+            {/* Company Name */}
+            <div>
+              <label htmlFor="edit-company-name" className="block text-sm font-medium text-slate-700 mb-1">
+                Company Name <span className="text-red-500">*</span>
+              </label>
+              <input
+                id="edit-company-name"
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                className="input w-full"
+                placeholder="Acme Corporation"
+                required
+              />
+            </div>
+
+            {/* Type and Industry Row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="edit-company-type" className="block text-sm font-medium text-slate-700 mb-1">
+                  Company Type
+                </label>
+                <select
+                  id="edit-company-type"
+                  value={formData.type}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, type: e.target.value }))}
+                  className="input w-full"
+                >
+                  <option value="">Select type...</option>
+                  {COMPANY_TYPE_OPTIONS.filter((t) => t !== 'all').map((type) => (
+                    <option key={type} value={type}>
+                      {type}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="edit-company-industry" className="block text-sm font-medium text-slate-700 mb-1">
+                  Industry
+                </label>
+                <select
+                  id="edit-company-industry"
+                  value={formData.industry}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, industry: e.target.value }))}
+                  className="input w-full"
+                >
+                  <option value="">Select industry...</option>
+                  {INDUSTRY_OPTIONS.filter((i) => i !== 'all').map((industry) => (
+                    <option key={industry} value={industry}>
+                      {industry}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* Size and Founded Year Row */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="edit-company-size" className="block text-sm font-medium text-slate-700 mb-1">
+                  Company Size
+                </label>
+                <select
+                  id="edit-company-size"
+                  value={formData.size}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, size: e.target.value }))}
+                  className="input w-full"
+                >
+                  <option value="">Select size...</option>
+                  {SIZE_OPTIONS.filter((s) => s !== 'all').map((size) => (
+                    <option key={size} value={size}>
+                      {size} employees
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="edit-company-founded" className="block text-sm font-medium text-slate-700 mb-1">
+                  Founded Year
+                </label>
+                <input
+                  id="edit-company-founded"
+                  type="number"
+                  value={formData.foundedYear || ''}
+                  onChange={(e) =>
+                    setFormData((prev) => ({
+                      ...prev,
+                      foundedYear: e.target.value ? parseInt(e.target.value, 10) : undefined,
+                    }))
+                  }
+                  className="input w-full"
+                  placeholder="2020"
+                  min={1800}
+                  max={new Date().getFullYear()}
+                />
+              </div>
+            </div>
+
+            {/* Headquarters */}
+            <div>
+              <label htmlFor="edit-company-headquarters" className="block text-sm font-medium text-slate-700 mb-1">
+                Headquarters
+              </label>
+              <input
+                id="edit-company-headquarters"
+                type="text"
+                value={formData.headquarters}
+                onChange={(e) => setFormData((prev) => ({ ...prev, headquarters: e.target.value }))}
+                className="input w-full"
+                placeholder="New York, NY"
+              />
+            </div>
+
+            {/* Website */}
+            <div>
+              <label htmlFor="edit-company-website" className="block text-sm font-medium text-slate-700 mb-1">
+                Website
+              </label>
+              <input
+                id="edit-company-website"
+                type="url"
+                value={formData.website}
+                onChange={(e) => setFormData((prev) => ({ ...prev, website: e.target.value }))}
+                className="input w-full"
+                placeholder="https://example.com"
+              />
+            </div>
+
+            {/* Description */}
+            <div>
+              <label htmlFor="edit-company-description" className="block text-sm font-medium text-slate-700 mb-1">
+                Description
+              </label>
+              <textarea
+                id="edit-company-description"
+                value={formData.description}
+                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                className="input w-full"
+                rows={3}
+                placeholder="Brief description of the company..."
+              />
+            </div>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button type="button" variant="secondary" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" disabled={updateCompanyMutation.isPending}>
+            {updateCompanyMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save Changes'
+            )}
+          </Button>
+        </ModalFooter>
+      </form>
+    </Modal>
+  );
+}
+
+// ============================================================================
 // Main Component
 // ============================================================================
 
@@ -375,6 +623,8 @@ export default function CompaniesPage() {
   const [typeFilter, setTypeFilter] = useState<CompanyType>('all');
   const [sizeFilter, setSizeFilter] = useState<SizeType>('all');
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingCompany, setEditingCompany] = useState<EditCompanyData | null>(null);
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
@@ -825,7 +1075,10 @@ export default function CompaniesPage() {
                         <Eye className="mr-2 h-4 w-4" />
                         View Details
                       </DropdownItem>
-                      <DropdownItem onClick={() => (window.location.href = `/companies/${company.id}/edit`)}>
+                      <DropdownItem onClick={() => {
+                        setEditingCompany(company);
+                        setIsEditModalOpen(true);
+                      }}>
                         <Edit className="mr-2 h-4 w-4" />
                         Edit
                       </DropdownItem>
@@ -865,6 +1118,22 @@ export default function CompaniesPage() {
         onSubmit={handleCreateCompany}
         isLoading={createCompanyMutation.isPending}
       />
+
+      {/* Edit Company Modal */}
+      {isEditModalOpen && editingCompany && (
+        <EditCompanyForm
+          isOpen={isEditModalOpen}
+          onClose={() => {
+            setIsEditModalOpen(false);
+            setEditingCompany(null);
+          }}
+          company={editingCompany}
+          onSuccess={() => {
+            setIsEditModalOpen(false);
+            setEditingCompany(null);
+          }}
+        />
+      )}
     </div>
   );
 }

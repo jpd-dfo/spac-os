@@ -20,6 +20,7 @@ import Link from 'next/link';
 import toast from 'react-hot-toast';
 
 import { useNotificationStream, type AlertNotification } from '@/hooks';
+import { useMobileMenu } from './MobileMenuContext';
 import { trpc } from '@/lib/trpc';
 import { cn } from '@/lib/utils';
 
@@ -72,7 +73,7 @@ function formatRelativeTime(date: Date | string): string {
 export function Header() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const { toggle: toggleMobileMenu } = useMobileMenu();
 
   // Real-time notification stream
   const handleNewAlert = useCallback((alert: AlertNotification) => {
@@ -174,7 +175,7 @@ export function Header() {
     <header className="sticky top-0 z-40 flex h-16 items-center justify-between border-b border-slate-200 bg-white px-4 lg:px-6">
       {/* Mobile menu button */}
       <button
-        onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        onClick={toggleMobileMenu}
         className="lg:hidden flex h-10 w-10 items-center justify-center rounded-lg text-slate-500 hover:bg-slate-100"
         aria-label="Toggle menu"
       >

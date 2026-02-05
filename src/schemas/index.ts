@@ -559,7 +559,7 @@ export const TargetFilterSchema = z.object({
 // ============================================================================
 
 export const ContactCreateSchema = z.object({
-  organizationId: UuidSchema,
+  organizationId: UuidSchema.optional().nullable(),
   externalCrmId: z.string().max(255).optional().nullable(),
   externalCrmType: z.enum(['salesforce', 'hubspot', 'dynamics', 'other']).optional().nullable(),
   type: ContactTypeSchema.default('OTHER'),

@@ -178,16 +178,30 @@ export default function NewSPACPage() {
     // Clear any previous error
     setErrorMessage(null);
 
-    // Map form data to the backend schema
-    // The backend expects a simpler schema than what the form collects
+    // Map form data to the backend schema with all collected fields
     const mutationInput = {
+      // Basic Information
       name: data.name,
       ticker: data.ticker || null,
       status: mapFrontendStatusToBackend(data.status),
-      trustAmount: data.trustBalance ?? null,
+      phase: mapFrontendPhaseToBackend(data.phase),
+      description: data.description || null,
+
+      // Financial Information
+      trustBalance: data.trustBalance ?? null,
+      ipoSize: data.ipoSize ?? null,
+      sharesOutstanding: data.sharesOutstanding ?? null,
+
+      // Dates
       ipoDate: data.ipoDate ? new Date(data.ipoDate) : null,
       deadlineDate: data.deadline ? new Date(data.deadline) : null,
-      redemptionRate: null, // Not captured in form currently
+
+      // Extensions
+      maxExtensions: data.maxExtensions ?? 6,
+
+      // Target criteria
+      targetSectors: data.targetSectors ?? [],
+      targetGeographies: data.targetGeographies ?? [],
     };
 
     // Call the tRPC mutation
@@ -202,6 +216,23 @@ export default function NewSPACPage() {
       return frontendStatus as typeof validStatuses[number];
     }
     return 'SEARCHING';
+  }
+
+  // Map frontend phase enum to Prisma SpacPhase enum
+  function mapFrontendPhaseToBackend(frontendPhase: string): 'PRE_IPO' | 'IPO' | 'TARGET_SEARCH' | 'LOI' | 'DUE_DILIGENCE' | 'DA_NEGOTIATION' | 'SEC_REVIEW' | 'PROXY' | 'VOTE' | 'CLOSING' | 'POST_CLOSE' | 'LIQUIDATION' {
+    const phaseMapping: Record<string, 'PRE_IPO' | 'IPO' | 'TARGET_SEARCH' | 'LOI' | 'DUE_DILIGENCE' | 'DA_NEGOTIATION' | 'SEC_REVIEW' | 'PROXY' | 'VOTE' | 'CLOSING' | 'POST_CLOSE' | 'LIQUIDATION'> = {
+      'FORMATION': 'PRE_IPO',
+      'IPO': 'IPO',
+      'TARGET_SEARCH': 'TARGET_SEARCH',
+      'DUE_DILIGENCE': 'DUE_DILIGENCE',
+      'NEGOTIATION': 'DA_NEGOTIATION',
+      'DEFINITIVE_AGREEMENT': 'DA_NEGOTIATION',
+      'SEC_REVIEW': 'SEC_REVIEW',
+      'SHAREHOLDER_VOTE': 'VOTE',
+      'CLOSING': 'CLOSING',
+      'DE_SPAC': 'POST_CLOSE',
+    };
+    return phaseMapping[frontendPhase] ?? 'TARGET_SEARCH';
   }
 
   const handleCancel = () => {

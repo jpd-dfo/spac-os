@@ -178,6 +178,23 @@ function buildSecEdgarUrl(cik?: string, formType?: FilingType): string | null {
   return `https://www.sec.gov/cgi-bin/browse-edgar?action=getcompany&CIK=${cleanCik}&type=${formType || ''}&dateb=&owner=include&count=40`;
 }
 
+// Map frontend FilingStatus to API FilingStatus
+type ApiFilingStatus = 'DRAFTING' | 'INTERNAL_REVIEW' | 'LEGAL_REVIEW' | 'BOARD_APPROVAL' | 'FILED' | 'SEC_COMMENT' | 'RESPONSE_FILED' | 'AMENDED' | 'EFFECTIVE' | 'WITHDRAWN';
+
+function mapToApiStatus(frontendStatus: FilingStatus): ApiFilingStatus {
+  const statusMap: Record<FilingStatus, ApiFilingStatus> = {
+    DRAFT: 'DRAFTING',
+    INTERNAL_REVIEW: 'INTERNAL_REVIEW',
+    EXTERNAL_REVIEW: 'LEGAL_REVIEW',
+    SUBMITTED: 'FILED',
+    SEC_COMMENT: 'SEC_COMMENT',
+    RESPONSE_FILED: 'RESPONSE_FILED',
+    EFFECTIVE: 'EFFECTIVE',
+    COMPLETE: 'EFFECTIVE',
+  };
+  return statusMap[frontendStatus];
+}
+
 // Get valid status transitions
 function getValidStatusTransitions(currentStatus: FilingStatus): { status: FilingStatus; label: string }[] {
   const transitions: Record<FilingStatus, { status: FilingStatus; label: string }[]> = {
@@ -248,6 +265,13 @@ export default function FilingDetailPage() {
     { filingId },
     { enabled: !!filingId }
   );
+
+  // Status update mutation
+  const updateStatusMutation = trpc.filing.updateStatus.useMutation({
+    onSuccess: () => {
+      void filingQuery.refetch();
+    },
+  });
 
   // Transform API data to FilingPageData format
   const filing = useMemo((): FilingPageData | null => {
@@ -1277,14 +1301,23 @@ export default function FilingDetailPage() {
                 Cancel
               </Button>
               <Button
+                disabled={updateStatusMutation.isLoading}
                 onClick={() => {
-                  // TODO: Call API to update status
-                  console.log('Updating status to:', selectedNewStatus);
-                  setShowUpdateStatusModal(false);
-                  setSelectedNewStatus(null);
+                  if (selectedNewStatus) {
+                    const apiStatus = mapToApiStatus(selectedNewStatus);
+                    updateStatusMutation.mutate(
+                      { id: filingId, status: apiStatus },
+                      {
+                        onSuccess: () => {
+                          setShowUpdateStatusModal(false);
+                          setSelectedNewStatus(null);
+                        },
+                      }
+                    );
+                  }
                 }}
               >
-                Update Status
+                {updateStatusMutation.isLoading ? 'Updating...' : 'Update Status'}
               </Button>
             </div>
           </div>

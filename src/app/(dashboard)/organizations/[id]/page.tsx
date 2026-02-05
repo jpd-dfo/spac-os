@@ -30,6 +30,7 @@ import {
   PieChart as PieChartIcon,
   BarChart3,
   Percent,
+  Loader2,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
@@ -337,6 +338,398 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, organizationName, isDe
           {isDeleting ? 'Deleting...' : 'Delete'}
         </Button>
       </ModalFooter>
+    </Modal>
+  );
+}
+
+// ============================================================================
+// EDIT ORGANIZATION MODAL
+// ============================================================================
+
+interface EditOrganizationModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  organization: OrganizationWithCounts;
+  onSuccess: () => void;
+}
+
+function EditOrganizationModal({ isOpen, onClose, organization, onSuccess }: EditOrganizationModalProps) {
+  const [formData, setFormData] = useState({
+    name: organization.name,
+    legalName: organization.legalName || '',
+    type: organization.type,
+    subType: organization.subType || '',
+    website: organization.website || '',
+    description: organization.description || '',
+    headquarters: organization.headquarters || '',
+    foundedYear: organization.foundedYear || '',
+    employeeCount: organization.employeeCount || '',
+    aum: organization.aum || '',
+    dealSizeMin: organization.dealSizeMin || '',
+    dealSizeMax: organization.dealSizeMax || '',
+    industryFocus: organization.industryFocus || [],
+    geographyFocus: organization.geographyFocus || [],
+    // Target Company specific
+    revenue: organization.revenue || '',
+    ebitda: organization.ebitda || '',
+    revenueGrowth: organization.revenueGrowth || '',
+    grossMargin: organization.grossMargin || '',
+  });
+
+  const utils = trpc.useUtils();
+
+  const updateMutation = trpc.organization.update.useMutation({
+    onSuccess: () => {
+      toast.success('Organization updated successfully');
+      utils.organization.getById.invalidate({ id: organization.id });
+      onSuccess();
+      onClose();
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to update organization');
+    },
+  });
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!formData.name.trim()) {
+      toast.error('Organization name is required');
+      return;
+    }
+
+    updateMutation.mutate({
+      id: organization.id,
+      data: {
+        name: formData.name.trim(),
+        legalName: formData.legalName.trim() || null,
+        type: formData.type as 'PE_FIRM' | 'IB' | 'TARGET_COMPANY' | 'SERVICE_PROVIDER' | 'LAW_FIRM' | 'ACCOUNTING_FIRM' | 'OTHER',
+        subType: (formData.subType || null) as 'BUYOUT' | 'GROWTH_EQUITY' | 'VENTURE_CAPITAL' | 'FAMILY_OFFICE' | 'SOVEREIGN_WEALTH' | 'HEDGE_FUND' | 'BULGE_BRACKET' | 'MIDDLE_MARKET' | 'BOUTIQUE' | 'REGIONAL' | null,
+        website: formData.website.trim() || null,
+        description: formData.description.trim() || null,
+        headquarters: formData.headquarters.trim() || null,
+        foundedYear: formData.foundedYear ? Number(formData.foundedYear) : null,
+        employeeCount: formData.employeeCount ? Number(formData.employeeCount) : null,
+        aum: formData.aum ? Number(formData.aum) : null,
+        dealSizeMin: formData.dealSizeMin ? Number(formData.dealSizeMin) : null,
+        dealSizeMax: formData.dealSizeMax ? Number(formData.dealSizeMax) : null,
+        industryFocus: formData.industryFocus,
+        geographyFocus: formData.geographyFocus,
+        // Target Company specific
+        revenue: formData.revenue ? Number(formData.revenue) : null,
+        ebitda: formData.ebitda ? Number(formData.ebitda) : null,
+        revenueGrowth: formData.revenueGrowth ? Number(formData.revenueGrowth) : null,
+        grossMargin: formData.grossMargin ? Number(formData.grossMargin) : null,
+      },
+    });
+  };
+
+  const isTargetCompany = formData.type === 'TARGET_COMPANY';
+  const isPEorIB = formData.type === 'PE_FIRM' || formData.type === 'IB';
+
+  return (
+    <Modal isOpen={isOpen} onClose={onClose} size="lg">
+      <form onSubmit={handleSubmit}>
+        <ModalHeader>
+          <ModalTitle>Edit Organization</ModalTitle>
+        </ModalHeader>
+        <ModalBody>
+          <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+            {/* Basic Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="org-name" className="block text-sm font-medium text-slate-700 mb-1">
+                  Name <span className="text-red-500">*</span>
+                </label>
+                <input
+                  id="org-name"
+                  type="text"
+                  value={formData.name}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, name: e.target.value }))}
+                  className="input w-full"
+                  required
+                />
+              </div>
+              <div>
+                <label htmlFor="org-legal-name" className="block text-sm font-medium text-slate-700 mb-1">
+                  Legal Name
+                </label>
+                <input
+                  id="org-legal-name"
+                  type="text"
+                  value={formData.legalName}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, legalName: e.target.value }))}
+                  className="input w-full"
+                />
+              </div>
+            </div>
+
+            {/* Type and Sub Type */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="org-type" className="block text-sm font-medium text-slate-700 mb-1">
+                  Type
+                </label>
+                <select
+                  id="org-type"
+                  value={formData.type}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, type: e.target.value, subType: '' }))}
+                  className="input w-full"
+                >
+                  <option value="PE_FIRM">PE Firm</option>
+                  <option value="IB">Investment Bank</option>
+                  <option value="TARGET_COMPANY">Target Company</option>
+                  <option value="SERVICE_PROVIDER">Service Provider</option>
+                  <option value="LAW_FIRM">Law Firm</option>
+                  <option value="ACCOUNTING_FIRM">Accounting Firm</option>
+                  <option value="OTHER">Other</option>
+                </select>
+              </div>
+              <div>
+                <label htmlFor="org-subtype" className="block text-sm font-medium text-slate-700 mb-1">
+                  Sub Type
+                </label>
+                <select
+                  id="org-subtype"
+                  value={formData.subType}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, subType: e.target.value }))}
+                  className="input w-full"
+                >
+                  <option value="">Select sub-type...</option>
+                  {formData.type === 'PE_FIRM' && (
+                    <>
+                      <option value="BUYOUT">Buyout</option>
+                      <option value="GROWTH_EQUITY">Growth Equity</option>
+                      <option value="VENTURE_CAPITAL">Venture Capital</option>
+                      <option value="FAMILY_OFFICE">Family Office</option>
+                      <option value="SOVEREIGN_WEALTH">Sovereign Wealth</option>
+                      <option value="HEDGE_FUND">Hedge Fund</option>
+                    </>
+                  )}
+                  {formData.type === 'IB' && (
+                    <>
+                      <option value="BULGE_BRACKET">Bulge Bracket</option>
+                      <option value="MIDDLE_MARKET">Middle Market</option>
+                      <option value="BOUTIQUE">Boutique</option>
+                      <option value="REGIONAL">Regional</option>
+                    </>
+                  )}
+                </select>
+              </div>
+            </div>
+
+            {/* Website and Headquarters */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="org-website" className="block text-sm font-medium text-slate-700 mb-1">
+                  Website
+                </label>
+                <input
+                  id="org-website"
+                  type="url"
+                  value={formData.website}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, website: e.target.value }))}
+                  className="input w-full"
+                  placeholder="https://example.com"
+                />
+              </div>
+              <div>
+                <label htmlFor="org-headquarters" className="block text-sm font-medium text-slate-700 mb-1">
+                  Headquarters
+                </label>
+                <input
+                  id="org-headquarters"
+                  type="text"
+                  value={formData.headquarters}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, headquarters: e.target.value }))}
+                  className="input w-full"
+                  placeholder="New York, NY"
+                />
+              </div>
+            </div>
+
+            {/* Founded Year and Employee Count */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <label htmlFor="org-founded" className="block text-sm font-medium text-slate-700 mb-1">
+                  Founded Year
+                </label>
+                <input
+                  id="org-founded"
+                  type="number"
+                  value={formData.foundedYear}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, foundedYear: e.target.value }))}
+                  className="input w-full"
+                  placeholder="2020"
+                  min={1800}
+                  max={new Date().getFullYear()}
+                />
+              </div>
+              <div>
+                <label htmlFor="org-employees" className="block text-sm font-medium text-slate-700 mb-1">
+                  Employee Count
+                </label>
+                <input
+                  id="org-employees"
+                  type="number"
+                  value={formData.employeeCount}
+                  onChange={(e) => setFormData((prev) => ({ ...prev, employeeCount: e.target.value }))}
+                  className="input w-full"
+                  placeholder="100"
+                  min={1}
+                />
+              </div>
+            </div>
+
+            {/* PE/IB specific fields */}
+            {isPEorIB && (
+              <>
+                <div className="grid grid-cols-3 gap-4">
+                  <div>
+                    <label htmlFor="org-aum" className="block text-sm font-medium text-slate-700 mb-1">
+                      AUM ($)
+                    </label>
+                    <input
+                      id="org-aum"
+                      type="number"
+                      value={formData.aum}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, aum: e.target.value }))}
+                      className="input w-full"
+                      placeholder="1000000000"
+                      min={0}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="org-deal-min" className="block text-sm font-medium text-slate-700 mb-1">
+                      Deal Size Min ($)
+                    </label>
+                    <input
+                      id="org-deal-min"
+                      type="number"
+                      value={formData.dealSizeMin}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, dealSizeMin: e.target.value }))}
+                      className="input w-full"
+                      placeholder="50000000"
+                      min={0}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="org-deal-max" className="block text-sm font-medium text-slate-700 mb-1">
+                      Deal Size Max ($)
+                    </label>
+                    <input
+                      id="org-deal-max"
+                      type="number"
+                      value={formData.dealSizeMax}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, dealSizeMax: e.target.value }))}
+                      className="input w-full"
+                      placeholder="500000000"
+                      min={0}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Target Company specific fields */}
+            {isTargetCompany && (
+              <>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="org-revenue" className="block text-sm font-medium text-slate-700 mb-1">
+                      Revenue ($)
+                    </label>
+                    <input
+                      id="org-revenue"
+                      type="number"
+                      value={formData.revenue}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, revenue: e.target.value }))}
+                      className="input w-full"
+                      placeholder="100000000"
+                      min={0}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="org-ebitda" className="block text-sm font-medium text-slate-700 mb-1">
+                      EBITDA ($)
+                    </label>
+                    <input
+                      id="org-ebitda"
+                      type="number"
+                      value={formData.ebitda}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, ebitda: e.target.value }))}
+                      className="input w-full"
+                      placeholder="20000000"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label htmlFor="org-growth" className="block text-sm font-medium text-slate-700 mb-1">
+                      Revenue Growth (%)
+                    </label>
+                    <input
+                      id="org-growth"
+                      type="number"
+                      value={formData.revenueGrowth}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, revenueGrowth: e.target.value }))}
+                      className="input w-full"
+                      placeholder="25"
+                      step="0.1"
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="org-margin" className="block text-sm font-medium text-slate-700 mb-1">
+                      Gross Margin (%)
+                    </label>
+                    <input
+                      id="org-margin"
+                      type="number"
+                      value={formData.grossMargin}
+                      onChange={(e) => setFormData((prev) => ({ ...prev, grossMargin: e.target.value }))}
+                      className="input w-full"
+                      placeholder="65"
+                      step="0.1"
+                      min={0}
+                      max={100}
+                    />
+                  </div>
+                </div>
+              </>
+            )}
+
+            {/* Description */}
+            <div>
+              <label htmlFor="org-description" className="block text-sm font-medium text-slate-700 mb-1">
+                Description
+              </label>
+              <textarea
+                id="org-description"
+                value={formData.description}
+                onChange={(e) => setFormData((prev) => ({ ...prev, description: e.target.value }))}
+                className="input w-full"
+                rows={3}
+                placeholder="Brief description of the organization..."
+              />
+            </div>
+          </div>
+        </ModalBody>
+        <ModalFooter>
+          <Button type="button" variant="secondary" onClick={onClose} disabled={updateMutation.isPending}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" disabled={updateMutation.isPending}>
+            {updateMutation.isPending ? (
+              <>
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                Saving...
+              </>
+            ) : (
+              'Save Changes'
+            )}
+          </Button>
+        </ModalFooter>
+      </form>
     </Modal>
   );
 }
@@ -1588,6 +1981,7 @@ export default function OrganizationDetailPage() {
 
   const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
 
   // ============================================================================
   // DATA FETCHING
@@ -1750,7 +2144,7 @@ export default function OrganizationDetailPage() {
           <Button
             variant="secondary"
             size="md"
-            onClick={() => router.push(`/organizations/${organization.id}/edit`)}
+            onClick={() => setIsEditModalOpen(true)}
           >
             <Edit className="mr-2 h-4 w-4" />
             Edit
@@ -2314,6 +2708,16 @@ export default function OrganizationDetailPage() {
         organizationName={organization.name}
         isDeleting={deleteMutation.isPending}
       />
+
+      {/* Edit Organization Modal */}
+      {isEditModalOpen && (
+        <EditOrganizationModal
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
+          organization={organization}
+          onSuccess={() => refetch()}
+        />
+      )}
     </div>
   );
 }
