@@ -1,18 +1,85 @@
 # SPAC OS Issues Log
 
-## Current Status (February 4, 2026)
+## Current Status (February 5, 2026)
 
 **Build:** PASSING
-**All Tech Debt:** RESOLVED
-**Sprint:** 9 Complete, Sprint 10 Planned
+**E2E Tests:** 15/15 Sprint 12 tests passing
+**Sprint:** 12 Complete, Sprint 13 Planned
 
-### Active Issues (Carryover to Sprint 10)
+### Active Issues (Carryover to Sprint 13)
 
 | ID | Priority | Description | Status |
 |----|----------|-------------|--------|
 | S10-001 | P2 | Gmail/Calendar APIs need Google Cloud credentials | Blocked on credentials |
-| S10-002 | P3 | ~16 `no-explicit-any` ESLint warnings | Acceptable - documented |
-| S10-003 | P1 | Supabase connection pool saturated - prisma db push fails with MaxClientsInSessionMode | **RESOLVED** - Connection pool cleared, schema pushed |
+| S10-002 | P3 | ~528 ESLint warnings (mostly no-explicit-any) | Acceptable - documented |
+| S12-001 | P3 | Quick-add ownership templates show "coming soon" toast | Deferred |
+| S12-002 | P3 | AI fit score summary uses templates instead of live Claude API | Deferred |
+| S12-003 | P2 | Mobile navigation not implemented (sidebar hidden on mobile) | Open |
+| S12-004 | P2 | /docs link in sidebar footer 404s | Open |
+| S12-005 | P2 | AI Insights action buttons don't navigate | Open |
+| S12-006 | P2 | Missing /organizations/[id]/edit page (button 404s) | Open |
+| S12-007 | P2 | Missing /companies/[id]/edit page (button 404s) | Open |
+
+---
+
+## Sprint 12 Issues
+
+### Test Results
+- **TypeScript:** PASSED (0 errors)
+- **ESLint:** PASSED (0 errors, 528 warnings)
+- **E2E Tests:** 15/15 PASSED
+
+### Sprint 12 QA Summary
+
+**Overall Status: APPROVED**
+
+Sprint 12 delivered all 4 vertical slices:
+- Slice 12.1: Target Company Directory - COMPLETE
+- Slice 12.2: Target Ownership Intelligence - COMPLETE
+- Slice 12.3: Target Key Contacts - COMPLETE
+- Slice 12.4: Target Deal Fit Scoring - COMPLETE
+
+### Issues Found & Fixed During Sprint 12
+
+| ID | Severity | Description | File | Status |
+|----|----------|-------------|------|--------|
+| S12-FIX-001 | P1 | Input focus bug in Add Organization modal | organizations/page.tsx | **FIXED** - Extracted to memoized component |
+| S12-FIX-002 | P1 | UuidSchema rejected cuid() IDs | src/schemas/index.ts | **FIXED** - Changed to z.string().min(1) |
+| S12-FIX-003 | P1 | Seed data schema mismatches | prisma/seed.ts | **FIXED** - Updated field names |
+
+### UI Audit Findings (February 5, 2026)
+
+A comprehensive UI audit was conducted across all pages. Summary:
+
+| Area | Critical | High | Medium | Low |
+|------|----------|------|--------|-----|
+| Dashboard & Nav | 0 | 0 | 3 | 7 |
+| Organizations | 0 | 1 | 5 | 3 |
+| SPACs & Pipeline | 1 | 5 | 14 | 11 |
+| Contacts & CRM | 0 | 4 | 4 | 8 |
+| Docs & Filings | 0 | 3 | 12 | 23 |
+
+**Critical/High Priority Issues from Audit:**
+
+| ID | Area | Description | Severity |
+|----|------|-------------|----------|
+| AUDIT-001 | SPACs | SPAC create form loses most field data (not sent to API) | CRITICAL |
+| AUDIT-002 | SPACs | SEC filing table shows wrong field (type vs formType) | HIGH |
+| AUDIT-003 | SPACs | Hardcoded trust per share value | HIGH |
+| AUDIT-004 | SPACs | Documents tab upload only logs to console | HIGH |
+| AUDIT-005 | Pipeline | Document upload uses wrong mutation | HIGH |
+| AUDIT-006 | Pipeline | Page props type mismatch with Next.js App Router | HIGH |
+| AUDIT-007 | Contacts | Hardcoded organization ID when creating contacts | HIGH |
+| AUDIT-008 | Companies | Edit link goes to non-existent page (404) | HIGH |
+| AUDIT-009 | Docs | PDF viewer never receives URL prop | HIGH |
+| AUDIT-010 | Docs | Upload handler doesn't actually upload files | HIGH |
+| AUDIT-011 | Integrations | Integrations page uses mock data (no real OAuth) | HIGH |
+
+Note: These audit findings are from pre-existing code, not Sprint 12 changes.
+
+---
+
+## Sprint 10/11 Issues (Resolved)
 
 ### Build Fixes Applied (February 4, 2026)
 
