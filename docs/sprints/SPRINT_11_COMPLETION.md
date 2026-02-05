@@ -181,8 +181,24 @@ model IBCoverage {
 - [x] TypeScript type-check passes
 - [x] ESLint passes (warnings only)
 - [x] Production build succeeds
-- [ ] Prisma schema push (pending - connection pool at capacity)
-- [ ] E2E tests (pending schema push)
+- [x] Prisma schema push completed
+- [x] E2E tests pass (19 tests)
+
+### E2E Test Summary
+
+The E2E tests in `e2e/ib-management.spec.ts` handle both authenticated and unauthenticated states:
+- **Unauthenticated**: Verifies redirect to sign-in (expected behavior)
+- **Authenticated**: Tests full functionality with form input and submission
+
+Key test coverage:
+- IB Organization creation with full form submission (name, type, subtype, HQ, website, AUM, description)
+- Form validation preventing submission without required fields
+- IB detail page showing Mandates/Coverage tabs (not Portfolio)
+- PE Firm detail page showing Portfolio tab (not Mandates/Coverage)
+- Tab interaction and navigation
+- Dashboard activity feed without mock data
+- Search and filter functionality
+- Error handling for non-existent organizations
 
 ---
 
