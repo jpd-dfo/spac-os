@@ -35,11 +35,12 @@ import {
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardHeader, CardTitle, CardContent, CardDescription } from '@/components/ui/Card';
-import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
+import { Dropdown, DropdownItem } from '@/components/ui/Dropdown';
 import { EmptyState } from '@/components/ui/EmptyState';
 import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '@/components/ui/Modal';
 import { Table, TableHead, TableBody, TableRow, TableCell } from '@/components/ui/Table';
 import { Tabs, TabsList, TabTrigger, TabContent } from '@/components/ui/Tabs';
+import { AddDealModal } from '@/components/companies/AddDealModal';
 import { CONTACT_TYPE_LABELS } from '@/lib/constants';
 import { trpc } from '@/lib/trpc/client';
 import { formatLargeNumber, formatDate, formatRelativeTime, cn } from '@/lib/utils';
@@ -213,181 +214,6 @@ function NotFoundState({ id }: { id: string }) {
         </Button>
       </div>
     </div>
-  );
-}
-
-// ============================================================================
-// ADD DEAL FORM
-// ============================================================================
-
-interface AddDealFormProps {
-  isOpen: boolean;
-  onClose: () => void;
-  companyId: string;
-  onSuccess: () => void;
-}
-
-function AddDealForm({ isOpen, onClose, companyId, onSuccess }: AddDealFormProps) {
-  const [formData, setFormData] = useState({
-    dealName: '',
-    role: '',
-    status: 'In Progress',
-    value: '',
-    closedAt: '',
-  });
-
-  const addDealMutation = trpc.company.addDeal.useMutation({
-    onSuccess: () => {
-      toast.success('Deal added successfully');
-      onSuccess();
-      onClose();
-      resetForm();
-    },
-    onError: (error) => {
-      toast.error(`Failed to add deal: ${error.message}`);
-    },
-  });
-
-  const resetForm = () => {
-    setFormData({
-      dealName: '',
-      role: '',
-      status: 'In Progress',
-      value: '',
-      closedAt: '',
-    });
-  };
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.dealName.trim() || !formData.role.trim()) {
-      toast.error('Deal name and role are required');
-      return;
-    }
-
-    addDealMutation.mutate({
-      companyId,
-      dealName: formData.dealName,
-      role: formData.role,
-      status: formData.status,
-      value: formData.value ? parseFloat(formData.value) : null,
-      closedAt: formData.closedAt ? new Date(formData.closedAt) : null,
-    });
-  };
-
-  return (
-    <Modal isOpen={isOpen} onClose={onClose} size="md">
-      <form onSubmit={handleSubmit}>
-        <ModalHeader>
-          <ModalTitle>Add Deal</ModalTitle>
-        </ModalHeader>
-        <ModalBody>
-          <div className="space-y-4">
-            <div>
-              <label htmlFor="deal-name" className="block text-sm font-medium text-slate-700 mb-1">
-                Deal Name <span className="text-red-500">*</span>
-              </label>
-              <input
-                id="deal-name"
-                type="text"
-                value={formData.dealName}
-                onChange={(e) => setFormData((prev) => ({ ...prev, dealName: e.target.value }))}
-                className="input w-full"
-                placeholder="e.g., Project Alpha Acquisition"
-                required
-              />
-            </div>
-
-            <div>
-              <label htmlFor="deal-role" className="block text-sm font-medium text-slate-700 mb-1">
-                Role <span className="text-red-500">*</span>
-              </label>
-              <select
-                id="deal-role"
-                value={formData.role}
-                onChange={(e) => setFormData((prev) => ({ ...prev, role: e.target.value }))}
-                className="input w-full"
-                required
-              >
-                <option value="">Select role...</option>
-                <option value="Lead Advisor">Lead Advisor</option>
-                <option value="Co-Advisor">Co-Advisor</option>
-                <option value="Legal Counsel">Legal Counsel</option>
-                <option value="Co-Counsel">Co-Counsel</option>
-                <option value="Target Company">Target Company</option>
-                <option value="Sponsor">Sponsor</option>
-                <option value="Investor">Investor</option>
-                <option value="Other">Other</option>
-              </select>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="deal-status" className="block text-sm font-medium text-slate-700 mb-1">
-                  Status
-                </label>
-                <select
-                  id="deal-status"
-                  value={formData.status}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, status: e.target.value }))}
-                  className="input w-full"
-                >
-                  <option value="In Progress">In Progress</option>
-                  <option value="Won">Won</option>
-                  <option value="Lost">Lost</option>
-                </select>
-              </div>
-              <div>
-                <label htmlFor="deal-value" className="block text-sm font-medium text-slate-700 mb-1">
-                  Deal Value ($)
-                </label>
-                <input
-                  id="deal-value"
-                  type="number"
-                  value={formData.value}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, value: e.target.value }))}
-                  className="input w-full"
-                  placeholder="1000000"
-                  min={0}
-                  step={1000}
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="deal-closed" className="block text-sm font-medium text-slate-700 mb-1">
-                Closed Date
-              </label>
-              <input
-                id="deal-closed"
-                type="date"
-                value={formData.closedAt}
-                onChange={(e) => setFormData((prev) => ({ ...prev, closedAt: e.target.value }))}
-                className="input w-full"
-              />
-            </div>
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button type="button" variant="secondary" onClick={onClose}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" disabled={addDealMutation.isPending}>
-            {addDealMutation.isPending ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Adding...
-              </>
-            ) : (
-              <>
-                <Plus className="mr-2 h-4 w-4" />
-                Add Deal
-              </>
-            )}
-          </Button>
-        </ModalFooter>
-      </form>
-    </Modal>
   );
 }
 
@@ -1306,7 +1132,7 @@ export default function CompanyDetailPage() {
       </Tabs>
 
       {/* Add Deal Modal */}
-      <AddDealForm
+      <AddDealModal
         isOpen={isAddDealModalOpen}
         onClose={() => setIsAddDealModalOpen(false)}
         companyId={company.id}

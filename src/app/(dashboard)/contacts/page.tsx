@@ -13,21 +13,19 @@ import {
   Phone,
   Building,
   MoreVertical,
-  Loader2,
   AlertCircle,
   RefreshCw,
   Trash2,
   Edit,
   Eye,
-  X,
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 
+import { AddContactModal, NewContactData } from '@/components/contacts/AddContactModal';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardContent } from '@/components/ui/Card';
 import { Dropdown, DropdownItem, DropdownDivider } from '@/components/ui/Dropdown';
-import { Modal, ModalHeader, ModalTitle, ModalBody, ModalFooter } from '@/components/ui/Modal';
 import { Pagination } from '@/components/ui/Pagination';
 import { CONTACT_TYPE_LABELS, DEFAULT_PAGE_SIZE } from '@/lib/constants';
 import { trpc } from '@/lib/trpc';
@@ -117,280 +115,6 @@ function getStatusBadgeVariant(status: string): 'primary' | 'secondary' | 'succe
     default:
       return 'secondary';
   }
-}
-
-// ============================================================================
-// Add Contact Form Component
-// ============================================================================
-
-interface AddContactFormProps {
-  isOpen: boolean;
-  onClose: () => void;
-  onSubmit: (data: NewContactData) => void;
-  isLoading: boolean;
-}
-
-interface NewContactData {
-  firstName: string;
-  lastName: string;
-  email?: string;
-  phone?: string;
-  company?: string;
-  title?: string;
-  type: ContactType;
-  notes?: string;
-  tags?: string[];
-}
-
-function AddContactForm({ isOpen, onClose, onSubmit, isLoading }: AddContactFormProps) {
-  const [formData, setFormData] = useState<NewContactData>({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phone: '',
-    company: '',
-    title: '',
-    type: 'OTHER',
-    notes: '',
-    tags: [],
-  });
-  const [tagInput, setTagInput] = useState('');
-
-  const handleSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!formData.firstName || !formData.lastName) {
-      toast.error('First name and last name are required');
-      return;
-    }
-    onSubmit(formData);
-  };
-
-  const handleAddTag = () => {
-    if (tagInput.trim() && !formData.tags?.includes(tagInput.trim())) {
-      setFormData((prev) => ({
-        ...prev,
-        tags: [...(prev.tags || []), tagInput.trim()],
-      }));
-      setTagInput('');
-    }
-  };
-
-  const handleRemoveTag = (tag: string) => {
-    setFormData((prev) => ({
-      ...prev,
-      tags: prev.tags?.filter((t) => t !== tag) || [],
-    }));
-  };
-
-  const resetForm = () => {
-    setFormData({
-      firstName: '',
-      lastName: '',
-      email: '',
-      phone: '',
-      company: '',
-      title: '',
-      type: 'OTHER',
-      notes: '',
-      tags: [],
-    });
-    setTagInput('');
-  };
-
-  return (
-    <Modal
-      isOpen={isOpen}
-      onClose={() => {
-        resetForm();
-        onClose();
-      }}
-      size="lg"
-    >
-      <form onSubmit={handleSubmit}>
-        <ModalHeader>
-          <ModalTitle>Add New Contact</ModalTitle>
-        </ModalHeader>
-        <ModalBody>
-          <div className="space-y-4">
-            {/* Name Row */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="contact-firstName" className="block text-sm font-medium text-slate-700 mb-1">
-                  First Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="contact-firstName"
-                  type="text"
-                  value={formData.firstName}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, firstName: e.target.value }))}
-                  className="input w-full"
-                  placeholder="John"
-                  required
-                />
-              </div>
-              <div>
-                <label htmlFor="contact-lastName" className="block text-sm font-medium text-slate-700 mb-1">
-                  Last Name <span className="text-red-500">*</span>
-                </label>
-                <input
-                  id="contact-lastName"
-                  type="text"
-                  value={formData.lastName}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, lastName: e.target.value }))}
-                  className="input w-full"
-                  placeholder="Doe"
-                  required
-                />
-              </div>
-            </div>
-
-            {/* Contact Type */}
-            <div>
-              <label htmlFor="contact-type" className="block text-sm font-medium text-slate-700 mb-1">Contact Type</label>
-              <select
-                id="contact-type"
-                value={formData.type}
-                onChange={(e) => setFormData((prev) => ({ ...prev, type: e.target.value as ContactType }))}
-                className="input w-full"
-              >
-                {Object.entries(TYPE_LABELS).map(([value, label]) => (
-                  <option key={value} value={value}>
-                    {label}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Email and Phone */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="contact-email" className="block text-sm font-medium text-slate-700 mb-1">Email</label>
-                <input
-                  id="contact-email"
-                  type="email"
-                  value={formData.email}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, email: e.target.value }))}
-                  className="input w-full"
-                  placeholder="john.doe@company.com"
-                />
-              </div>
-              <div>
-                <label htmlFor="contact-phone" className="block text-sm font-medium text-slate-700 mb-1">Phone</label>
-                <input
-                  id="contact-phone"
-                  type="tel"
-                  value={formData.phone}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, phone: e.target.value }))}
-                  className="input w-full"
-                  placeholder="+1 (555) 123-4567"
-                />
-              </div>
-            </div>
-
-            {/* Company and Title */}
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label htmlFor="contact-company" className="block text-sm font-medium text-slate-700 mb-1">Company</label>
-                <input
-                  id="contact-company"
-                  type="text"
-                  value={formData.company}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, company: e.target.value }))}
-                  className="input w-full"
-                  placeholder="Acme Corporation"
-                />
-              </div>
-              <div>
-                <label htmlFor="contact-title" className="block text-sm font-medium text-slate-700 mb-1">Title</label>
-                <input
-                  id="contact-title"
-                  type="text"
-                  value={formData.title}
-                  onChange={(e) => setFormData((prev) => ({ ...prev, title: e.target.value }))}
-                  className="input w-full"
-                  placeholder="Managing Director"
-                />
-              </div>
-            </div>
-
-            {/* Tags */}
-            <div>
-              <label htmlFor="contact-tags" className="block text-sm font-medium text-slate-700 mb-1">Tags</label>
-              <div className="flex gap-2 mb-2">
-                <input
-                  id="contact-tags"
-                  type="text"
-                  value={tagInput}
-                  onChange={(e) => setTagInput(e.target.value)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') {
-                      e.preventDefault();
-                      handleAddTag();
-                    }
-                  }}
-                  className="input flex-1"
-                  placeholder="Add tag and press Enter"
-                />
-                <Button type="button" variant="secondary" size="md" onClick={handleAddTag}>
-                  Add
-                </Button>
-              </div>
-              {formData.tags && formData.tags.length > 0 && (
-                <div className="flex flex-wrap gap-2">
-                  {formData.tags.map((tag) => (
-                    <span
-                      key={tag}
-                      className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-2 py-1 text-xs text-slate-700"
-                    >
-                      {tag}
-                      <button
-                        type="button"
-                        onClick={() => handleRemoveTag(tag)}
-                        className="text-slate-400 hover:text-slate-600"
-                      >
-                        <X className="h-3 w-3" />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {/* Notes */}
-            <div>
-              <label htmlFor="contact-notes" className="block text-sm font-medium text-slate-700 mb-1">Notes</label>
-              <textarea
-                id="contact-notes"
-                value={formData.notes}
-                onChange={(e) => setFormData((prev) => ({ ...prev, notes: e.target.value }))}
-                className="input w-full"
-                rows={3}
-                placeholder="Additional notes about this contact..."
-              />
-            </div>
-          </div>
-        </ModalBody>
-        <ModalFooter>
-          <Button type="button" variant="secondary" onClick={() => { resetForm(); onClose(); }}>
-            Cancel
-          </Button>
-          <Button type="submit" variant="primary" disabled={isLoading}>
-            {isLoading ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                Creating...
-              </>
-            ) : (
-              <>
-                <Plus className="mr-2 h-4 w-4" />
-                Create Contact
-              </>
-            )}
-          </Button>
-        </ModalFooter>
-      </form>
-    </Modal>
-  );
 }
 
 // ============================================================================
@@ -895,7 +619,7 @@ export default function ContactsPage() {
       )}
 
       {/* Add Contact Modal */}
-      <AddContactForm
+      <AddContactModal
         isOpen={isAddModalOpen}
         onClose={() => setIsAddModalOpen(false)}
         onSubmit={handleCreateContact}
