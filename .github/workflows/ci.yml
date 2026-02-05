@@ -138,11 +138,13 @@ jobs:
         run: npx prisma migrate deploy
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/spac_os_test
+          DIRECT_URL: postgresql://test_user:test_password@localhost:5432/spac_os_test
 
       - name: Run tests
         run: npm test -- --passWithNoTests
         env:
           DATABASE_URL: postgresql://test_user:test_password@localhost:5432/spac_os_test
+          DIRECT_URL: postgresql://test_user:test_password@localhost:5432/spac_os_test
           REDIS_URL: redis://localhost:6379
           NEXTAUTH_SECRET: test-secret-for-ci
           NODE_ENV: test
@@ -190,6 +192,7 @@ jobs:
           NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY: ${{ secrets.NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY || 'pk_test_placeholder' }}
           CLERK_SECRET_KEY: ${{ secrets.CLERK_SECRET_KEY || 'sk_test_placeholder' }}
           DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
+          DIRECT_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
           # Skip static generation for pages that require auth
           SKIP_ENV_VALIDATION: true
 
@@ -273,12 +276,14 @@ jobs:
         run: npx prisma validate
         env:
           DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
+          DIRECT_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
 
       - name: Check for pending migrations
         run: npx prisma migrate status
         continue-on-error: true
         env:
           DATABASE_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
+          DIRECT_URL: postgresql://placeholder:placeholder@localhost:5432/placeholder
 
   # ===========================================================================
   # Deploy Preview (for PRs)
