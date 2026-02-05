@@ -56,6 +56,24 @@ const InteractionTypeSchema = z.enum([
   'OTHER',
 ]);
 
+// Sprint 10 - New enums for contact organization relationships
+const SeniorityLevelSchema = z.enum([
+  'C_LEVEL',
+  'PARTNER',
+  'MANAGING_DIRECTOR',
+  'VP',
+  'DIRECTOR',
+  'ASSOCIATE',
+  'ANALYST',
+]);
+
+const RelationshipStrengthSchema = z.enum([
+  'COLD',
+  'WARM',
+  'HOT',
+  'ADVOCATE',
+]);
+
 // ============================================================================
 // FILTER SCHEMA
 // ============================================================================
@@ -1136,5 +1154,99 @@ export const contactRouter = createTRPCRouter({
       });
 
       return contacts;
+    }),
+
+  // ============================================================================
+  // SPRINT 10 - ORGANIZATION RELATIONSHIPS
+  // ============================================================================
+
+  /**
+   * Get all contacts at an organization with optional filters
+   * Returns contacts ordered by name with basic contact info
+   */
+  listByOrganization: protectedProcedure
+    .input(z.object({
+      organizationId: UuidSchema,
+      seniorityLevel: SeniorityLevelSchema.optional(),
+      relationshipStrength: RelationshipStrengthSchema.optional(),
+      limit: z.number().int().min(1).max(100).default(50),
+    }))
+    .query(async ({ ctx, input }) => {
+      const { organizationId, seniorityLevel, relationshipStrength, limit } = input;
+
+      const where: Prisma.ContactWhereInput = {
+        organizationId,
+        status: { not: 'ARCHIVED' },
+      };
+
+      if (seniorityLevel) {
+        where.seniorityLevel = seniorityLevel;
+      }
+
+      if (relationshipStrength) {
+        where.relationshipStrength = relationshipStrength;
+      }
+
+      const contacts = await ctx.db.contact.findMany({
+        where,
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+          phone: true,
+          title: true,
+          seniorityLevel: true,
+          relationshipStrength: true,
+          dealRoles: true,
+          isStarred: true,
+          lastInteractionAt: true,
+        },
+        orderBy: [
+          { lastName: 'asc' },
+          { firstName: 'asc' },
+        ],
+        take: limit,
+      });
+
+      return contacts;
+    }),
+
+  /**
+   * Quick update relationship strength for a contact
+   * Sprint 10 - Simplified update for relationship tracking
+   */
+  updateRelationshipStrength: orgAuditedProcedure
+    .input(z.object({
+      id: UuidSchema,
+      relationshipStrength: RelationshipStrengthSchema,
+    }))
+    .mutation(async ({ ctx, input }) => {
+      const { id, relationshipStrength } = input;
+
+      const contact = await ctx.db.contact.findUnique({
+        where: { id },
+      });
+
+      if (!contact) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: 'Contact not found',
+        });
+      }
+
+      const updated = await ctx.db.contact.update({
+        where: { id },
+        data: { relationshipStrength },
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          relationshipStrength: true,
+          organizationId: true,
+        },
+      });
+
+      return updated;
     }),
 });
