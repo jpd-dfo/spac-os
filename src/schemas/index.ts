@@ -261,7 +261,8 @@ export const TransactionTypeSchema = z.enum([
 // BASE SCHEMAS & UTILITIES
 // ============================================================================
 
-export const UuidSchema = z.string().uuid();
+// Note: Using min(1) instead of uuid() because Prisma uses cuid() for IDs
+export const UuidSchema = z.string().min(1);
 
 export const TickerSchema = z
   .string()

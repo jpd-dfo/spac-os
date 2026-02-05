@@ -500,6 +500,9 @@ model Spac {
   notes            Note[]
   complianceAlerts ComplianceAlert[]
 
+  // Sprint 12 - Target Fit Scores
+  fitScores        TargetFitScore[]
+
   @@index([organizationId])
   @@index([status])
   @@index([ticker])
@@ -569,9 +572,14 @@ model Target {
   notes          Note[]
   scoreHistories ScoreHistory[]
 
+  // Sprint 12 - Link to Organization (type=TARGET_COMPANY) profile
+  organizationId String?
+  organization   Organization?   @relation("TargetOrganization", fields: [organizationId], references: [id])
+
   @@index([spacId])
   @@index([status])
   @@index([industry])
+  @@index([organizationId])
   @@map("targets")
 }
 
@@ -1460,6 +1468,12 @@ model Organization {
   foundedYear   Int?
   employeeCount Int?
 
+  // Sprint 12 - Target Company Financial Metrics
+  revenue       Decimal? @db.Decimal(18, 2) // Annual revenue
+  ebitda        Decimal? @db.Decimal(18, 2) // EBITDA
+  revenueGrowth Decimal? @db.Decimal(5, 2)  // Revenue growth rate (%)
+  grossMargin   Decimal? @db.Decimal(5, 2)  // Gross margin (%)
+
   // Soft delete
   deletedAt DateTime?
 
@@ -1479,6 +1493,10 @@ model Organization {
   // Sprint 11 - IB-specific relations
   ibMandates    IBMandate[]         @relation("IBMandates")
   ibCoverage    IBCoverage[]        @relation("IBCoverage")
+
+  // Sprint 12 - Target Company relations
+  targets       Target[]            @relation("TargetOrganization")
+  fitScores     TargetFitScore[]
 
   @@index([slug])
   @@index([type])
@@ -1882,4 +1900,43 @@ enum CoverageExpertise {
   STRONG     // Well established
   MODERATE   // Some presence
   EMERGING   // Building capability
+}
+
+// ============================================================================
+// SPRINT 12 - TARGET COMPANY MANAGEMENT MODELS
+// ============================================================================
+
+/// TargetFitScore - AI-powered fit scoring for target companies against SPAC criteria
+model TargetFitScore {
+  id              String   @id @default(cuid())
+
+  // Links to target company (Organization type=TARGET_COMPANY) and SPAC
+  organizationId  String
+  organization    Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  spacId          String           // Which SPAC's criteria was used
+  spac            Spac             @relation(fields: [spacId], references: [id], onDelete: Cascade)
+
+  // Scores (0-100)
+  overallScore    Int              // Weighted overall fit score
+  sizeScore       Int              // Revenue/EBITDA fit vs criteria
+  sectorScore     Int              // Industry/sector alignment
+  geographyScore  Int              // Geographic fit
+  ownershipScore  Int              // Ownership complexity (PE backing, founder %)
+
+  // AI-generated insights
+  aiSummary       String?          @db.Text
+  aiRecommendation String?         @db.Text
+
+  // Audit
+  calculatedAt    DateTime         @default(now())
+  calculatedBy    String?          // User ID or "AI"
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+
+  @@unique([organizationId, spacId])  // One score per org+spac combo
+  @@index([organizationId])
+  @@index([spacId])
+  @@index([overallScore])
+  @@map("target_fit_scores")
 }

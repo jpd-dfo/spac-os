@@ -27,6 +27,9 @@ import {
   FileText,
   Compass,
   Plus,
+  PieChart as PieChartIcon,
+  BarChart3,
+  Percent,
 } from 'lucide-react';
 
 import { Badge } from '@/components/ui/Badge';
@@ -42,7 +45,7 @@ import { formatLargeNumber, formatDate, formatRelativeTime, cn } from '@/lib/uti
 // TYPES
 // ============================================================================
 
-type TabType = 'overview' | 'portfolio' | 'contacts' | 'activity' | 'mandates' | 'coverage';
+type TabType = 'overview' | 'portfolio' | 'contacts' | 'activity' | 'mandates' | 'coverage' | 'ownership' | 'dealfit';
 
 // Type for organization data with counts (extends router return type)
 type OrganizationWithCounts = {
@@ -64,6 +67,11 @@ type OrganizationWithCounts = {
   logoUrl: string | null;
   foundedYear: number | null;
   employeeCount: number | null;
+  // Sprint 12 - Target Company Financial Metrics
+  revenue: number | null;
+  ebitda: number | null;
+  revenueGrowth: number | null;
+  grossMargin: number | null;
   createdAt: Date;
   updatedAt: Date;
   deletedAt: Date | null;
@@ -1055,6 +1063,521 @@ function CoverageTab({ organizationId }: { organizationId: string }) {
 }
 
 // ============================================================================
+// TARGET COMPANY TABS - OWNERSHIP & DEAL FIT (Sprint 12)
+// ============================================================================
+
+// Ownership template types
+type OwnershipTemplate = 'founder' | 'pe_majority' | 'pe_minority';
+
+function OwnershipTab({ organizationId }: { organizationId: string }) {
+  const { data, isLoading, isError, error } = trpc.ownership.listByOwned.useQuery(
+    { ownedId: organizationId },
+    { retry: 1 }
+  );
+
+  const handleApplyTemplate = (template: OwnershipTemplate) => {
+    toast(`Applying ${template.replace('_', ' ')} template - coming soon`, { icon: '🚧' });
+  };
+
+  const handleAddStake = () => {
+    toast('Add ownership stake coming soon', { icon: '🚧' });
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Ownership Structure</CardTitle>
+          <CardDescription>Who owns this company</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 animate-pulse">
+            <div className="h-64 bg-slate-100 rounded-lg" />
+            <div className="h-32 bg-slate-100 rounded-lg" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Ownership Structure</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8">
+            <AlertCircle className="h-10 w-10 text-danger-400 mb-3" />
+            <p className="text-sm text-danger-600">{error?.message || 'Failed to load ownership'}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const stakes = data?.stakes || [];
+  const totalOwnership = stakes.reduce((sum, s) => sum + (s.ownershipPct || 0), 0);
+
+  // Prepare pie chart data
+  const pieData = stakes.map((stake, index) => ({
+    name: stake.owner.name,
+    value: stake.ownershipPct || 0,
+    color: ['#3B82F6', '#10B981', '#F59E0B', '#EF4444', '#8B5CF6', '#EC4899'][index % 6],
+  }));
+
+  // Add "Other/Unknown" if less than 100%
+  if (totalOwnership < 100) {
+    pieData.push({
+      name: 'Other/Unknown',
+      value: 100 - totalOwnership,
+      color: '#94A3B8',
+    });
+  }
+
+  if (stakes.length === 0) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between">
+            <div>
+              <CardTitle>Ownership Structure</CardTitle>
+              <CardDescription>Who owns this company</CardDescription>
+            </div>
+            <Button variant="primary" size="sm" onClick={handleAddStake}>
+              <Plus className="mr-2 h-4 w-4" />
+              Add Stake
+            </Button>
+          </CardHeader>
+          <CardContent>
+            <EmptyState
+              icon={<PieChartIcon className="h-12 w-12" />}
+              title="No ownership data"
+              description="Add ownership stakes to track who owns this company."
+            />
+          </CardContent>
+        </Card>
+
+        {/* Quick Templates */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Quick Templates</CardTitle>
+            <CardDescription>Apply common ownership structures</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="secondary" size="sm" onClick={() => handleApplyTemplate('founder')}>
+                100% Founder Owned
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => handleApplyTemplate('pe_majority')}>
+                PE Majority (51%+)
+              </Button>
+              <Button variant="secondary" size="sm" onClick={() => handleApplyTemplate('pe_minority')}>
+                PE Minority (&lt;50%)
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Card>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle>Ownership Structure</CardTitle>
+            <CardDescription>
+              {totalOwnership.toFixed(1)}% tracked across {stakes.length} stakeholder{stakes.length !== 1 ? 's' : ''}
+            </CardDescription>
+          </div>
+          <Button variant="primary" size="sm" onClick={handleAddStake}>
+            <Plus className="mr-2 h-4 w-4" />
+            Add Stake
+          </Button>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Pie Chart Visualization */}
+            <div className="flex items-center justify-center">
+              <div className="relative w-64 h-64">
+                {/* Simple CSS pie chart (could be replaced with Recharts) */}
+                <div className="w-full h-full rounded-full overflow-hidden relative"
+                  style={{
+                    background: `conic-gradient(${pieData.map((d, i) =>
+                      `${d.color} ${pieData.slice(0, i).reduce((sum, p) => sum + p.value, 0) * 3.6}deg ${(pieData.slice(0, i).reduce((sum, p) => sum + p.value, 0) + d.value) * 3.6}deg`
+                    ).join(', ')})`,
+                  }}
+                >
+                  <div className="absolute inset-8 bg-white rounded-full flex items-center justify-center">
+                    <div className="text-center">
+                      <p className="text-2xl font-bold text-slate-900">{totalOwnership.toFixed(0)}%</p>
+                      <p className="text-xs text-slate-500">tracked</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Legend */}
+            <div className="space-y-3">
+              {pieData.map((item) => (
+                <div key={item.name} className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                    <span className="text-sm text-slate-700">{item.name}</span>
+                  </div>
+                  <span className="text-sm font-medium text-slate-900">{item.value.toFixed(1)}%</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Ownership Details Table */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Stakeholder Details</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="divide-y divide-slate-200">
+            {stakes.map((stake) => {
+              const holdYears = stake.investmentDate
+                ? Math.floor((Date.now() - new Date(stake.investmentDate).getTime()) / (365 * 24 * 60 * 60 * 1000))
+                : null;
+
+              return (
+                <div key={stake.id} className="py-4 first:pt-0 last:pb-0">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100">
+                        <Building2 className="h-5 w-5 text-primary-600" />
+                      </div>
+                      <div>
+                        <Link
+                          href={`/organizations/${stake.owner.id}`}
+                          className="font-medium text-slate-900 hover:text-primary-600 hover:underline"
+                        >
+                          {stake.owner.name}
+                        </Link>
+                        <div className="mt-1 flex flex-wrap gap-1.5">
+                          <Badge variant="secondary" size="sm">
+                            {stake.owner.type?.replace(/_/g, ' ') || 'Unknown'}
+                          </Badge>
+                          <Badge variant={stake.stakeType === 'MAJORITY' ? 'primary' : 'secondary'} size="sm">
+                            {stake.stakeType?.replace(/_/g, ' ') || 'Unknown'}
+                          </Badge>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-xl font-bold text-slate-900">{stake.ownershipPct?.toFixed(1)}%</p>
+                      {stake.boardSeats && stake.boardSeats > 0 && (
+                        <p className="text-xs text-slate-500">{stake.boardSeats} board seat{stake.boardSeats > 1 ? 's' : ''}</p>
+                      )}
+                    </div>
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
+                    {stake.investmentDate && (
+                      <span className="flex items-center gap-1">
+                        <Calendar className="h-3 w-3" />
+                        Invested: {formatDate(stake.investmentDate)}
+                      </span>
+                    )}
+                    {holdYears !== null && holdYears >= 0 && (
+                      <span className={cn(holdYears >= 5 && 'text-warning-600 font-medium')}>
+                        <Clock className="inline h-3 w-3 mr-1" />
+                        {holdYears} year{holdYears !== 1 ? 's' : ''} held
+                        {holdYears >= 5 && ' (exit window)'}
+                      </span>
+                    )}
+                    {stake.entryValuation && (
+                      <span>Entry: {formatLargeNumber(stake.entryValuation)}</span>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Quick Templates */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Quick Templates</CardTitle>
+          <CardDescription>Apply common ownership structures</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="secondary" size="sm" onClick={() => handleApplyTemplate('founder')}>
+              100% Founder Owned
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleApplyTemplate('pe_majority')}>
+              PE Majority (51%+)
+            </Button>
+            <Button variant="secondary" size="sm" onClick={() => handleApplyTemplate('pe_minority')}>
+              PE Minority (&lt;50%)
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function DealFitTab({ organizationId, organizationName }: { organizationId: string; organizationName: string }) {
+  const [selectedSpacId, setSelectedSpacId] = useState<string | null>(null);
+
+  // Fetch available SPACs
+  const { data: spacsData, isLoading: spacsLoading } = trpc.spac.list.useQuery(
+    { page: 1, limit: 50 },
+    { retry: 1 }
+  );
+
+  // Fetch existing fit scores for this organization
+  const { data: fitScores, isLoading: scoresLoading, refetch: refetchScores } = trpc.organization.listFitScores.useQuery(
+    { organizationId },
+    { retry: 1 }
+  );
+
+  // Calculate fit score mutation
+  const calculateMutation = trpc.organization.calculateFitScore.useMutation({
+    onSuccess: () => {
+      toast.success('Fit score calculated successfully');
+      refetchScores();
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Failed to calculate fit score');
+    },
+  });
+
+  const handleCalculate = () => {
+    if (!selectedSpacId) {
+      toast.error('Please select a SPAC first');
+      return;
+    }
+    calculateMutation.mutate({ organizationId, spacId: selectedSpacId });
+  };
+
+  const spacs = spacsData?.items || [];
+  const scores = fitScores || [];
+
+  const getScoreColor = (score: number) => {
+    if (score >= 75) {
+      return 'text-success-600 bg-success-100';
+    }
+    if (score >= 50) {
+      return 'text-warning-600 bg-warning-100';
+    }
+    return 'text-danger-600 bg-danger-100';
+  };
+
+  const getScoreLabel = (score: number) => {
+    if (score >= 75) {
+      return 'Strong Fit';
+    }
+    if (score >= 50) {
+      return 'Moderate Fit';
+    }
+    return 'Limited Fit';
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Calculate New Score */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Calculate Fit Score</CardTitle>
+          <CardDescription>
+            Score how well {organizationName} fits a SPAC's investment criteria
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col sm:flex-row gap-4">
+            <div className="flex-1">
+              <label htmlFor="spac-select" className="block text-sm font-medium text-slate-700 mb-1">Select SPAC</label>
+              <select
+                id="spac-select"
+                className="w-full rounded-md border border-slate-300 bg-white px-3 py-2 text-sm focus:border-primary-500 focus:outline-none focus:ring-1 focus:ring-primary-500"
+                value={selectedSpacId || ''}
+                onChange={(e) => setSelectedSpacId(e.target.value || null)}
+                disabled={spacsLoading}
+              >
+                <option value="">Choose a SPAC...</option>
+                {spacs.map((spac) => (
+                  <option key={spac.id} value={spac.id}>
+                    {spac.name} {spac.ticker ? `(${spac.ticker})` : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="flex items-end">
+              <Button
+                variant="primary"
+                onClick={handleCalculate}
+                disabled={!selectedSpacId || calculateMutation.isPending}
+              >
+                {calculateMutation.isPending ? (
+                  <>
+                    <RefreshCw className="mr-2 h-4 w-4 animate-spin" />
+                    Calculating...
+                  </>
+                ) : (
+                  <>
+                    <BarChart3 className="mr-2 h-4 w-4" />
+                    Calculate Score
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Existing Scores */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Fit Scores ({scores.length})</CardTitle>
+          <CardDescription>Previously calculated fit scores against different SPACs</CardDescription>
+        </CardHeader>
+        <CardContent>
+          {scoresLoading ? (
+            <div className="space-y-4 animate-pulse">
+              {[1, 2].map((i) => (
+                <div key={i} className="h-32 bg-slate-100 rounded-lg" />
+              ))}
+            </div>
+          ) : scores.length === 0 ? (
+            <EmptyState
+              icon={<BarChart3 className="h-12 w-12" />}
+              title="No fit scores yet"
+              description="Select a SPAC above and calculate a fit score to see how well this target matches."
+            />
+          ) : (
+            <div className="space-y-4">
+              {scores.map((score) => (
+                <div key={score.id} className="rounded-lg border border-slate-200 p-4">
+                  <div className="flex items-start justify-between gap-4 mb-4">
+                    <div>
+                      <p className="font-medium text-slate-900">
+                        vs {score.spac.name} {score.spac.ticker ? `(${score.spac.ticker})` : ''}
+                      </p>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Calculated {formatRelativeTime(score.calculatedAt)}
+                      </p>
+                    </div>
+                    <div className={cn('px-3 py-1 rounded-full text-sm font-semibold', getScoreColor(score.overallScore))}>
+                      {score.overallScore}/100 - {getScoreLabel(score.overallScore)}
+                    </div>
+                  </div>
+
+                  {/* Score Breakdown */}
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-4">
+                    <div>
+                      <p className="text-xs text-slate-500">Size Fit</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-slate-200 rounded-full">
+                          <div
+                            className={cn('h-2 rounded-full', score.sizeScore >= 70 ? 'bg-success-500' : score.sizeScore >= 40 ? 'bg-warning-500' : 'bg-danger-500')}
+                            style={{ width: `${score.sizeScore}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-slate-900">{score.sizeScore}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Sector Fit</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-slate-200 rounded-full">
+                          <div
+                            className={cn('h-2 rounded-full', score.sectorScore >= 70 ? 'bg-success-500' : score.sectorScore >= 40 ? 'bg-warning-500' : 'bg-danger-500')}
+                            style={{ width: `${score.sectorScore}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-slate-900">{score.sectorScore}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Geography Fit</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-slate-200 rounded-full">
+                          <div
+                            className={cn('h-2 rounded-full', score.geographyScore >= 70 ? 'bg-success-500' : score.geographyScore >= 40 ? 'bg-warning-500' : 'bg-danger-500')}
+                            style={{ width: `${score.geographyScore}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-slate-900">{score.geographyScore}</span>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Ownership Fit</p>
+                      <div className="flex items-center gap-2">
+                        <div className="flex-1 h-2 bg-slate-200 rounded-full">
+                          <div
+                            className={cn('h-2 rounded-full', score.ownershipScore >= 70 ? 'bg-success-500' : score.ownershipScore >= 40 ? 'bg-warning-500' : 'bg-danger-500')}
+                            style={{ width: `${score.ownershipScore}%` }}
+                          />
+                        </div>
+                        <span className="text-sm font-medium text-slate-900">{score.ownershipScore}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* AI Summary */}
+                  {score.aiSummary && (
+                    <div className="bg-slate-50 rounded-lg p-3 mb-3">
+                      <p className="text-sm text-slate-700">{score.aiSummary}</p>
+                    </div>
+                  )}
+
+                  {/* AI Recommendation */}
+                  {score.aiRecommendation && (
+                    <div className={cn(
+                      'rounded-lg p-3',
+                      score.overallScore >= 75 ? 'bg-success-50 border border-success-200' :
+                      score.overallScore >= 50 ? 'bg-warning-50 border border-warning-200' :
+                      'bg-danger-50 border border-danger-200'
+                    )}>
+                      <p className={cn(
+                        'text-sm font-medium',
+                        score.overallScore >= 75 ? 'text-success-700' :
+                        score.overallScore >= 50 ? 'text-warning-700' :
+                        'text-danger-700'
+                      )}>
+                        {score.aiRecommendation}
+                      </p>
+                    </div>
+                  )}
+
+                  {/* Recalculate Button */}
+                  <div className="mt-3 flex justify-end">
+                    <Button
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => {
+                        setSelectedSpacId(score.spac.id);
+                        calculateMutation.mutate({ organizationId, spacId: score.spac.id });
+                      }}
+                      disabled={calculateMutation.isPending}
+                    >
+                      <RefreshCw className={cn('mr-2 h-3 w-3', calculateMutation.isPending && 'animate-spin')} />
+                      Recalculate
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+// ============================================================================
 // MAIN PAGE COMPONENT
 // ============================================================================
 
@@ -1135,22 +1658,32 @@ export default function OrganizationDetailPage() {
 
   // For PE_FIRM: Overview, Portfolio, Contacts, Activity
   // For IB: Overview, Mandates, Coverage, Contacts, Activity (no Portfolio)
+  // For TARGET_COMPANY: Overview, Ownership, Contacts, Activity, Deal Fit (Sprint 12)
   const isIB = organization.type === 'IB';
+  const isTargetCompany = organization.type === 'TARGET_COMPANY';
 
-  const tabs: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }[] = isIB
+  const tabs: { id: TabType; label: string; icon: React.ComponentType<{ className?: string }>; count?: number }[] = isTargetCompany
     ? [
         { id: 'overview', label: 'Overview', icon: Building2 },
-        { id: 'mandates', label: 'Mandates', icon: FileText },
-        { id: 'coverage', label: 'Coverage', icon: Compass },
+        { id: 'ownership', label: 'Ownership', icon: PieChartIcon, count: organization._count?.ownedByStakes || 0 },
         { id: 'contacts', label: 'Contacts', icon: Users, count: organization._count?.contacts || 0 },
         { id: 'activity', label: 'Activity', icon: Activity },
+        { id: 'dealfit', label: 'Deal Fit', icon: Target },
       ]
-    : [
-        { id: 'overview', label: 'Overview', icon: Building2 },
-        { id: 'portfolio', label: 'Portfolio', icon: Briefcase, count: organization._count?.ownedStakes || 0 },
-        { id: 'contacts', label: 'Contacts', icon: Users, count: organization._count?.contacts || 0 },
-        { id: 'activity', label: 'Activity', icon: Activity },
-      ];
+    : isIB
+      ? [
+          { id: 'overview', label: 'Overview', icon: Building2 },
+          { id: 'mandates', label: 'Mandates', icon: FileText },
+          { id: 'coverage', label: 'Coverage', icon: Compass },
+          { id: 'contacts', label: 'Contacts', icon: Users, count: organization._count?.contacts || 0 },
+          { id: 'activity', label: 'Activity', icon: Activity },
+        ]
+      : [
+          { id: 'overview', label: 'Overview', icon: Building2 },
+          { id: 'portfolio', label: 'Portfolio', icon: Briefcase, count: organization._count?.ownedStakes || 0 },
+          { id: 'contacts', label: 'Contacts', icon: Users, count: organization._count?.contacts || 0 },
+          { id: 'activity', label: 'Activity', icon: Activity },
+        ];
 
   // ============================================================================
   // RENDER
@@ -1234,78 +1767,154 @@ export default function OrganizationDetailPage() {
       </div>
 
       {/* ================================================================== */}
-      {/* KEY METRICS ROW */}
+      {/* KEY METRICS ROW - Conditional based on organization type */}
       {/* ================================================================== */}
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        {/* AUM */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success-100">
-                <DollarSign className="h-5 w-5 text-success-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">AUM</p>
-                <p className="text-xl font-bold text-slate-900">
-                  {organization.aum ? formatLargeNumber(organization.aum) : '-'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {isTargetCompany ? (
+          <>
+            {/* Revenue (Target Company) */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success-100">
+                    <DollarSign className="h-5 w-5 text-success-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Revenue</p>
+                    <p className="text-xl font-bold text-slate-900">
+                      {organization.revenue ? formatLargeNumber(organization.revenue) : '-'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Fund Vintage */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100">
-                <Calendar className="h-5 w-5 text-primary-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Fund Vintage</p>
-                <p className="text-xl font-bold text-slate-900">
-                  {organization.fundVintage || '-'}
-                </p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            {/* EBITDA (Target Company) */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100">
+                    <BarChart3 className="h-5 w-5 text-primary-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">EBITDA</p>
+                    <p className="text-xl font-bold text-slate-900">
+                      {organization.ebitda ? formatLargeNumber(organization.ebitda) : '-'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Portfolio Companies */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-100">
-                <Briefcase className="h-5 w-5 text-warning-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Portfolio</p>
-                <p className="text-xl font-bold text-slate-900">
-                  {organization._count?.ownedStakes || 0}
-                </p>
-                <p className="text-xs text-slate-500">companies</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Revenue Growth (Target Company) */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-100">
+                    <Percent className="h-5 w-5 text-warning-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Growth</p>
+                    <p className="text-xl font-bold text-slate-900">
+                      {organization.revenueGrowth ? `${organization.revenueGrowth.toFixed(1)}%` : '-'}
+                    </p>
+                    <p className="text-xs text-slate-500">revenue YoY</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-        {/* Contacts */}
-        <Card>
-          <CardContent className="p-4">
-            <div className="flex items-center gap-3">
-              <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
-                <Users className="h-5 w-5 text-slate-600" />
-              </div>
-              <div>
-                <p className="text-sm text-slate-500">Contacts</p>
-                <p className="text-xl font-bold text-slate-900">
-                  {organization._count?.contacts || 0}
-                </p>
-                <p className="text-xs text-slate-500">people</p>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            {/* Owners Count (Target Company) */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+                    <PieChartIcon className="h-5 w-5 text-slate-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Owners</p>
+                    <p className="text-xl font-bold text-slate-900">
+                      {organization._count?.ownedByStakes || 0}
+                    </p>
+                    <p className="text-xs text-slate-500">stakeholders</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <>
+            {/* AUM */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-success-100">
+                    <DollarSign className="h-5 w-5 text-success-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">AUM</p>
+                    <p className="text-xl font-bold text-slate-900">
+                      {organization.aum ? formatLargeNumber(organization.aum) : '-'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Fund Vintage */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary-100">
+                    <Calendar className="h-5 w-5 text-primary-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Fund Vintage</p>
+                    <p className="text-xl font-bold text-slate-900">
+                      {organization.fundVintage || '-'}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Portfolio Companies */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-warning-100">
+                    <Briefcase className="h-5 w-5 text-warning-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Portfolio</p>
+                    <p className="text-xl font-bold text-slate-900">
+                      {organization._count?.ownedStakes || 0}
+                    </p>
+                    <p className="text-xs text-slate-500">companies</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Contacts */}
+            <Card>
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+                    <Users className="h-5 w-5 text-slate-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm text-slate-500">Contacts</p>
+                    <p className="text-xl font-bold text-slate-900">
+                      {organization._count?.contacts || 0}
+                    </p>
+                    <p className="text-xs text-slate-500">people</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* ================================================================== */}
@@ -1560,7 +2169,28 @@ export default function OrganizationDetailPage() {
                   <CardTitle>Quick Actions</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-2">
-                  {isIB ? (
+                  {isTargetCompany ? (
+                    <>
+                      <Button
+                        variant="secondary"
+                        className="w-full justify-start"
+                        size="sm"
+                        onClick={() => setActiveTab('ownership')}
+                      >
+                        <PieChartIcon className="mr-2 h-4 w-4" />
+                        View Ownership
+                      </Button>
+                      <Button
+                        variant="secondary"
+                        className="w-full justify-start"
+                        size="sm"
+                        onClick={() => setActiveTab('dealfit')}
+                      >
+                        <Target className="mr-2 h-4 w-4" />
+                        View Deal Fit
+                      </Button>
+                    </>
+                  ) : isIB ? (
                     <>
                       <Button
                         variant="secondary"
@@ -1640,6 +2270,24 @@ export default function OrganizationDetailPage() {
         {isIB && (
           <TabContent value="coverage">
             <CoverageTab organizationId={id} />
+          </TabContent>
+        )}
+
+        {/* ================================================================== */}
+        {/* OWNERSHIP TAB (TARGET_COMPANY only - Sprint 12) */}
+        {/* ================================================================== */}
+        {isTargetCompany && (
+          <TabContent value="ownership">
+            <OwnershipTab organizationId={id} />
+          </TabContent>
+        )}
+
+        {/* ================================================================== */}
+        {/* DEAL FIT TAB (TARGET_COMPANY only - Sprint 12) */}
+        {/* ================================================================== */}
+        {isTargetCompany && (
+          <TabContent value="dealfit">
+            <DealFitTab organizationId={id} organizationName={organization.name} />
           </TabContent>
         )}
 

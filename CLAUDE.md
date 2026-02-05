@@ -68,10 +68,11 @@ Required in `.env.local`:
 Core models in Prisma:
 - `User` - Clerk-synced users
 - `Spac` - SPAC entities with lifecycle tracking
-- `Organization` - PE firms, IBs, and other ecosystem entities (Sprint 10)
-- `OwnershipStake` - PE portfolio ownership tracking (Sprint 10)
+- `Organization` - PE firms, IBs, Target Companies, and ecosystem entities (Sprint 10-12)
+- `OwnershipStake` - Portfolio/target ownership tracking (Sprint 10, 12)
 - `IBMandate` - IB mandate tracking for deal flow (Sprint 11)
 - `IBCoverage` - IB sector/industry coverage (Sprint 11)
+- `TargetFitScore` - AI-powered deal fit scoring against SPAC criteria (Sprint 12)
 - `Contact` - CRM contacts with organization links
 - `Company` - CRM companies
 - `Document` - Uploaded files and analysis
@@ -86,16 +87,22 @@ Core models in Prisma:
 ## Current Sprint Status
 - ✅ Sprints 1-10: Complete (Foundation through PE Firm Management)
 - ✅ Sprint 11: Complete (IB Firm Management, Mandate Tracking, Dashboard Real Data)
+- ✅ Sprint 12: Complete (Target Company Management, Ownership Intelligence, Deal Fit Scoring)
 
-### Sprint 11 Routes (IB Firm Management)
-- `/organizations` - PE firms, IBs, and ecosystem entities list
-- `/organizations/[id]` - Organization detail with:
+### Sprint 12 Routes (Target Company Management)
+- `/organizations` - PE firms, IBs, Target Companies, and ecosystem entities list
+- `/organizations/[id]` - Organization detail with type-specific tabs:
   - PE_FIRM: Overview, Portfolio, Contacts, Activity tabs
   - IB: Overview, Mandates, Coverage, Contacts, Activity tabs
-- `/companies` - CRM companies list
-- `/companies/[id]` - Company detail with Contacts, Deal History tabs
+  - TARGET_COMPANY: Overview, Ownership, Contacts, Activity, Deal Fit tabs
 
-### Sprint 11 API Routes
+### Sprint 12 API Routes
+- `trpc.organization.listTargetCompanies` - Filtered target company listing
+- `trpc.organization.calculateFitScore` - AI-powered deal fit score calculation
+- `trpc.organization.getFitScore` - Get existing fit score for org+SPAC combo
+- `trpc.organization.listFitScores` - List all fit scores for an organization
+
+### Sprint 11 Routes (IB Firm Management)
 - `trpc.mandate.*` - IB mandate CRUD (list, listByOrganization, getById, create, update, delete)
 - `trpc.coverage.*` - IB coverage CRUD (listByOrganization, create, update, delete, assignContact, removeContact)
 - `trpc.activity.listRecent` - Global recent activity for dashboard
