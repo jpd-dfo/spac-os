@@ -331,49 +331,353 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, organizationName, isDe
 }
 
 // ============================================================================
-// PLACEHOLDER TAB COMPONENTS
+// TAB COMPONENTS - WIRED TO REAL APIs
 // ============================================================================
 
 function PortfolioTab({ organizationId }: { organizationId: string }) {
-  // TODO: Will use ownership.listByOwner when implemented
+  const { data, isLoading, isError, error } = trpc.ownership.listByOwner.useQuery(
+    { ownerId: organizationId, limit: 50 },
+    { retry: 1 }
+  );
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Portfolio Companies</CardTitle>
+          <CardDescription>Companies owned or invested in by this organization</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 animate-pulse">
+            {[1, 2, 3].map((i) => (
+              <div key={i} className="h-24 bg-slate-100 rounded-lg" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Portfolio Companies</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8">
+            <AlertCircle className="h-10 w-10 text-danger-400 mb-3" />
+            <p className="text-sm text-danger-600">{error?.message || 'Failed to load portfolio'}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const stakes = data?.stakes || [];
+
+  if (stakes.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Portfolio Companies</CardTitle>
+          <CardDescription>Companies owned or invested in by this organization</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EmptyState
+            icon={<Briefcase className="h-12 w-12" />}
+            title="No portfolio companies"
+            description="This organization has not recorded any portfolio company investments yet."
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Portfolio Companies</CardTitle>
+        <CardTitle>Portfolio Companies ({stakes.length})</CardTitle>
         <CardDescription>Companies owned or invested in by this organization</CardDescription>
       </CardHeader>
       <CardContent>
-        <EmptyState
-          icon={<Briefcase className="h-12 w-12" />}
-          title="Portfolio data coming soon"
-          description={`Portfolio companies for organization ${organizationId} will be displayed here using the ownership.listByOwner endpoint.`}
-        />
+        <div className="divide-y divide-slate-200">
+          {stakes.map((stake) => {
+            const holdYears = stake.investmentDate
+              ? Math.floor((Date.now() - new Date(stake.investmentDate).getTime()) / (365 * 24 * 60 * 60 * 1000))
+              : null;
+            const isApproachingExit = holdYears !== null && holdYears >= 5;
+
+            return (
+              <div key={stake.id} className="py-4 first:pt-0 last:pb-0">
+                <div className="flex items-start justify-between gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-slate-100">
+                      <Building2 className="h-5 w-5 text-slate-600" />
+                    </div>
+                    <div>
+                      <Link
+                        href={`/organizations/${stake.owned.id}`}
+                        className="font-medium text-slate-900 hover:text-primary-600 hover:underline"
+                      >
+                        {stake.owned.name}
+                      </Link>
+                      <p className="text-sm text-slate-500">
+                        {stake.owned.industryFocus?.join(', ') || stake.owned.type}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="font-semibold text-slate-900">{stake.ownershipPct}%</p>
+                    <Badge
+                      variant={stake.exitStatus === 'ACTIVE' ? 'success' : stake.exitStatus === 'FULLY_EXITED' ? 'secondary' : 'warning'}
+                      size="sm"
+                    >
+                      {stake.exitStatus.replace(/_/g, ' ')}
+                    </Badge>
+                  </div>
+                </div>
+                <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
+                  {stake.investmentDate && (
+                    <span className="flex items-center gap-1">
+                      <Calendar className="h-3 w-3" />
+                      Invested: {formatDate(stake.investmentDate)}
+                    </span>
+                  )}
+                  {stake.entryMultiple && (
+                    <span>Entry: {stake.entryMultiple.toFixed(1)}x</span>
+                  )}
+                  {holdYears !== null && (
+                    <span className={cn(isApproachingExit && 'text-warning-600 font-medium')}>
+                      <Clock className="inline h-3 w-3 mr-1" />
+                      {holdYears} year{holdYears !== 1 ? 's' : ''} held
+                      {isApproachingExit && ' (exit window)'}
+                    </span>
+                  )}
+                  {stake.boardSeats && stake.boardSeats > 0 && (
+                    <span>{stake.boardSeats} board seat{stake.boardSeats > 1 ? 's' : ''}</span>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
 }
 
 function ContactsTab({ organizationId }: { organizationId: string }) {
-  // TODO: Will use contact.listByOrganization when implemented
+  const { data: contacts, isLoading, isError, error } = trpc.contact.listByOrganization.useQuery(
+    { organizationId, limit: 50 },
+    { retry: 1 }
+  );
+
+  const SENIORITY_LABELS: Record<string, string> = {
+    C_LEVEL: 'C-Level',
+    PARTNER: 'Partner',
+    MANAGING_DIRECTOR: 'Managing Director',
+    VP: 'VP',
+    DIRECTOR: 'Director',
+    ASSOCIATE: 'Associate',
+    ANALYST: 'Analyst',
+  };
+
+  const DEFAULT_RELATIONSHIP = { label: 'Cold', variant: 'secondary' as const };
+  const RELATIONSHIP_CONFIG: Record<string, { label: string; variant: 'secondary' | 'warning' | 'danger' | 'success' }> = {
+    COLD: { label: 'Cold', variant: 'secondary' },
+    WARM: { label: 'Warm', variant: 'warning' },
+    HOT: { label: 'Hot', variant: 'danger' },
+    ADVOCATE: { label: 'Advocate', variant: 'success' },
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Contacts</CardTitle>
+          <CardDescription>People associated with this organization</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-4 sm:grid-cols-2 animate-pulse">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="h-32 bg-slate-100 rounded-lg" />
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Contacts</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8">
+            <AlertCircle className="h-10 w-10 text-danger-400 mb-3" />
+            <p className="text-sm text-danger-600">{error?.message || 'Failed to load contacts'}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (!contacts || contacts.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Contacts</CardTitle>
+          <CardDescription>People associated with this organization</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EmptyState
+            icon={<Users className="h-12 w-12" />}
+            title="No contacts"
+            description="No contacts have been linked to this organization yet."
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Contacts</CardTitle>
+        <CardTitle>Contacts ({contacts.length})</CardTitle>
         <CardDescription>People associated with this organization</CardDescription>
       </CardHeader>
       <CardContent>
-        <EmptyState
-          icon={<Users className="h-12 w-12" />}
-          title="Contacts coming soon"
-          description={`Contacts for organization ${organizationId} will be displayed here using the contact.listByOrganization endpoint.`}
-        />
+        <div className="grid gap-4 sm:grid-cols-2">
+          {contacts.map((contact) => {
+            const relationshipConfig = RELATIONSHIP_CONFIG[contact.relationshipStrength || 'COLD'] ?? DEFAULT_RELATIONSHIP;
+
+            return (
+              <Link
+                key={contact.id}
+                href={`/contacts/${contact.id}`}
+                className="block rounded-lg border border-slate-200 p-4 hover:border-slate-300 hover:shadow-sm transition-all"
+              >
+                <div className="flex items-start gap-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary-100 text-primary-600 font-semibold">
+                    {contact.firstName?.[0] || ''}{contact.lastName?.[0] || ''}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-medium text-slate-900 truncate">
+                      {contact.firstName} {contact.lastName}
+                    </p>
+                    {contact.title && (
+                      <p className="text-sm text-slate-500 truncate">{contact.title}</p>
+                    )}
+                    <div className="mt-2 flex flex-wrap gap-1.5">
+                      {contact.seniorityLevel && (
+                        <Badge variant="secondary" size="sm">
+                          {SENIORITY_LABELS[contact.seniorityLevel] || contact.seniorityLevel}
+                        </Badge>
+                      )}
+                      <Badge variant={relationshipConfig.variant} size="sm">
+                        {relationshipConfig.label}
+                      </Badge>
+                    </div>
+                    {contact.lastInteractionAt && (
+                      <p className="mt-2 text-xs text-slate-400">
+                        Last contact: {formatRelativeTime(contact.lastInteractionAt)}
+                      </p>
+                    )}
+                  </div>
+                </div>
+              </Link>
+            );
+          })}
+        </div>
       </CardContent>
     </Card>
   );
 }
 
 function ActivityTab({ organizationId }: { organizationId: string }) {
-  // TODO: Will use activity.listByOrganization when implemented
+  const { data, isLoading, isError, error } =
+    trpc.activity.listByOrganization.useQuery(
+      { organizationId, limit: 50 },
+      { retry: 1 }
+    );
+
+  const ACTIVITY_TYPE_CONFIG: Record<string, { icon: typeof Activity; label: string; color: string }> = {
+    EMAIL_SENT: { icon: Activity, label: 'Email Sent', color: 'text-blue-600 bg-blue-100' },
+    EMAIL_RECEIVED: { icon: Activity, label: 'Email Received', color: 'text-blue-600 bg-blue-100' },
+    MEETING_SCHEDULED: { icon: Calendar, label: 'Meeting Scheduled', color: 'text-purple-600 bg-purple-100' },
+    MEETING_COMPLETED: { icon: Calendar, label: 'Meeting Completed', color: 'text-purple-600 bg-purple-100' },
+    CALL_MADE: { icon: Activity, label: 'Call Made', color: 'text-green-600 bg-green-100' },
+    CALL_RECEIVED: { icon: Activity, label: 'Call Received', color: 'text-green-600 bg-green-100' },
+    NOTE_ADDED: { icon: Activity, label: 'Note Added', color: 'text-slate-600 bg-slate-100' },
+    DEAL_DISCUSSED: { icon: Target, label: 'Deal Discussed', color: 'text-warning-600 bg-warning-100' },
+    DOCUMENT_SHARED: { icon: Activity, label: 'Document Shared', color: 'text-teal-600 bg-teal-100' },
+    CONTACT_ADDED: { icon: Users, label: 'Contact Added', color: 'text-primary-600 bg-primary-100' },
+    RELATIONSHIP_UPDATED: { icon: TrendingUp, label: 'Relationship Updated', color: 'text-success-600 bg-success-100' },
+  };
+
+  if (isLoading) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Activity Timeline</CardTitle>
+          <CardDescription>Recent activity and events for this organization</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="space-y-4 animate-pulse">
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex gap-4">
+                <div className="h-10 w-10 bg-slate-100 rounded-full" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-slate-100 rounded w-3/4" />
+                  <div className="h-3 bg-slate-100 rounded w-1/2" />
+                </div>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (isError) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Activity Timeline</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="flex flex-col items-center justify-center py-8">
+            <AlertCircle className="h-10 w-10 text-danger-400 mb-3" />
+            <p className="text-sm text-danger-600">{error?.message || 'Failed to load activity'}</p>
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  const activities = data?.items || [];
+
+  if (activities.length === 0) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle>Activity Timeline</CardTitle>
+          <CardDescription>Recent activity and events for this organization</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <EmptyState
+            icon={<Activity className="h-12 w-12" />}
+            title="No activity yet"
+            description="No interactions or activities have been logged for this organization."
+          />
+        </CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -381,11 +685,52 @@ function ActivityTab({ organizationId }: { organizationId: string }) {
         <CardDescription>Recent activity and events for this organization</CardDescription>
       </CardHeader>
       <CardContent>
-        <EmptyState
-          icon={<Activity className="h-12 w-12" />}
-          title="Activity feed coming soon"
-          description={`Activity timeline for organization ${organizationId} will be displayed here using the activity.listByOrganization endpoint.`}
-        />
+        <div className="relative">
+          {/* Timeline line */}
+          <div className="absolute left-5 top-0 bottom-0 w-px bg-slate-200" />
+
+          <div className="space-y-6">
+            {activities.map((activity) => {
+              const config = ACTIVITY_TYPE_CONFIG[activity.type] || {
+                icon: Activity,
+                label: activity.type.replace(/_/g, ' '),
+                color: 'text-slate-600 bg-slate-100',
+              };
+              const Icon = config.icon;
+
+              return (
+                <div key={activity.id} className="relative flex gap-4">
+                  <div className={cn('flex h-10 w-10 items-center justify-center rounded-full z-10', config.color)}>
+                    <Icon className="h-5 w-5" />
+                  </div>
+                  <div className="flex-1 pt-1">
+                    <p className="font-medium text-slate-900">{activity.title}</p>
+                    {activity.description && (
+                      <p className="text-sm text-slate-500 mt-0.5">{activity.description}</p>
+                    )}
+                    <div className="mt-1 flex items-center gap-3 text-xs text-slate-400">
+                      <span>{formatRelativeTime(activity.createdAt)}</span>
+                      {activity.contact && (
+                        <span>
+                          with {activity.contact.firstName} {activity.contact.lastName}
+                        </span>
+                      )}
+                      {activity.user && (
+                        <span>by {activity.user.name}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          {data?.hasMore && (
+            <p className="mt-6 text-center text-sm text-slate-500">
+              Showing {activities.length} most recent activities
+            </p>
+          )}
+        </div>
       </CardContent>
     </Card>
   );

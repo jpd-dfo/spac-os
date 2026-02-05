@@ -987,7 +987,11 @@ export default function CompanyDetailPage() {
                   </TableHead>
                   <TableBody>
                     {company.deals.map((deal) => (
-                      <TableRow key={deal.id}>
+                      <TableRow
+                        key={deal.id}
+                        className="cursor-pointer hover:bg-slate-50"
+                        onClick={() => toast('Deal details view coming soon')}
+                      >
                         <TableCell>
                           <span className="font-medium text-slate-900">{deal.dealName}</span>
                         </TableCell>

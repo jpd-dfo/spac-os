@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
+import toast from 'react-hot-toast';
 
 import {
   Plus,
@@ -174,7 +175,7 @@ export default function TasksPage() {
             {tasksQuery.data?.total ? ` · ${tasksQuery.data.total} total tasks` : ''}
           </p>
         </div>
-        <Button variant="primary" size="md">
+        <Button variant="primary" size="md" onClick={() => toast('Task creation form coming soon')}>
           <Plus className="mr-2 h-4 w-4" />
           New Task
         </Button>
@@ -285,11 +286,15 @@ export default function TasksPage() {
             {filteredTasks.map((task) => (
               <div
                 key={task.id}
-                className="flex items-start gap-4 p-4 hover:bg-slate-50"
+                className="flex items-start gap-4 p-4 hover:bg-slate-50 cursor-pointer"
+                onClick={() => toast(`Task detail page coming soon: ${task.title}`)}
               >
                 <button
                   className="mt-0.5 flex-shrink-0 transition-transform hover:scale-110"
-                  onClick={() => handleStatusToggle(task.id, task.status)}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleStatusToggle(task.id, task.status);
+                  }}
                   disabled={updateStatusMutation.isPending}
                 >
                   {updateStatusMutation.isPending ? (

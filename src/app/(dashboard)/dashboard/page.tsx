@@ -1,6 +1,8 @@
 'use client';
 
 import { useMemo, useCallback } from 'react';
+import { useRouter } from 'next/navigation';
+import toast from 'react-hot-toast';
 
 import {
   Building2,
@@ -292,6 +294,12 @@ function _EmptyStateCard({
 // ============================================================================
 
 export default function DashboardPage() {
+  // ============================================================================
+  // ROUTER FOR NAVIGATION
+  // ============================================================================
+
+  const router = useRouter();
+
   // ============================================================================
   // AUTH - USER DATA FROM CLERK
   // ============================================================================
@@ -1197,31 +1205,49 @@ export default function DashboardPage() {
   // ============================================================================
 
   const handleViewSpacDetails = () => {
-    // TODO: Navigate to SPAC details
+    if (primarySpac?.id) {
+      router.push(`/spacs/${primarySpac.id}`);
+    }
   };
 
   const handleViewPipeline = () => {
-    // TODO: Navigate to pipeline
+    router.push('/pipeline');
   };
 
-  const handleTargetClick = (_targetId: string) => {
-    // TODO: Navigate to target
+  const handleTargetClick = (targetId: string) => {
+    router.push(`/pipeline/${targetId}`);
   };
 
   const handleViewCalendar = () => {
-    // TODO: Navigate to compliance calendar
+    router.push('/compliance');
   };
 
-  const handleDeadlineClick = (_deadlineId: string) => {
-    // TODO: Navigate to deadline
+  const handleDeadlineClick = (deadlineId: string) => {
+    // Parse the deadline ID to determine where to navigate
+    if (deadlineId.startsWith('spac-deadline-')) {
+      const spacId = deadlineId.replace('spac-deadline-', '');
+      router.push(`/spacs/${spacId}`);
+    } else if (deadlineId.startsWith('filing-deadline-')) {
+      const filingId = deadlineId.replace('filing-deadline-', '');
+      router.push(`/filings/${filingId}`);
+    } else if (deadlineId.startsWith('target-close-')) {
+      const targetId = deadlineId.replace('target-close-', '');
+      router.push(`/pipeline/${targetId}`);
+    } else {
+      router.push('/compliance');
+    }
   };
 
   const handleViewAllActivity = () => {
-    // TODO: Navigate to activity feed
+    toast('Activity page coming soon');
   };
 
-  const handleActivityClick = (_activityId: string) => {
-    // TODO: Navigate to activity
+  const handleActivityClick = (activityId: string) => {
+    // Find the activity by ID and navigate based on its relatedItem.href
+    const activity = recentActivities.find(a => a.id === activityId);
+    if (activity?.relatedItem?.href) {
+      router.push(activity.relatedItem.href);
+    }
   };
 
   // AI Insights handlers (TD-013)
@@ -1238,8 +1264,8 @@ export default function DashboardPage() {
   });
 
   const handleViewAllInsights = useCallback(() => {
-    // Navigate to AI insights page (could be /ai or /insights)
-    window.location.href = '/ai';
+    // AI insights dashboard coming soon - for now show toast
+    toast('AI insights dashboard coming soon. View AI scores on the Pipeline page.');
   }, []);
 
   const handleInsightAction = useCallback((insightId: string, action: 'acknowledge' | 'dismiss' | 'resolve') => {
@@ -1255,20 +1281,30 @@ export default function DashboardPage() {
     aiInsightsQuery.refetch();
   }, [aiInsightsQuery]);
 
-  const handleRecentActivityClick = (_activity: any) => {
-    // TODO: Navigate to activity
+  const handleRecentActivityClick = (activity: ActivityItem) => {
+    // Navigate based on activity.relatedItem.href if available
+    if (activity?.relatedItem?.href) {
+      router.push(activity.relatedItem.href);
+    }
   };
 
   const handleViewAllRecentActivity = () => {
-    // TODO: View all recent activity
+    toast('Activity page coming soon');
   };
 
-  const handleUpcomingDeadlineClick = (_deadline: any) => {
-    // TODO: Navigate to deadline
+  const handleUpcomingDeadlineClick = (deadline: DeadlineItem) => {
+    // Navigate to deadline.href if available, otherwise to compliance
+    if (deadline?.href) {
+      router.push(deadline.href);
+    } else if (deadline?.relatedSpac?.href) {
+      router.push(deadline.relatedSpac.href);
+    } else {
+      router.push('/compliance');
+    }
   };
 
   const handleViewAllDeadlines = () => {
-    // TODO: View all deadlines
+    router.push('/compliance');
   };
 
   // ============================================================================

@@ -1,7 +1,5 @@
 'use client';
 
-import { ReactNode } from 'react';
-
 import Link from 'next/link';
 
 import {
@@ -10,13 +8,9 @@ import {
   Upload,
   FileText,
   Building2,
-  Calendar,
   Users,
-  Settings,
   ChevronRight,
   type LucideIcon,
-  BarChart3,
-  ClipboardList,
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/Button';
@@ -132,7 +126,7 @@ export const defaultQuickActions: QuickAction[] = [
     label: 'Add Target',
     description: 'Add a potential acquisition target',
     icon: Target,
-    href: '/targets/new',
+    href: '/pipeline?action=new',
     color: 'teal',
   },
   {
@@ -140,7 +134,7 @@ export const defaultQuickActions: QuickAction[] = [
     label: 'Upload Document',
     description: 'Upload files to the document library',
     icon: Upload,
-    href: '/documents/upload',
+    href: '/documents?action=upload',
     color: 'blue',
   },
   {
@@ -148,37 +142,13 @@ export const defaultQuickActions: QuickAction[] = [
     label: 'Create Filing',
     description: 'Prepare an SEC filing',
     icon: FileText,
-    href: '/filings/new',
+    href: '/filings?action=create',
     color: 'purple',
   },
 ];
 
 export const extendedQuickActions: QuickAction[] = [
   ...defaultQuickActions,
-  {
-    id: 'schedule-meeting',
-    label: 'Schedule Meeting',
-    description: 'Set up a new meeting',
-    icon: Calendar,
-    href: '/calendar/new',
-    color: 'warning',
-  },
-  {
-    id: 'create-task',
-    label: 'Create Task',
-    description: 'Add a new task',
-    icon: ClipboardList,
-    href: '/tasks/new',
-    color: 'success',
-  },
-  {
-    id: 'view-reports',
-    label: 'View Reports',
-    description: 'Access analytics and reports',
-    icon: BarChart3,
-    href: '/reports',
-    color: 'default',
-  },
   {
     id: 'team-settings',
     label: 'Team Settings',
