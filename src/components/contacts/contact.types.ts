@@ -45,8 +45,8 @@ export interface ExtendedContact {
   firstName: string;
   lastName: string;
   title: string;
-  company: string;
-  companyId: string;
+  organizationId?: string | null;
+  organization?: { id: string; name: string } | null;
   category: ContactCategory;
   email: string;
   phone: string;
@@ -69,23 +69,11 @@ export interface ExtendedContact {
   createdAt: string;
 }
 
-export interface Company {
+// Organization type - for contacts linked to organizations
+// Full Organization type is in the Prisma schema
+export interface ContactOrganization {
   id: string;
   name: string;
-  logo?: string;
-  industry: string;
-  type: string;
-  website: string;
-  address: string;
-  city: string;
-  state: string;
-  country: string;
-  employeeCount?: number;
-  foundedYear?: number;
-  description: string;
-  contactIds: string[];
-  dealHistory: { dealName: string; role: string; year: number; outcome: string }[];
-  news: { title: string; date: string; source: string; url: string }[];
 }
 
 export const contactCategories: ContactCategory[] = [

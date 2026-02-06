@@ -115,7 +115,7 @@ export function ContactCard({
               </p>
             </div>
             <p className="text-sm text-slate-500 truncate">{contact.title}</p>
-            <p className="text-sm text-slate-400 truncate">{contact.company}</p>
+            <p className="text-sm text-slate-400 truncate">{contact.organization?.name}</p>
           </div>
           <div className="flex flex-col items-end gap-1">
             <Badge size="sm" className={getCategoryColor(contact.category)}>
@@ -161,10 +161,12 @@ export function ContactCard({
                 {contact.firstName} {contact.lastName}
               </h3>
               <p className="text-sm text-slate-600">{contact.title}</p>
-              <div className="flex items-center gap-1 mt-1 text-sm text-slate-500">
-                <Building className="h-3.5 w-3.5" />
-                <span>{contact.company}</span>
-              </div>
+              {contact.organization?.name && (
+                <div className="flex items-center gap-1 mt-1 text-sm text-slate-500">
+                  <Building className="h-3.5 w-3.5" />
+                  <span>{contact.organization.name}</span>
+                </div>
+              )}
             </div>
           </div>
           <div className="flex items-center gap-1">

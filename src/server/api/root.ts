@@ -7,7 +7,7 @@ import { activityRouter } from './routers/activity.router';
 import { aiRouter } from './routers/ai.router';
 import { alertRouter } from './routers/alert.router';
 import { calendarRouter } from './routers/calendar.router';
-import { companyRouter } from './routers/company.router';
+// companyRouter removed in Sprint 12.5 - use organizationRouter instead
 import { complianceRouter } from './routers/compliance.router';
 import { contactRouter } from './routers/contact.router';
 import { coverageRouter } from './routers/coverage.router';
@@ -50,7 +50,7 @@ export const appRouter = createTRPCRouter({
   ai: aiRouter,
   alert: alertRouter,
   calendar: calendarRouter,
-  company: companyRouter,
+  // company router removed - use organization router for all company-like entities
   compliance: complianceRouter,
   contact: contactRouter,
   coverage: coverageRouter,

@@ -5,7 +5,6 @@ export { ContactCard } from './ContactCard';
 export { ContactDetailModal } from './ContactDetailModal';
 export { RelationshipGraph } from './RelationshipGraph';
 export { InteractionLog } from './InteractionLog';
-export { CompanyProfile } from './CompanyProfile';
 export { AddContactForm } from './AddContactForm';
 
 // Export types from dedicated types file
@@ -20,5 +19,5 @@ export type {
   ContactNote,
   LinkedDeal,
   ExtendedContact,
-  Company,
+  ContactOrganization,
 } from './contact.types';

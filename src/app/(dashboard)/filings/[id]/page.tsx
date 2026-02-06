@@ -365,8 +365,8 @@ export default function FilingDetailPage() {
         id: r.id,
         name: r.name || r.email || 'Unknown',
         email: r.email || '',
-        reviewStatus: r.status === 'approved' ? 'APPROVED' as const :
-                      r.status === 'changes_requested' ? 'CHANGES_REQUESTED' as const : 'PENDING' as const,
+        reviewStatus: r.status === 'APPROVED' ? 'APPROVED' as const :
+                      r.status === 'CHANGES_REQUESTED' ? 'CHANGES_REQUESTED' as const : 'PENDING' as const,
         reviewedAt: r.reviewedAt ? new Date(r.reviewedAt) : undefined,
         comments: r.comments || undefined,
       })),
@@ -398,8 +398,8 @@ export default function FilingDetailPage() {
       workflowSteps: (workflowQuery.data || []).map((step) => ({
         id: step.id,
         name: step.name,
-        status: step.status === 'completed' ? 'COMPLETE' as const :
-                step.status === 'in_progress' ? 'CURRENT' as const : 'PENDING' as const,
+        status: step.status === 'COMPLETED' ? 'COMPLETE' as const :
+                step.status === 'IN_PROGRESS' ? 'CURRENT' as const : 'PENDING' as const,
         completedAt: step.completedAt ? new Date(step.completedAt) : undefined,
         completedBy: step.completedById || undefined,
         notes: step.description || undefined,

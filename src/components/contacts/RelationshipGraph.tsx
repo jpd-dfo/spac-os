@@ -54,17 +54,18 @@ const categoryColors: Record<ContactCategory, { bg: string; border: string; text
 function generateLinks(contacts: ExtendedContact[]): Link[] {
   const links: Link[] = [];
 
-  // Generate links based on same company
-  const companyGroups = new Map<string, string[]>();
+  // Generate links based on same organization
+  const orgGroups = new Map<string, string[]>();
   contacts.forEach((c) => {
-    if (c.company) {
-      const existing = companyGroups.get(c.company) || [];
+    const orgName = c.organization?.name;
+    if (orgName) {
+      const existing = orgGroups.get(orgName) || [];
       existing.push(c.id);
-      companyGroups.set(c.company, existing);
+      orgGroups.set(orgName, existing);
     }
   });
 
-  companyGroups.forEach((ids) => {
+  orgGroups.forEach((ids) => {
     for (let i = 0; i < ids.length; i++) {
       for (let j = i + 1; j < ids.length; j++) {
         const sourceId = ids[i];
@@ -403,13 +404,13 @@ export function RelationshipGraph({
 
       const name = `${hoveredNode.contact.firstName} ${hoveredNode.contact.lastName}`;
       const title = hoveredNode.contact.title;
-      const company = hoveredNode.contact.company;
+      const orgName = hoveredNode.contact.organization?.name || '';
       const score = `Score: ${hoveredNode.contact.relationshipScore}`;
 
       const maxWidth = Math.max(
         ctx.measureText(name).width,
         ctx.measureText(title).width,
-        ctx.measureText(company).width,
+        ctx.measureText(orgName).width,
         ctx.measureText(score).width
       );
 
@@ -433,7 +434,7 @@ export function RelationshipGraph({
       ctx.fillStyle = '#94A3B8';
       ctx.font = '11px Inter, system-ui, sans-serif';
       ctx.fillText(title, tooltipX + 10, tooltipY + 35);
-      ctx.fillText(company, tooltipX + 10, tooltipY + 50);
+      ctx.fillText(orgName, tooltipX + 10, tooltipY + 50);
 
       const scoreColor =
         hoveredNode.contact.relationshipScore >= 80

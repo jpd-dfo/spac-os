@@ -1035,7 +1035,7 @@ export default function DashboardPage() {
           id: `interaction-${interaction.id}`,
           type: interactionTypeMap[interaction.type] || 'NOTE',
           title: interaction.subject || `${interaction.type.toLowerCase()} with ${contactName}`,
-          description: interaction.outcome || interaction.contact?.company || undefined,
+          description: interaction.outcome || interaction.contact?.organization?.name || undefined,
           timestamp: interaction.date,
           user: interaction.createdBy ? {
             name: interaction.createdBy.name || 'Team Member',

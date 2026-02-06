@@ -124,10 +124,12 @@ export function ContactDetailModal({
                   <Badge className={getCategoryColor(contact.category)}>{contact.category}</Badge>
                 </div>
                 <p className="text-slate-600 mt-1">{contact.title}</p>
-                <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
-                  <Building className="h-4 w-4" />
-                  <span>{contact.company}</span>
-                </div>
+                {contact.organization?.name && (
+                  <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
+                    <Building className="h-4 w-4" />
+                    <span>{contact.organization.name}</span>
+                  </div>
+                )}
 
                 {/* Relationship Score */}
                 <div className="flex items-center gap-3 mt-3">

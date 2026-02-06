@@ -523,12 +523,12 @@ export default function SPACsPage() {
 
                       {/* Deadline Column */}
                       <TableCell className="hidden sm:table-cell">
-                        {spac.deadline ? (
+                        {spac.deadlineDate ? (
                           <div className={cn(
                             isUrgent && 'text-warning-600',
                             isExpired && 'text-danger-600'
                           )}>
-                            <p className="text-sm">{formatDate(spac.deadline)}</p>
+                            <p className="text-sm">{formatDate(spac.deadlineDate)}</p>
                             <p className="text-xs text-slate-500">
                               {days !== null && days > 0
                                 ? `${days} days left`

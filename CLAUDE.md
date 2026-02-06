@@ -68,16 +68,15 @@ Required in `.env.local`:
 Core models in Prisma:
 - `User` - Clerk-synced users
 - `Spac` - SPAC entities with lifecycle tracking
-- `Organization` - PE firms, IBs, Target Companies, and ecosystem entities (Sprint 10-12)
+- `Organization` - All company entities: PE firms, IBs, Target Companies, Law Firms, etc. (Sprint 10-12.5)
 - `OwnershipStake` - Portfolio/target ownership tracking (Sprint 10, 12)
 - `IBMandate` - IB mandate tracking for deal flow (Sprint 11)
 - `IBCoverage` - IB sector/industry coverage (Sprint 11)
 - `TargetFitScore` - AI-powered deal fit scoring against SPAC criteria (Sprint 12)
-- `Contact` - CRM contacts with organization links
-- `Company` - CRM companies
+- `Contact` - CRM contacts with organization links (organizationId only, companyId removed Sprint 12.5)
 - `Document` - Uploaded files and analysis
 - `ActivityFeed` - Unified activity timeline (Sprint 10)
-- `Filing` - SEC filings with workflow and review tracking
+- `Filing` - SEC filings with workflow and review tracking (consolidated from SecFiling Sprint 12.5)
 
 ### Deployment
 - **Vercel** - Auto-deploys from `main` branch
@@ -88,6 +87,16 @@ Core models in Prisma:
 - ✅ Sprints 1-10: Complete (Foundation through PE Firm Management)
 - ✅ Sprint 11: Complete (IB Firm Management, Mandate Tracking, Dashboard Real Data)
 - ✅ Sprint 12: Complete (Target Company Management, Ownership Intelligence, Deal Fit Scoring)
+- ✅ Sprint 12.5: Complete (Architecture Cleanup - Company/Organization consolidation)
+
+### Sprint 12.5 Changes (Architecture Cleanup)
+- **Removed**: Company model, CompanyDeal model, SecFiling model (consolidated into Organization and Filing)
+- **Removed**: Contact.company and Contact.companyId fields - use organizationId instead
+- **Removed**: Spac.deadline field - use deadlineDate instead
+- **Added**: OrganizationType.CONSULTING_FIRM and OrganizationType.GENERAL enum values
+- **Added**: Status enums: MeetingAttendeeStatus, BoardMeetingStatus, FilingWorkflowStepStatus, FilingReviewerStatus
+- **UI**: Sidebar renamed "Organizations" → "Companies" (still routes to /organizations)
+- **Seed**: Updated to use Organizations instead of Companies
 
 ### Sprint 12 Routes (Target Company Management)
 - `/organizations` - PE firms, IBs, Target Companies, and ecosystem entities list

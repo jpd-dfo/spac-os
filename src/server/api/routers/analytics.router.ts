@@ -306,16 +306,16 @@ export const analyticsRouter = createTRPCRouter({
               organizationId,
               deletedAt: null,
               status: { in: ['SEARCHING', 'LOI_SIGNED'] },
-              deadline: { gte: new Date(), lte: cutoffDate },
+              deadlineDate: { gte: new Date(), lte: cutoffDate },
             },
             select: {
               id: true,
               name: true,
               ticker: true,
-              deadline: true,
+              deadlineDate: true,
               status: true,
             },
-            orderBy: { deadline: 'asc' },
+            orderBy: { deadlineDate: 'asc' },
           }),
 
           // Task deadlines

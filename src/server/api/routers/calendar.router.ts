@@ -20,7 +20,8 @@ import {
 // SCHEMAS
 // ============================================================================
 
-const AttendeeStatusSchema = z.enum(['accepted', 'declined', 'pending', 'tentative']);
+// Sprint 12.5: Updated to match MeetingAttendeeStatus enum (uppercase)
+const AttendeeStatusSchema = z.enum(['ACCEPTED', 'DECLINED', 'PENDING']);
 
 const MeetingCreateSchema = z.object({
   title: z.string().min(1).max(255),
@@ -707,7 +708,10 @@ export const calendarRouter = createTRPCRouter({
                   lastName: true,
                   email: true,
                   phone: true,
-                  company: true,
+                  organizationId: true,
+                  organization: {
+                    select: { id: true, name: true },
+                  },
                   title: true,
                   avatarUrl: true,
                 },
@@ -760,7 +764,7 @@ export const calendarRouter = createTRPCRouter({
             contactId: a.contactId,
             userId: a.userId,
             email: a.email,
-            status: 'pending',
+            status: 'PENDING' as const,
           }));
 
         if (attendeeData.length > 0) {
@@ -931,7 +935,7 @@ export const calendarRouter = createTRPCRouter({
       contactId: UuidSchema.optional(),
       userId: UuidSchema.optional(),
       email: z.string().email().optional(),
-      status: AttendeeStatusSchema.default('pending'),
+      status: AttendeeStatusSchema.default('PENDING'),
     }).refine(
       (data) => data.contactId || data.userId || data.email,
       { message: 'Must provide contactId, userId, or email' }

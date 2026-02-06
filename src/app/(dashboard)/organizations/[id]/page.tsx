@@ -2314,7 +2314,7 @@ export default function OrganizationDetailPage() {
       {/* ================================================================== */}
       {/* TABS */}
       {/* ================================================================== */}
-      <Tabs defaultValue="overview" onValueChange={(v) => setActiveTab(v as TabType)}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
         <TabsList variant="default" aria-label="Organization Details">
           {tabs.map((tab) => {
             const Icon = tab.icon;

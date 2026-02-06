@@ -227,7 +227,7 @@ export const complianceRouter = createTRPCRouter({
     .input(z.object({
       spacId: UuidSchema.optional(),
       type: z.string().optional(),
-      status: z.string().optional(),
+      status: z.enum(['SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']).optional(),
       scheduledAfter: z.coerce.date().optional(),
       scheduledBefore: z.coerce.date().optional(),
       ...PaginationSchema.shape,
@@ -294,7 +294,7 @@ export const complianceRouter = createTRPCRouter({
   boardMeetings_updateStatus: orgAuditedProcedure
     .input(z.object({
       id: UuidSchema,
-      status: z.enum(['scheduled', 'in_progress', 'completed', 'cancelled']),
+      status: z.enum(['SCHEDULED', 'IN_PROGRESS', 'COMPLETED', 'CANCELLED']),
       actualDate: z.coerce.date().optional(),
       quorumMet: z.boolean().optional(),
     }))
@@ -305,7 +305,7 @@ export const complianceRouter = createTRPCRouter({
         where: { id },
         data: {
           status,
-          actualDate: actualDate || (status === 'completed' ? new Date() : undefined),
+          actualDate: actualDate || (status === 'COMPLETED' ? new Date() : undefined),
           quorumMet,
         },
       });
@@ -352,7 +352,7 @@ export const complianceRouter = createTRPCRouter({
       cutoffDate.setDate(cutoffDate.getDate() + input.days);
 
       const where: Prisma.BoardMeetingWhereInput = {
-        status: 'scheduled',
+        status: 'SCHEDULED',
         scheduledDate: {
           gte: new Date(),
           lte: cutoffDate,

@@ -105,13 +105,7 @@ enum DocumentStatus {
   ARCHIVED
 }
 
-enum SecFilingStatus {
-  DRAFT
-  REVIEW
-  SUBMITTED
-  ACCEPTED
-  AMENDED
-}
+// SecFilingStatus enum removed - SecFiling model deprecated in Sprint 12.5
 
 enum FilingType {
   S1
@@ -285,7 +279,37 @@ enum OrganizationType {
   SERVICE_PROVIDER
   LAW_FIRM
   ACCOUNTING_FIRM
+  CONSULTING_FIRM
+  GENERAL           // General company (contacts' employers, etc.)
   OTHER
+}
+
+// Sprint 12.5 - Status field enums (replacing string fields)
+enum MeetingAttendeeStatus {
+  PENDING
+  ACCEPTED
+  DECLINED
+}
+
+enum BoardMeetingStatus {
+  SCHEDULED
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum FilingWorkflowStepStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  SKIPPED
+}
+
+enum FilingReviewerStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  CHANGES_REQUESTED
 }
 
 enum OrganizationSubType {
@@ -447,8 +471,7 @@ model Spac {
 
   // Key Dates
   ipoDate           DateTime?
-  deadline          DateTime?
-  deadlineDate      DateTime?
+  deadlineDate      DateTime?      // SPAC deadline for completing business combination
   extensionDeadline DateTime?
   daAnnouncedDate   DateTime?
   proxyFiledDate    DateTime?
@@ -481,7 +504,6 @@ model Spac {
   targets          Target[]
   documents        Document[]
   filings          Filing[]
-  secFilings       SecFiling[]
   financials       Financial[]
   tasks            Task[]
   trustAccounts    TrustAccount[]
@@ -666,27 +688,7 @@ model Document {
   @@map("documents")
 }
 
-/// SEC Filing - SEC filings and regulatory documents (legacy model)
-model SecFiling {
-  id         String          @id @default(cuid())
-  formType   String
-  filingDate DateTime?
-  dueDate    DateTime?
-  status     SecFilingStatus @default(DRAFT)
-  edgarUrl   String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  spacId String
-  spac   Spac   @relation(fields: [spacId], references: [id])
-
-  @@index([spacId])
-  @@map("sec_filings")
-}
-
-/// Filing - Enhanced SEC filing management
+/// Filing - SEC filing management (consolidated from legacy SecFiling)
 model Filing {
   id          String       @id @default(cuid())
   type        FilingType
@@ -812,8 +814,6 @@ model Contact {
   email             String?
   phone             String?
   mobile            String?
-  company           String?       // Legacy field - prefer companyId
-  companyId         String?
   title             String?
   type              ContactType   @default(OTHER)
   status            ContactStatus @default(ACTIVE)
@@ -832,7 +832,7 @@ model Contact {
   lastInteractionAt DateTime?
   ownerId           String?
 
-  // Sprint 10 - Organization link and relationship fields
+  // Organization link (Sprint 12.5 - consolidated from legacy companyId)
   organizationId       String?
   seniorityLevel       SeniorityLevel?
   relationshipStrength RelationshipStrength @default(COLD)
@@ -842,7 +842,6 @@ model Contact {
   updatedAt DateTime @updatedAt
 
   // Relations
-  companyRef    Company?          @relation(fields: [companyId], references: [id])
   owner         User?             @relation("ContactOwner", fields: [ownerId], references: [id])
   organization  Organization?     @relation("OrganizationContacts", fields: [organizationId], references: [id])
   targets       TargetContact[]
@@ -857,7 +856,6 @@ model Contact {
   coverageAreas IBCoverage[]      @relation("CoverageContacts")
 
   @@index([email])
-  @@index([companyId])
   @@index([ownerId])
   @@index([status])
   @@index([organizationId])
@@ -865,47 +863,9 @@ model Contact {
   @@map("contacts")
 }
 
-/// Company - Organizations that contacts belong to
-model Company {
-  id           String  @id @default(cuid())
-  name         String
-  industry     String?
-  website      String?
-  description  String? @db.Text
-  type         String? // "Investment Bank", "Law Firm", "Target", etc.
-  size         String? // "1-50", "51-200", etc.
-  headquarters String?
-  foundedYear  Int?
-  logoUrl      String?
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
-  // Relations
-  contacts Contact[]
-  deals    CompanyDeal[]
-
-  @@index([name])
-  @@map("companies")
-}
-
-/// CompanyDeal - Deal history for companies
-model CompanyDeal {
-  id        String    @id @default(cuid())
-  companyId String
-  dealName  String
-  role      String    // "Lead Advisor", "Co-Counsel", etc.
-  status    String    // "Won", "Lost", "In Progress"
-  value     Decimal?  @db.Decimal(18, 2)
-  closedAt  DateTime?
-
-  createdAt DateTime @default(now())
-
-  company Company @relation(fields: [companyId], references: [id], onDelete: Cascade)
-
-  @@index([companyId])
-  @@map("company_deals")
-}
+// Company and CompanyDeal models removed in Sprint 12.5
+// All company data consolidated into Organization model
+// Use Organization with appropriate type (PE_FIRM, IB, TARGET_COMPANY, GENERAL, etc.)
 
 /// Interaction - Activity log for contact interactions
 model Interaction {
@@ -972,12 +932,12 @@ model Meeting {
 
 /// MeetingAttendee - Meeting attendees junction table
 model MeetingAttendee {
-  id        String  @id @default(cuid())
+  id        String                @id @default(cuid())
   meetingId String
   contactId String?
   userId    String?
   email     String?
-  status    String  @default("pending") // "accepted", "declined", "pending"
+  status    MeetingAttendeeStatus @default(PENDING)
 
   meeting Meeting  @relation(fields: [meetingId], references: [id], onDelete: Cascade)
   contact Contact? @relation(fields: [contactId], references: [id])
@@ -1307,19 +1267,19 @@ model ComplianceItem {
 
 /// BoardMeeting - Board meeting records
 model BoardMeeting {
-  id             String    @id @default(cuid())
+  id             String             @id @default(cuid())
   title          String
-  type           String // REGULAR, SPECIAL, UNANIMOUS_CONSENT
-  status         String    @default("scheduled") // scheduled, in_progress, completed, cancelled
+  type           String             // REGULAR, SPECIAL, UNANIMOUS_CONSENT
+  status         BoardMeetingStatus @default(SCHEDULED)
   scheduledDate  DateTime
   actualDate     DateTime?
   location       String?
-  agenda         String?   @db.Text
-  minutes        String?   @db.Text
-  attendees      String[]  @default([])
+  agenda         String?            @db.Text
+  minutes        String?            @db.Text
+  attendees      String[]           @default([])
   quorumRequired Int?
   quorumMet      Boolean?
-  resolutions    Json? // Array of resolutions with voting results
+  resolutions    Json?              // Array of resolutions with voting results
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -1653,11 +1613,11 @@ model ComplianceAlert {
 
 /// FilingWorkflowStep - Workflow steps for filing process
 model FilingWorkflowStep {
-  id            String    @id @default(cuid())
+  id            String                   @id @default(cuid())
   filingId      String
   name          String
-  description   String?   @db.Text
-  status        String    @default("pending") // pending, in_progress, completed, skipped
+  description   String?                  @db.Text
+  status        FilingWorkflowStepStatus @default(PENDING)
   order         Int
   dueDate       DateTime?
   completedAt   DateTime?
@@ -1675,14 +1635,14 @@ model FilingWorkflowStep {
 
 /// FilingReviewer - Assigned reviewers for filings
 model FilingReviewer {
-  id         String    @id @default(cuid())
+  id         String               @id @default(cuid())
   filingId   String
   userId     String?
   name       String?
   email      String?
-  role       String // "primary", "secondary", "legal", "external"
-  status     String    @default("pending") // pending, approved, rejected, changes_requested
-  comments   String?   @db.Text
+  role       String               // "primary", "secondary", "legal", "external"
+  status     FilingReviewerStatus @default(PENDING)
+  comments   String?              @db.Text
   reviewedAt DateTime?
 
   createdAt DateTime @default(now())

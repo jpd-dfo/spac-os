@@ -339,7 +339,7 @@ export default function SPACDetailPage() {
   const router = useRouter();
   const params = useParams();
   const id = params['id'] as string;
-  const [_activeTab, setActiveTab] = useState<TabType>('overview');
+  const [activeTab, setActiveTab] = useState<TabType>('overview');
   const [isUploadModalOpen, setIsUploadModalOpen] = useState(false);
 
   // ============================================================================
@@ -701,7 +701,7 @@ export default function SPACDetailPage() {
       {/* ================================================================== */}
       {/* TABS */}
       {/* ================================================================== */}
-      <Tabs defaultValue="overview" onValueChange={(v) => setActiveTab(v as TabType)}>
+      <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as TabType)}>
         <TabsList variant="default" aria-label="SPAC Details">
           {tabs.map((tab) => {
             const Icon = tab.icon;

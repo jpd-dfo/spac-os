@@ -77,9 +77,8 @@ export const interactionRouter = createTRPCRouter({
               firstName: true,
               lastName: true,
               email: true,
-              company: true,
-              companyId: true,
-              companyRef: {
+              organizationId: true,
+              organization: {
                 select: { id: true, name: true },
               },
             },
@@ -153,7 +152,7 @@ export const interactionRouter = createTRPCRouter({
                 firstName: true,
                 lastName: true,
                 email: true,
-                company: true,
+                organizationId: true,
               },
             },
             createdBy: {
@@ -217,7 +216,7 @@ export const interactionRouter = createTRPCRouter({
                 firstName: true,
                 lastName: true,
                 email: true,
-                company: true,
+                organizationId: true,
               },
             },
             createdBy: {
@@ -264,7 +263,10 @@ export const interactionRouter = createTRPCRouter({
               firstName: true,
               lastName: true,
               email: true,
-              company: true,
+              organizationId: true,
+              organization: {
+                select: { id: true, name: true },
+              },
             },
           },
           createdBy: {
@@ -349,9 +351,8 @@ export const interactionRouter = createTRPCRouter({
           firstName: true,
           lastName: true,
           email: true,
-          company: true,
-          companyId: true,
-          companyRef: {
+          organizationId: true,
+          organization: {
             select: { id: true, name: true },
           },
           title: true,
@@ -410,9 +411,8 @@ export const interactionRouter = createTRPCRouter({
               firstName: true,
               lastName: true,
               email: true,
-              company: true,
-              companyId: true,
-              companyRef: {
+              organizationId: true,
+              organization: {
                 select: { id: true, name: true },
               },
               avatarUrl: true,

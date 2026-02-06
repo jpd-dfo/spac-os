@@ -63,14 +63,13 @@ export async function generateAlerts(spacId?: string): Promise<GeneratedAlert[]>
       id: true,
       name: true,
       ticker: true,
-      deadline: true,
       deadlineDate: true,
       extensionDeadline: true,
     },
   });
 
   for (const spac of spacs) {
-    const deadline = spac.extensionDeadline || spac.deadlineDate || spac.deadline;
+    const deadline = spac.extensionDeadline || spac.deadlineDate;
     if (deadline) {
       const daysUntilDeadline = Math.ceil((deadline.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
 

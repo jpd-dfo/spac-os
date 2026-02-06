@@ -222,7 +222,6 @@ export default function ContactsPage() {
         lastName: data.lastName,
         email: data.email || undefined,
         phone: data.phone || undefined,
-        company: data.company || undefined,
         title: data.title || undefined,
         type: data.type,
         notes: data.notes || undefined,
@@ -481,16 +480,16 @@ export default function ContactsPage() {
                     </Badge>
                   </div>
                   <div className="flex items-center gap-4 mt-1 text-sm text-slate-500">
-                    {contact.title && contact.company && (
+                    {contact.title && contact.organization?.name && (
                       <span className="flex items-center gap-1 truncate">
                         <Building className="h-3.5 w-3.5" />
-                        {contact.title} at {contact.company}
+                        {contact.title} at {contact.organization.name}
                       </span>
                     )}
-                    {!contact.title && contact.company && (
+                    {!contact.title && contact.organization?.name && (
                       <span className="flex items-center gap-1 truncate">
                         <Building className="h-3.5 w-3.5" />
-                        {contact.company}
+                        {contact.organization.name}
                       </span>
                     )}
                     {contact.email && (

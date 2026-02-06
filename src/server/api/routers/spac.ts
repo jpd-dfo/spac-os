@@ -298,7 +298,6 @@ export const spacRouter = createTRPCRouter({
           // Dates
           ipoDate: input.ipoDate,
           deadlineDate: input.deadlineDate,
-          deadline: input.deadlineDate, // Also set deadline field
 
           // Extensions
           maxExtensions: input.maxExtensions,

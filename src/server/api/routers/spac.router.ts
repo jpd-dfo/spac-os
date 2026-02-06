@@ -135,7 +135,7 @@ export const spacRouter = createTRPCRouter({
       }
 
       if (deadlineBefore || deadlineAfter) {
-        where.deadline = {
+        where.deadlineDate = {
           ...(deadlineBefore && { lte: deadlineBefore }),
           ...(deadlineAfter && { gte: deadlineAfter }),
         };
@@ -385,7 +385,7 @@ export const spacRouter = createTRPCRouter({
       const where: Prisma.SpacWhereInput = {
         deletedAt: null,
         status: { in: ['SEARCHING', 'LOI_SIGNED'] },
-        deadline: {
+        deadlineDate: {
           lte: cutoffDate,
           gte: new Date(),
         },
@@ -394,7 +394,7 @@ export const spacRouter = createTRPCRouter({
 
       return ctx.db.spac.findMany({
         where,
-        orderBy: { deadline: 'asc' },
+        orderBy: { deadlineDate: 'asc' },
         include: {
           sponsors: {
             where: { isPrimary: true },
@@ -418,7 +418,7 @@ export const spacRouter = createTRPCRouter({
         where: { id: input.id },
         select: {
           ipoDate: true,
-          deadline: true,
+          deadlineDate: true,
           daAnnouncedDate: true,
           proxyFiledDate: true,
           voteDate: true,
@@ -503,12 +503,12 @@ export const spacRouter = createTRPCRouter({
         });
       }
 
-      if (spac.deadline) {
+      if (spac.deadlineDate) {
         events.push({
-          date: spac.deadline,
+          date: spac.deadlineDate,
           type: 'deadline',
           title: 'SPAC Deadline',
-          status: spac.deadline < now ? 'past' : 'future',
+          status: spac.deadlineDate < now ? 'past' : 'future',
         });
       }
 
@@ -629,7 +629,7 @@ export const spacRouter = createTRPCRouter({
           ticker: true,
           status: true,
           phase: true,
-          deadline: true,
+          deadlineDate: true,
           ipoSize: true,
           trustBalance: true,
           targets: {
@@ -678,7 +678,7 @@ export const spacRouter = createTRPCRouter({
         });
       }
 
-      if (!spac.deadline) {
+      if (!spac.deadlineDate) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: 'SPAC does not have a deadline set',
@@ -692,13 +692,12 @@ export const spacRouter = createTRPCRouter({
         });
       }
 
-      const newDeadline = new Date(spac.deadline);
+      const newDeadline = new Date(spac.deadlineDate);
       newDeadline.setMonth(newDeadline.getMonth() + input.months);
 
       const updated = await ctx.db.spac.update({
         where: { id: input.id },
         data: {
-          deadline: newDeadline,
           deadlineDate: newDeadline,
           extensionDeadline: newDeadline,
           extensionsUsed: { increment: 1 },

@@ -853,7 +853,7 @@ export const filingRouter = createTRPCRouter({
   updateWorkflowStep: orgAuditedProcedure
     .input(z.object({
       stepId: UuidSchema,
-      status: z.enum(['pending', 'in_progress', 'completed', 'skipped']),
+      status: z.enum(['PENDING', 'IN_PROGRESS', 'COMPLETED', 'SKIPPED']),
       completedById: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -861,7 +861,7 @@ export const filingRouter = createTRPCRouter({
         where: { id: input.stepId },
         data: {
           status: input.status,
-          completedAt: input.status === 'completed' ? new Date() : null,
+          completedAt: input.status === 'COMPLETED' ? new Date() : null,
           completedById: input.completedById,
         },
       });
@@ -900,7 +900,7 @@ export const filingRouter = createTRPCRouter({
           name: input.name,
           email: input.email,
           role: input.role,
-          status: 'pending',
+          status: 'PENDING',
         },
       });
       return reviewer;
@@ -912,7 +912,7 @@ export const filingRouter = createTRPCRouter({
   updateReviewerStatus: orgAuditedProcedure
     .input(z.object({
       reviewerId: UuidSchema,
-      status: z.enum(['pending', 'approved', 'rejected', 'changes_requested']),
+      status: z.enum(['PENDING', 'APPROVED', 'REJECTED', 'CHANGES_REQUESTED']),
       comments: z.string().optional(),
     }))
     .mutation(async ({ ctx, input }) => {
@@ -921,7 +921,7 @@ export const filingRouter = createTRPCRouter({
         data: {
           status: input.status,
           comments: input.comments,
-          reviewedAt: ['approved', 'rejected', 'changes_requested'].includes(input.status) ? new Date() : null,
+          reviewedAt: input.status !== 'PENDING' ? new Date() : null,
         },
       });
       return reviewer;

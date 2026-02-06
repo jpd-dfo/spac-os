@@ -50,8 +50,7 @@ const navigation: NavSection[] = [
     items: [
       { name: 'SPACs', href: '/spacs', icon: Building2 },
       { name: 'Pipeline', href: '/pipeline', icon: Target },
-      { name: 'Organizations', href: '/organizations', icon: Landmark },
-      { name: 'Companies', href: '/companies', icon: Briefcase },
+      { name: 'Companies', href: '/organizations', icon: Building2 },
       { name: 'Contacts', href: '/contacts', icon: Users },
       { name: 'Tasks', href: '/tasks', icon: CheckSquare },
       { name: 'Documents', href: '/documents', icon: FolderOpen },

@@ -43,8 +43,6 @@ async function main() {
     await prisma.sponsor.deleteMany({});
     await prisma.targetContact.deleteMany({});
     await prisma.contact.deleteMany({});
-    await prisma.companyDeal.deleteMany({});
-    await prisma.company.deleteMany({});
     await prisma.organizationUser.deleteMany({});
     await prisma.organization.deleteMany({});
     await prisma.user.deleteMany({});
@@ -112,7 +110,6 @@ async function main() {
       trustAmount: 253750000,
       trustBalance: 255500000,
       sharesOutstanding: 25000000n,
-      deadline: new Date('2026-06-15'),
       deadlineDate: new Date('2026-06-15'),
       extensionsUsed: 0,
       maxExtensions: 6,
@@ -217,30 +214,31 @@ async function main() {
   console.log(`✅ Created 3 pipeline targets\n`);
 
   // ============================================================================
-  // Companies (for contact associations)
+  // Service Provider Organizations (for contact associations)
+  // Sprint 12.5: Consolidated Company model into Organization
   // ============================================================================
 
-  console.log('🏢 Creating companies...');
-  const companies = [];
+  console.log('🏢 Creating service provider organizations...');
+  const serviceOrgs = [];
 
-  const companyData = [
-    { name: 'Kirkland & Ellis LLP', industry: 'Legal Services', type: 'Law Firm', headquarters: 'Chicago, IL' },
-    { name: 'Goldman Sachs', industry: 'Investment Banking', type: 'Investment Bank', headquarters: 'New York, NY' },
-    { name: 'Deloitte LLP', industry: 'Professional Services', type: 'Accounting Firm', headquarters: 'London, UK' },
-    { name: 'TechFlow Solutions', industry: 'Technology', type: 'Target', headquarters: 'San Francisco, CA' },
-    { name: 'Fidelity Investments', industry: 'Asset Management', type: 'Institutional Investor', headquarters: 'Boston, MA' },
-    { name: 'Morgan Stanley', industry: 'Investment Banking', type: 'Investment Bank', headquarters: 'New York, NY' },
-    { name: 'Skadden Arps', industry: 'Legal Services', type: 'Law Firm', headquarters: 'New York, NY' },
-    { name: 'BlackRock', industry: 'Asset Management', type: 'Institutional Investor', headquarters: 'New York, NY' },
-    { name: 'PayNext Financial', industry: 'Fintech', type: 'Target', headquarters: 'London, UK' },
-    { name: 'CyberShield Security', industry: 'Cybersecurity', type: 'Target', headquarters: 'Austin, TX' },
+  const serviceOrgData = [
+    { name: 'Kirkland & Ellis LLP', slug: 'kirkland-ellis', type: 'LAW_FIRM' as const, industryFocus: ['Legal Services'], headquarters: 'Chicago, IL' },
+    { name: 'Goldman Sachs', slug: 'goldman-sachs', type: 'IB' as const, industryFocus: ['Investment Banking'], headquarters: 'New York, NY' },
+    { name: 'Deloitte LLP', slug: 'deloitte', type: 'ACCOUNTING_FIRM' as const, industryFocus: ['Professional Services'], headquarters: 'London, UK' },
+    { name: 'TechFlow Solutions', slug: 'techflow-solutions', type: 'TARGET_COMPANY' as const, industryFocus: ['Technology'], headquarters: 'San Francisco, CA' },
+    { name: 'Fidelity Investments', slug: 'fidelity-investments', type: 'PE_FIRM' as const, industryFocus: ['Asset Management'], headquarters: 'Boston, MA' },
+    { name: 'Morgan Stanley', slug: 'morgan-stanley', type: 'IB' as const, industryFocus: ['Investment Banking'], headquarters: 'New York, NY' },
+    { name: 'Skadden Arps', slug: 'skadden-arps', type: 'LAW_FIRM' as const, industryFocus: ['Legal Services'], headquarters: 'New York, NY' },
+    { name: 'BlackRock', slug: 'blackrock', type: 'PE_FIRM' as const, industryFocus: ['Asset Management'], headquarters: 'New York, NY' },
+    { name: 'PayNext Financial', slug: 'paynext-financial', type: 'TARGET_COMPANY' as const, industryFocus: ['Fintech'], headquarters: 'London, UK' },
+    { name: 'CyberShield Security', slug: 'cybershield-security', type: 'TARGET_COMPANY' as const, industryFocus: ['Cybersecurity'], headquarters: 'Austin, TX' },
   ];
 
-  for (const data of companyData) {
-    const company = await prisma.company.create({ data });
-    companies.push(company);
+  for (const data of serviceOrgData) {
+    const org = await prisma.organization.create({ data });
+    serviceOrgs.push(org);
   }
-  console.log(`✅ Created ${companies.length} companies\n`);
+  console.log(`✅ Created ${serviceOrgs.length} service provider organizations\n`);
 
   // ============================================================================
   // Contacts (sequential to avoid connection limits)
@@ -249,27 +247,28 @@ async function main() {
   console.log('📇 Creating contacts...');
   const contacts = [];
 
+  // Sprint 12.5: Updated to use organizationId instead of companyId
   const contactData = [
     // Legal
-    { firstName: 'Michael', lastName: 'Thompson', email: 'mthompson@kirklandellis.com', companyId: companies[0].id, title: 'Partner', type: 'LEGAL' as const, isStarred: true, relationshipScore: 95 },
-    { firstName: 'Emily', lastName: 'Chen', email: 'echen@skadden.com', companyId: companies[6].id, title: 'Partner', type: 'LEGAL' as const, relationshipScore: 75 },
+    { firstName: 'Michael', lastName: 'Thompson', email: 'mthompson@kirklandellis.com', organizationId: serviceOrgs[0].id, title: 'Partner', type: 'LEGAL' as const, isStarred: true, relationshipScore: 95 },
+    { firstName: 'Emily', lastName: 'Chen', email: 'echen@skadden.com', organizationId: serviceOrgs[6].id, title: 'Partner', type: 'LEGAL' as const, relationshipScore: 75 },
     // Banking
-    { firstName: 'Jennifer', lastName: 'Liu', email: 'jennifer.liu@gs.com', companyId: companies[1].id, title: 'Managing Director', type: 'BANKER' as const, isStarred: true, relationshipScore: 90 },
-    { firstName: 'Marcus', lastName: 'Williams', email: 'marcus.williams@ms.com', companyId: companies[5].id, title: 'Managing Director', type: 'BANKER' as const, relationshipScore: 70 },
+    { firstName: 'Jennifer', lastName: 'Liu', email: 'jennifer.liu@gs.com', organizationId: serviceOrgs[1].id, title: 'Managing Director', type: 'BANKER' as const, isStarred: true, relationshipScore: 90 },
+    { firstName: 'Marcus', lastName: 'Williams', email: 'marcus.williams@ms.com', organizationId: serviceOrgs[5].id, title: 'Managing Director', type: 'BANKER' as const, relationshipScore: 70 },
     // Auditors
-    { firstName: 'Robert', lastName: 'Martinez', email: 'robert.martinez@deloitte.com', companyId: companies[2].id, title: 'Partner', type: 'AUDITOR' as const, relationshipScore: 80 },
+    { firstName: 'Robert', lastName: 'Martinez', email: 'robert.martinez@deloitte.com', organizationId: serviceOrgs[2].id, title: 'Partner', type: 'AUDITOR' as const, relationshipScore: 80 },
     // Target Execs
-    { firstName: 'Alex', lastName: 'Rivera', email: 'alex@techflow.io', companyId: companies[3].id, title: 'CEO & Co-Founder', type: 'TARGET_EXEC' as const, isStarred: true, relationshipScore: 85, seniorityLevel: 'C_LEVEL' as const },
-    { firstName: 'Maya', lastName: 'Patel', email: 'maya@techflow.io', companyId: companies[3].id, title: 'CTO & Co-Founder', type: 'TARGET_EXEC' as const, relationshipScore: 70, seniorityLevel: 'C_LEVEL' as const },
-    { firstName: 'James', lastName: 'Wong', email: 'james@techflow.io', companyId: companies[3].id, title: 'CFO', type: 'TARGET_EXEC' as const, isStarred: true, relationshipScore: 80, seniorityLevel: 'C_LEVEL' as const },
-    { firstName: 'John', lastName: 'Smith', email: 'john@paynext.com', companyId: companies[8].id, title: 'CEO', type: 'TARGET_EXEC' as const, relationshipScore: 55, seniorityLevel: 'C_LEVEL' as const },
-    { firstName: 'Rachel', lastName: 'Adams', email: 'rachel@cybershield.io', companyId: companies[9].id, title: 'CEO', type: 'TARGET_EXEC' as const, relationshipScore: 45, seniorityLevel: 'C_LEVEL' as const },
+    { firstName: 'Alex', lastName: 'Rivera', email: 'alex@techflow.io', organizationId: serviceOrgs[3].id, title: 'CEO & Co-Founder', type: 'TARGET_EXEC' as const, isStarred: true, relationshipScore: 85, seniorityLevel: 'C_LEVEL' as const },
+    { firstName: 'Maya', lastName: 'Patel', email: 'maya@techflow.io', organizationId: serviceOrgs[3].id, title: 'CTO & Co-Founder', type: 'TARGET_EXEC' as const, relationshipScore: 70, seniorityLevel: 'C_LEVEL' as const },
+    { firstName: 'James', lastName: 'Wong', email: 'james@techflow.io', organizationId: serviceOrgs[3].id, title: 'CFO', type: 'TARGET_EXEC' as const, isStarred: true, relationshipScore: 80, seniorityLevel: 'C_LEVEL' as const },
+    { firstName: 'John', lastName: 'Smith', email: 'john@paynext.com', organizationId: serviceOrgs[8].id, title: 'CEO', type: 'TARGET_EXEC' as const, relationshipScore: 55, seniorityLevel: 'C_LEVEL' as const },
+    { firstName: 'Rachel', lastName: 'Adams', email: 'rachel@cybershield.io', organizationId: serviceOrgs[9].id, title: 'CEO', type: 'TARGET_EXEC' as const, relationshipScore: 45, seniorityLevel: 'C_LEVEL' as const },
     // Investors
-    { firstName: 'Sarah', lastName: 'Williams', email: 'swilliams@fidelity.com', companyId: companies[4].id, title: 'Portfolio Manager', type: 'INVESTOR' as const, isStarred: true, relationshipScore: 85 },
-    { firstName: 'Thomas', lastName: 'Anderson', email: 'tanderson@blackrock.com', companyId: companies[7].id, title: 'Managing Director', type: 'INVESTOR' as const, relationshipScore: 70 },
-    // Board
+    { firstName: 'Sarah', lastName: 'Williams', email: 'swilliams@fidelity.com', organizationId: serviceOrgs[4].id, title: 'Portfolio Manager', type: 'INVESTOR' as const, isStarred: true, relationshipScore: 85 },
+    { firstName: 'Thomas', lastName: 'Anderson', email: 'tanderson@blackrock.com', organizationId: serviceOrgs[7].id, title: 'Managing Director', type: 'INVESTOR' as const, relationshipScore: 70 },
+    // Board (no organization - independent)
     { firstName: 'William', lastName: 'Harrison', email: 'wharrison@email.com', title: 'Independent Director', type: 'BOARD_MEMBER' as const, isStarred: true, relationshipScore: 90 },
-    // Advisors
+    // Advisors (no organization - independent)
     { firstName: 'Patricia', lastName: 'Gonzalez', email: 'pgonzalez@mckinsey.com', title: 'Partner', type: 'ADVISOR' as const, relationshipScore: 65 },
   ];
 
@@ -277,7 +276,6 @@ async function main() {
     const contact = await prisma.contact.create({
       data: {
         ...data,
-        company: data.companyId ? undefined : 'Independent',
         status: 'ACTIVE',
         relationshipStrength: data.relationshipScore >= 80 ? 'HOT' : data.relationshipScore >= 60 ? 'WARM' : 'COLD',
         ownerId: user.id,
@@ -551,12 +549,13 @@ async function main() {
   // ============================================================================
 
   console.log('📝 Creating filing workflow data...');
+  // Sprint 12.5: Updated to use FilingWorkflowStepStatus enum
   const workflowSteps = [
-    { name: 'Initial Draft', order: 1, status: 'completed' },
-    { name: 'Internal Review', order: 2, status: 'completed' },
-    { name: 'External Legal Review', order: 3, status: 'completed' },
-    { name: 'Board Approval', order: 4, status: 'in_progress' },
-    { name: 'File with SEC', order: 5, status: 'pending' },
+    { name: 'Initial Draft', order: 1, status: 'COMPLETED' as const },
+    { name: 'Internal Review', order: 2, status: 'COMPLETED' as const },
+    { name: 'External Legal Review', order: 3, status: 'COMPLETED' as const },
+    { name: 'Board Approval', order: 4, status: 'IN_PROGRESS' as const },
+    { name: 'File with SEC', order: 5, status: 'PENDING' as const },
   ];
 
   for (const step of workflowSteps) {
@@ -566,14 +565,15 @@ async function main() {
         name: step.name,
         order: step.order,
         status: step.status,
-        completedAt: step.status === 'completed' ? new Date(Date.now() - (5 - step.order) * 7 * 24 * 60 * 60 * 1000) : null,
+        completedAt: step.status === 'COMPLETED' ? new Date(Date.now() - (5 - step.order) * 7 * 24 * 60 * 60 * 1000) : null,
       },
     });
   }
 
+  // Sprint 12.5: Updated to use FilingReviewerStatus enum
   const reviewers = [
-    { name: 'John Smith', email: 'john@example.com', role: 'primary', status: 'approved' },
-    { name: 'Sarah Johnson', email: 'sarah@example.com', role: 'legal', status: 'approved' },
+    { name: 'John Smith', email: 'john@example.com', role: 'primary', status: 'APPROVED' as const },
+    { name: 'Sarah Johnson', email: 'sarah@example.com', role: 'legal', status: 'APPROVED' as const },
   ];
 
   for (const r of reviewers) {
@@ -581,7 +581,7 @@ async function main() {
       data: {
         filingId: filing.id,
         ...r,
-        reviewedAt: r.status === 'approved' ? new Date() : null,
+        reviewedAt: r.status === 'APPROVED' ? new Date() : null,
       },
     });
   }
@@ -600,7 +600,7 @@ async function main() {
   console.log(`  - SPAC: ${spac.ticker} - ${spac.name}`);
   console.log(`  - Sponsor: ${sponsor.name}`);
   console.log(`  - Pipeline Targets: 3`);
-  console.log(`  - Companies: ${companies.length}`);
+  console.log(`  - Service Provider Orgs: ${serviceOrgs.length}`);
   console.log(`  - Contacts: ${contacts.length + targetExecData.length}`);
   console.log(`  - PE Firms: 3`);
   console.log(`  - Target Companies: ${targetCompanies.length}`);

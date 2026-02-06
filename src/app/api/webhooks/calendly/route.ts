@@ -110,7 +110,7 @@ export async function POST(request: NextRequest) {
             create: {
               contactId: contact?.id,
               email: invitee.email,
-              status: 'accepted',
+              status: 'ACCEPTED',
             },
           },
         },
@@ -162,7 +162,7 @@ export async function POST(request: NextRequest) {
             meetingId: meeting.id,
             email: invitee.email,
           },
-          data: { status: 'canceled' },
+          data: { status: 'DECLINED' },
         });
 
         logger.info(`Calendly webhook: Canceled meeting ${meeting.id}`);

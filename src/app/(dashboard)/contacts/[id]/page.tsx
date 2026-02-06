@@ -529,7 +529,7 @@ interface EditContactModalProps {
     email: string | null;
     phone: string | null;
     mobile: string | null;
-    company: string | null;
+    organization?: { id: string; name: string } | null;
     title: string | null;
     linkedIn: string | null;
     city: string | null;
@@ -548,7 +548,6 @@ function EditContactModal({ isOpen, onClose, contact, onSuccess }: EditContactMo
     email: contact.email || '',
     phone: contact.phone || '',
     mobile: contact.mobile || '',
-    company: contact.company || '',
     title: contact.title || '',
     linkedinUrl: contact.linkedIn || '',
     city: contact.city || '',
@@ -583,7 +582,6 @@ function EditContactModal({ isOpen, onClose, contact, onSuccess }: EditContactMo
         email: formData.email.trim() || undefined,
         phone: formData.phone.trim() || undefined,
         mobile: formData.mobile.trim() || undefined,
-        company: formData.company.trim() || undefined,
         title: formData.title.trim() || undefined,
         linkedinUrl: formData.linkedinUrl.trim() || undefined,
         city: formData.city.trim() || undefined,
@@ -648,11 +646,12 @@ function EditContactModal({ isOpen, onClose, contact, onSuccess }: EditContactMo
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-            <Input
-              label="Company"
-              value={formData.company}
-              onChange={(e) => setFormData({ ...formData, company: e.target.value })}
-            />
+            <div>
+              <span className="block text-sm font-medium text-slate-700 mb-1">Company</span>
+              <div className="px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-slate-600">
+                {contact.organization?.name || 'No company assigned'}
+              </div>
+            </div>
             <Input
               label="Title"
               value={formData.title}
@@ -839,7 +838,7 @@ export default function ContactDetailPage() {
                 <p className="text-slate-600">{contact.title || 'No title'}</p>
                 <div className="flex items-center gap-2 mt-1 text-sm text-slate-500">
                   <Building className="h-4 w-4" />
-                  <span>{contact.company || contact.companyRef?.name || 'No company'}</span>
+                  <span>{contact.organization?.name || 'No company'}</span>
                 </div>
               </div>
             </div>

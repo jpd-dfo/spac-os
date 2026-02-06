@@ -81,7 +81,7 @@ const RelationshipStrengthSchema = z.enum([
 const ContactFilterSchema = z.object({
   status: z.array(ContactStatusSchema).optional(),
   type: z.array(ContactTypeSchema).optional(),
-  companyId: UuidSchema.optional(),
+  organizationId: UuidSchema.optional(), // Sprint 12.5 - replaced companyId
   search: z.string().optional(),
   isStarred: z.boolean().optional(),
   ownerId: UuidSchema.optional(),
@@ -109,7 +109,7 @@ export const contactRouter = createTRPCRouter({
       const {
         status,
         type,
-        companyId,
+        organizationId,
         search,
         isStarred,
         ownerId,
@@ -134,9 +134,9 @@ export const contactRouter = createTRPCRouter({
         where.type = { in: type };
       }
 
-      // Filter by company
-      if (companyId) {
-        where.companyId = companyId;
+      // Filter by organization (Sprint 12.5 - replaced companyId)
+      if (organizationId) {
+        where.organizationId = organizationId;
       }
 
       // Filter by starred status
@@ -168,8 +168,8 @@ export const contactRouter = createTRPCRouter({
           { firstName: { contains: search, mode: 'insensitive' } },
           { lastName: { contains: search, mode: 'insensitive' } },
           { email: { contains: search, mode: 'insensitive' } },
-          { company: { contains: search, mode: 'insensitive' } },
           { title: { contains: search, mode: 'insensitive' } },
+          { organization: { name: { contains: search, mode: 'insensitive' } } },
         ];
       }
 
@@ -177,8 +177,8 @@ export const contactRouter = createTRPCRouter({
         ctx.db.contact.findMany({
           where,
           include: {
-            companyRef: {
-              select: { id: true, name: true, industry: true, logoUrl: true },
+            organization: {
+              select: { id: true, name: true, type: true, logoUrl: true },
             },
             owner: {
               select: { id: true, name: true, image: true },
@@ -218,7 +218,7 @@ export const contactRouter = createTRPCRouter({
       const contact = await ctx.db.contact.findUnique({
         where: { id: input.id },
         include: {
-          companyRef: true,
+          organization: true,
           owner: {
             select: { id: true, name: true, email: true, image: true },
           },
@@ -323,7 +323,7 @@ export const contactRouter = createTRPCRouter({
           email: input.email,
           phone: input.phone,
           mobile: input.mobile,
-          company: input.company,
+          // company field removed in Sprint 12.5 - use organizationId instead
           title: input.title,
           type: (input.type as Prisma.ContactCreateInput['type']) ?? 'OTHER',
           status: 'ACTIVE',
@@ -341,7 +341,7 @@ export const contactRouter = createTRPCRouter({
           organizationId,
         },
         include: {
-          companyRef: true,
+          organization: true,
           owner: {
             select: { id: true, name: true, image: true },
           },
@@ -379,7 +379,7 @@ export const contactRouter = createTRPCRouter({
       if (input.data.email !== undefined) { updateData.email = input.data.email; }
       if (input.data.phone !== undefined) { updateData.phone = input.data.phone; }
       if (input.data.mobile !== undefined) { updateData.mobile = input.data.mobile; }
-      if (input.data.company !== undefined) { updateData.company = input.data.company; }
+      // company field removed in Sprint 12.5 - use organizationId via schema input
       if (input.data.title !== undefined) { updateData.title = input.data.title; }
       if (input.data.type !== undefined) { updateData.type = input.data.type as Prisma.ContactUpdateInput['type']; }
       if (input.data.linkedinUrl !== undefined) { updateData.linkedIn = input.data.linkedinUrl; }
@@ -395,7 +395,7 @@ export const contactRouter = createTRPCRouter({
         where: { id: input.id },
         data: updateData,
         include: {
-          companyRef: true,
+          organization: true,
           owner: {
             select: { id: true, name: true, image: true },
           },
@@ -456,7 +456,7 @@ export const contactRouter = createTRPCRouter({
   // ============================================================================
 
   /**
-   * Full-text search across firstName, lastName, email, company name
+   * Full-text search across firstName, lastName, email, organization name
    */
   search: protectedProcedure
     .input(z.object({
@@ -472,9 +472,8 @@ export const contactRouter = createTRPCRouter({
           { firstName: { contains: query, mode: 'insensitive' } },
           { lastName: { contains: query, mode: 'insensitive' } },
           { email: { contains: query, mode: 'insensitive' } },
-          { company: { contains: query, mode: 'insensitive' } },
           {
-            companyRef: {
+            organization: {
               name: { contains: query, mode: 'insensitive' },
             },
           },
@@ -488,7 +487,7 @@ export const contactRouter = createTRPCRouter({
       const contacts = await ctx.db.contact.findMany({
         where,
         include: {
-          companyRef: {
+          organization: {
             select: { id: true, name: true, logoUrl: true },
           },
         },
@@ -504,16 +503,16 @@ export const contactRouter = createTRPCRouter({
     }),
 
   /**
-   * Get contacts by company ID
+   * Get contacts by organization ID (Sprint 12.5 - renamed from getByCompany)
    */
-  getByCompany: protectedProcedure
+  getByOrganization: protectedProcedure
     .input(z.object({
-      companyId: UuidSchema,
+      organizationId: UuidSchema,
       includeArchived: z.boolean().default(false),
     }))
     .query(async ({ ctx, input }) => {
       const where: Prisma.ContactWhereInput = {
-        companyId: input.companyId,
+        organizationId: input.organizationId,
       };
 
       if (!input.includeArchived) {
@@ -1101,7 +1100,7 @@ export const contactRouter = createTRPCRouter({
         orderBy: { relationshipScore: 'desc' },
         take: input.limit,
         include: {
-          companyRef: {
+          organization: {
             select: { id: true, name: true, logoUrl: true },
           },
           _count: {
@@ -1148,7 +1147,7 @@ export const contactRouter = createTRPCRouter({
         ],
         take: input.limit,
         include: {
-          companyRef: {
+          organization: {
             select: { id: true, name: true },
           },
           owner: {
